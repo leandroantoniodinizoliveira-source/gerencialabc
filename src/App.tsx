@@ -28,10 +28,19 @@ import {
   Check,
   AlertTriangle,
   X,
+  Droplets,
   Save,
   FileText,
   Menu,
-  RefreshCw
+  RefreshCw,
+  ListTodo,
+  Search,
+  User,
+  Mail,
+  Briefcase,
+  Calendar,
+  Home,
+  Shield
 } from "lucide-react";
 import {
   LineChart,
@@ -65,10 +74,13 @@ import {
   SupplySource,
   OperationalAdjustment,
   AdjustmentType,
+  Task,
 } from "./types";
 
 import { calculateDemand, formatNumber, formatInteger, cn } from "./lib/utils";
 import { MapTab } from "./components/MapTab";
+import { PlanningTab } from "./components/PlanningTab";
+import { HomeTab } from "./components/HomeTab";
 
 const formatSaldoValue = (val: number, type: 'percent' | 'hab' | 'ls', showSuffix = true) => {
   if (val == null || Number.isNaN(val)) return <span style={{ color: '#94a3b8' }}>-</span>;
@@ -309,9 +321,27 @@ export default function App() {
     const saved = localStorage.getItem("adasa-demands");
     return saved ? JSON.parse(saved) : [INITIAL_DEMAND];
   });
-  const [activeTab, setActiveTab] = useState<"edit" | "compare" | "manage" | "analyze" | "templates">(
-    "analyze",
+  const [activeTab, setActiveTab] = useState<"home" | "edit" | "compare" | "manage" | "analyze" | "templates" | "planning">(
+    "home",
   );
+  const [activePlanningSubTab, setActivePlanningSubTab] = useState<"tasks" | "dashboard" | "plans" | "areas" | "categories" | "responsibles">("dashboard");
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [plans, setPlans] = useState<any[]>([]);
+  const [areas, setAreas] = useState<any[]>([]);
+  const [categories, setCategories] = useState<any[]>([]);
+  const [responsibles, setResponsibles] = useState<any[]>([]);
+  
+  // Task management states
+  const [taskFormOpen, setTaskFormOpen] = useState(false);
+  const [taskFormMode, setTaskFormMode] = useState<"create" | "edit">("create");
+  const [editingTaskData, setEditingTaskData] = useState<any>({});
+  const [taskSearch, setTaskSearch] = useState("");
+  const [taskStatusFilter, setTaskStatusFilter] = useState("");
+  const [taskPriorityFilter, setTaskPriorityFilter] = useState("");
+  const [manageSubTabState, setManageSubTabState] = useState<"tasks" | "responsibles">("tasks");
+  const [responsibleFormOpen, setResponsibleFormOpen] = useState(false);
+  const [editingResponsibleData, setEditingResponsibleData] = useState<any>({});
+
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [manageSubTab, setManageSubTab] = useState<
     "list" | "balance" | "systems" | "demand" | "supply"
@@ -493,6 +523,10 @@ export default function App() {
           if (data.data.operationalAdjustments) setOperationalAdjustments(data.data.operationalAdjustments);
           if (data.data.templateFiles) setTemplateFiles(data.data.templateFiles);
           if (data.data.riskReferences) setRiskReferences(data.data.riskReferences);
+          if (data.data.tasks) setTasks(data.data.tasks);
+          if (data.data.plans) setPlans(data.data.plans);
+          if (data.data.areas) setAreas(data.data.areas);
+          if (data.data.responsibles) setResponsibles(data.data.responsibles);
           
           if (isManualSync) {
             setHasPendingChanges(false);
@@ -514,6 +548,91 @@ export default function App() {
       console.error("Erro ao carregar dados inicias do banco", e);
     } finally {
       setIsDataLoaded(true);
+    }
+  };
+
+  const handleTaskSubmitInApp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const isEdit = taskFormMode === 'edit';
+      const url = isEdit ? `/api/tasks/${editingTaskData.id}` : "/api/tasks";
+      const method = isEdit ? "PUT" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...editingTaskData,
+          progress: editingTaskData.progress ? parseInt(editingTaskData.progress) : 0,
+          planId: editingTaskData.planId ? parseInt(editingTaskData.planId) : null,
+          areaIds: Array.isArray(editingTaskData.areaIds) ? editingTaskData.areaIds.map((id: any) => parseInt(id)) : [],
+          responsibleIds: Array.isArray(editingTaskData.responsibleIds) ? editingTaskData.responsibleIds.map((id: any) => parseInt(id)) : []
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast("Éxito", isEdit ? "Tarefa atualizada com sucesso." : "Tarefa cadastrada com sucesso.", "success");
+        setTaskFormOpen(false);
+        fetchCloudData();
+      } else {
+        showToast("Erro", data.error || "Erro ao salvar tarefa.", "error");
+      }
+    } catch (err: any) {
+      showToast("Erro", "Erro ao conectar ao servidor.", "error");
+    }
+  };
+
+  const handleTaskDeleteInApp = async (id: number) => {
+    try {
+      const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        showToast("Éxito", "Tarefa excluída com sucesso.", "success");
+        fetchCloudData();
+      } else {
+        showToast("Erro", data.error || "Erro ao deletar tarefa.", "error");
+      }
+    } catch (err) {
+      showToast("Erro", "Erro ao conectar ao servidor.", "error");
+    }
+  };
+
+  const handleResponsibleSubmitInApp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      const id = editingResponsibleData.id;
+      const isEdit = !!id;
+      const url = isEdit ? `/api/responsibles/${id}` : "/api/responsibles";
+      const method = isEdit ? "PUT" : "POST";
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editingResponsibleData)
+      });
+      const data = await res.json();
+      if (data.success) {
+        showToast("Éxito", isEdit ? "Responsável atualizado com sucesso." : "Responsável cadastrado com sucesso.", "success");
+        setResponsibleFormOpen(false);
+        fetchCloudData();
+      } else {
+        showToast("Erro", data.error || "Erro ao salvar responsável.", "error");
+      }
+    } catch (err) {
+      showToast("Erro", "Erro ao conectar ao servidor.", "error");
+    }
+  };
+
+  const handleResponsibleDeleteInApp = async (id: number) => {
+    try {
+      const res = await fetch(`/api/responsibles/${id}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.success) {
+        showToast("Éxito", "Responsável excluído com sucesso.", "success");
+        fetchCloudData();
+      } else {
+        showToast("Erro", data.error || "Erro ao deletar responsável.", "error");
+      }
+    } catch (err) {
+      showToast("Erro", "Erro ao conectar ao servidor.", "error");
     }
   };
 
@@ -664,6 +783,11 @@ export default function App() {
           setSavedBalanceIds(payload.waterBalances.map((w: any) => w.id));
           if (!isSilent) {
             showToast("Sucesso", "Balanço salvo com sucesso no banco!", "success");
+          }
+        } else if (resData.error === "DATABASE_URL_MISSING") {
+          setHasPendingChanges(false); // mock save
+          if (!isSilent) {
+            showToast("Aviso", "Banco de dados não configurado (DATABASE_URL ausente).", "error");
           }
         } else {
           throw new Error(resData.error);
@@ -3064,12 +3188,12 @@ const renderSupplyTable = () => {
          <div className="flex items-center gap-2">
             <TrendingUp size={22} className="text-adasa-light" />
             <div className="flex flex-col">
-              <span className="font-bold text-lg leading-tight">Balanço Hídrico SAA</span>
-              <span className="text-[10px] text-white/50 tracking-widest uppercase mt-0.5">v1.0.4</span>
+              <span className="font-bold text-lg leading-tight">Gerencial SAE</span>
+              <span className="text-[10px] text-white/50 tracking-widest uppercase mt-0.5">Gerenciamento ABC</span>
             </div>
          </div>
          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors">
-           {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
+            {isMobileMenuOpen ? <X size={24} /> : <Menu size={24} />}
          </button>
       </div>
 
@@ -3082,35 +3206,109 @@ const renderSupplyTable = () => {
             exit={{ opacity: 0 }}
             className="md:hidden fixed inset-0 bg-adasa-dark/95 z-30 pt-20 px-6 flex flex-col backdrop-blur-sm"
           >
-            <nav className="space-y-3 flex-1">
-              <button
-                onClick={() => handleTabChange("manage")}
-                className={cn("w-full px-5 py-4 rounded-2xl flex items-center gap-4 transition-all duration-200 text-base font-semibold", activeTab === "manage" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-white/20")}
-              >
-                <LayoutGrid size={22} className={activeTab === "manage" ? "text-adasa-mid" : "text-white/60"} />
-                Cadastrar Balanço
-              </button>
-              <button
-                onClick={() => handleTabChange("analyze")}
-                className={cn("w-full px-5 py-4 rounded-2xl flex items-center gap-4 transition-all duration-200 text-base font-semibold", activeTab === "analyze" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-white/20")}
-              >
-                <TrendingUp size={22} className={activeTab === "analyze" ? "text-adasa-mid" : "text-white/60"} />
-                Analisar Balanço
-              </button>
-              <button
-                onClick={() => handleTabChange("compare")}
-                className={cn("w-full px-5 py-4 rounded-2xl flex items-center gap-4 transition-all duration-200 text-base font-semibold", activeTab === "compare" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-white/20")}
-              >
-                <ArrowRightLeft size={22} className={activeTab === "compare" ? "text-adasa-mid" : "text-white/60"} />
-                Comparar Balanços
-              </button>
-              <button
-                onClick={() => handleTabChange("templates")}
-                className={cn("w-full px-5 py-4 rounded-2xl flex items-center gap-4 transition-all duration-200 text-base font-semibold", activeTab === "templates" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-white/20")}
-              >
-                <FileText size={22} className={activeTab === "templates" ? "text-adasa-mid" : "text-white/60"} />
-                Arquivos Modelo
-              </button>
+            <nav className="space-y-4 flex-1 overflow-y-auto pb-6">
+              <div>
+                <div className="space-y-1 mb-2">
+                  <button
+                    onClick={() => handleTabChange("home")}
+                    className={cn("w-full px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "home" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                  >
+                    <Home size={20} className={activeTab === "home" ? "text-adasa-mid" : "text-white/60"} />
+                    Início
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-black text-white/50 uppercase tracking-widest mb-2 flex items-center gap-1.5 px-2 mt-2">
+                  <ListTodo size={14} /> Plano de Atividades
+                </h4>
+                <div className="space-y-1">
+                  <button
+                    onClick={() => { setActivePlanningSubTab("tasks"); handleTabChange("planning"); }}
+                    className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "planning" && activePlanningSubTab === "tasks" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                  >
+                    <ListTodo size={20} className={activeTab === "planning" && activePlanningSubTab === "tasks" ? "text-adasa-mid" : "text-white/60"} />
+                    Cadastrar Atividades
+                  </button>
+                  <button
+                    onClick={() => { setActivePlanningSubTab("dashboard"); handleTabChange("planning"); }}
+                    className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "planning" && activePlanningSubTab === "dashboard" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                  >
+                    <BarChart3 size={20} className={activeTab === "planning" && activePlanningSubTab === "dashboard" ? "text-adasa-mid" : "text-white/60"} />
+                    Painel de Atividades
+                  </button>
+                  <button
+                    onClick={() => { setActivePlanningSubTab("plans"); handleTabChange("planning"); }}
+                    className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "planning" && activePlanningSubTab === "plans" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                  >
+                    <LayoutGrid size={20} className={activeTab === "planning" && activePlanningSubTab === "plans" ? "text-adasa-mid" : "text-white/60"} />
+                    Cadastrar Planos
+                  </button>
+                  <button
+                    onClick={() => { setActivePlanningSubTab("areas"); handleTabChange("planning"); }}
+                    className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "planning" && activePlanningSubTab === "areas" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                  >
+                    <LayoutGrid size={20} className={activeTab === "planning" && activePlanningSubTab === "areas" ? "text-adasa-mid" : "text-white/60"} />
+                    Cadastrar Áreas Temáticas
+                  </button>
+                  <button
+                    onClick={() => { setActivePlanningSubTab("categories"); handleTabChange("planning"); }}
+                    className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "planning" && activePlanningSubTab === "categories" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                  >
+                    <LayoutGrid size={20} className={activeTab === "planning" && activePlanningSubTab === "categories" ? "text-adasa-mid" : "text-white/60"} />
+                    Cadastrar Categorias
+                  </button>
+                  <button
+                    onClick={() => { setActivePlanningSubTab("responsibles"); handleTabChange("planning"); }}
+                    className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "planning" && activePlanningSubTab === "responsibles" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                  >
+                    <LayoutGrid size={20} className={activeTab === "planning" && activePlanningSubTab === "responsibles" ? "text-adasa-mid" : "text-white/60"} />
+                    Cadastrar Responsáveis
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-black text-white/50 uppercase tracking-widest mb-2 flex items-center gap-1.5 px-2 mt-2">
+                  <Shield size={14} /> Fiscalização
+                </h4>
+                <div className="pl-4 border-l border-white/10 ml-3.5 space-y-2 mt-2 mb-4">
+                  <h5 className="text-[11px] font-bold text-white/60 uppercase tracking-wider mb-2 flex items-center gap-1.5 px-1">
+                    <Droplets size={12} /> Balanço Hídricos
+                  </h5>
+                  <div className="space-y-1">
+                    <button
+                      onClick={() => handleTabChange("manage")}
+                      className={cn("w-full px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "manage" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                    >
+                      <LayoutGrid size={20} className={activeTab === "manage" ? "text-adasa-mid" : "text-white/60"} />
+                      Cadastrar Balanço
+                    </button>
+                    <button
+                      onClick={() => handleTabChange("analyze")}
+                      className={cn("w-full px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "analyze" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                    >
+                      <TrendingUp size={20} className={activeTab === "analyze" ? "text-adasa-mid" : "text-white/60"} />
+                      Analisar Balanço
+                    </button>
+                    <button
+                      onClick={() => handleTabChange("compare")}
+                      className={cn("w-full px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "compare" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                    >
+                      <ArrowRightLeft size={20} className={activeTab === "compare" ? "text-adasa-mid" : "text-white/60"} />
+                      Comparar Balanço
+                    </button>
+                    <button
+                      onClick={() => handleTabChange("templates")}
+                      className={cn("w-full px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "templates" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                    >
+                      <FileText size={20} className={activeTab === "templates" ? "text-adasa-mid" : "text-white/60"} />
+                      Arquivos de Modelo
+                    </button>
+                  </div>
+                </div>
+              </div>
             </nav>
           </motion.div>
         )}
@@ -3125,96 +3323,239 @@ const renderSupplyTable = () => {
           <div className="hidden md:block">
             <div className="flex flex-col">
               <span className="text-xl font-black text-white tracking-tight block leading-tight">
-                Balanço Hídrico SAA
+                Gerencial SAE
               </span>
-              <span className="text-xs font-medium text-white/40 block mt-1 tracking-widest">
-                VERSION v1.0.4
+              <span className="text-[10px] font-medium text-white/40 block mt-1 tracking-widest uppercase">
+                Gerenciamento ABC
               </span>
             </div>
           </div>
         </div>
 
-        <nav className="space-y-2 flex-1 text-white">
-          <button
-            onClick={() => handleTabChange("manage")}
-            className={cn(
-              "w-full px-4 py-3 rounded-2xl flex items-center gap-4 transition-all duration-200 group text-sm font-semibold",
-              activeTab === "manage"
-                ? "bg-white/10 text-white shadow-lg border border-white/10"
-                : "text-white/60 hover:text-white hover:bg-white/5",
-            )}
-          >
-            <LayoutGrid
-              size={18}
-              className={cn(
-                "flex-shrink-0 transition-colors",
-                activeTab === "manage"
-                  ? "text-adasa-light"
-                  : "text-white/40 group-hover:text-white/60",
-              )}
-            />
-            <span className="hidden md:inline">Cadastrar Balanço</span>
-          </button>
-          <button
-            onClick={() => handleTabChange("analyze")}
-            className={cn(
-              "w-full px-4 py-3 rounded-2xl flex items-center gap-4 transition-all duration-200 group text-sm font-semibold",
-              activeTab === "analyze"
-                ? "bg-white/10 text-white shadow-lg border border-white/10"
-                : "text-white/60 hover:text-white hover:bg-white/5",
-            )}
-          >
-            <TrendingUp
-              size={18}
-              className={cn(
-                "flex-shrink-0 transition-colors",
-                activeTab === "analyze"
-                  ? "text-adasa-light"
-                  : "text-white/40 group-hover:text-white/60",
-              )}
-            />
-            <span className="hidden md:inline">Analisar Balanço</span>
-          </button>
-          <button
-            onClick={() => handleTabChange("compare")}
-            className={cn(
-              "w-full px-4 py-3 rounded-2xl flex items-center gap-4 transition-all duration-200 group text-sm font-semibold",
-              activeTab === "compare"
-                ? "bg-white/10 text-white shadow-lg border border-white/10"
-                : "text-white/60 hover:text-white hover:bg-white/5",
-            )}
-          >
-            <ArrowRightLeft
-              size={18}
-              className={cn(
-                "flex-shrink-0 transition-colors",
-                activeTab === "compare"
-                  ? "text-adasa-light"
-                  : "text-white/40 group-hover:text-white/60",
-              )}
-            />
-            <span className="hidden md:inline">Comparar Balanços</span>
-          </button>
-          <button
-            onClick={() => handleTabChange("templates")}
-            className={cn(
-              "w-full px-4 py-3 rounded-2xl flex items-center gap-4 transition-all duration-200 group text-sm font-semibold",
-              activeTab === "templates"
-                ? "bg-white/10 text-white shadow-lg border border-white/10"
-                : "text-white/60 hover:text-white hover:bg-white/5",
-            )}
-          >
-            <FileText
-              size={18}
-              className={cn(
-                "flex-shrink-0 transition-colors",
-                activeTab === "templates"
-                  ? "text-adasa-light"
-                  : "text-white/40 group-hover:text-white/60",
-              )}
-            />
-            <span className="hidden md:inline">Arquivos Modelo</span>
-          </button>
+        <nav className="space-y-4 flex-1 text-white overflow-y-auto pb-4 custom-scrollbar pr-2">
+          <div>
+            <div className="space-y-1 mb-2">
+              <button
+                onClick={() => handleTabChange("home")}
+                className={cn(
+                  "w-full px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                  activeTab === "home"
+                    ? "bg-white/10 text-white shadow-sm border border-white/10"
+                    : "text-white/60 hover:text-white hover:bg-white/5",
+                )}
+              >
+                <Home
+                  size={16}
+                  className={cn(
+                    "flex-shrink-0 transition-colors",
+                    activeTab === "home" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                  )}
+                />
+                <span className="hidden md:inline">Início</span>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-2 flex items-center gap-1.5 px-2 mt-2">
+              <ListTodo size={12} /> Plano de Atividades
+            </h4>
+            <div className="space-y-1">
+              <button
+                onClick={() => { setActivePlanningSubTab("tasks"); handleTabChange("planning"); }}
+                className={cn(
+                  "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                  activeTab === "planning" && activePlanningSubTab === "tasks"
+                    ? "bg-white/10 text-white shadow-sm border border-white/10"
+                    : "text-white/60 hover:text-white hover:bg-white/5",
+                )}
+              >
+                <ListTodo
+                  size={16}
+                  className={cn(
+                    "flex-shrink-0 transition-colors",
+                    activeTab === "planning" && activePlanningSubTab === "tasks" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                  )}
+                />
+                <span className="hidden md:inline">Cadastrar Atividades</span>
+              </button>
+              <button
+                onClick={() => { setActivePlanningSubTab("dashboard"); handleTabChange("planning"); }}
+                className={cn(
+                  "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                  activeTab === "planning" && activePlanningSubTab === "dashboard"
+                    ? "bg-white/10 text-white shadow-sm border border-white/10"
+                    : "text-white/60 hover:text-white hover:bg-white/5",
+                )}
+              >
+                <BarChart3
+                  size={16}
+                  className={cn(
+                    "flex-shrink-0 transition-colors",
+                    activeTab === "planning" && activePlanningSubTab === "dashboard" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                  )}
+                />
+                <span className="hidden md:inline">Painel de Atividades</span>
+              </button>
+              <button
+                onClick={() => { setActivePlanningSubTab("plans"); handleTabChange("planning"); }}
+                className={cn(
+                  "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                  activeTab === "planning" && activePlanningSubTab === "plans"
+                    ? "bg-white/10 text-white shadow-sm border border-white/10"
+                    : "text-white/60 hover:text-white hover:bg-white/5",
+                )}
+              >
+                <LayoutGrid
+                  size={16}
+                  className={cn(
+                    "flex-shrink-0 transition-colors",
+                    activeTab === "planning" && activePlanningSubTab === "plans" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                  )}
+                />
+                <span className="hidden md:inline">Cadastrar Planos</span>
+              </button>
+              <button
+                onClick={() => { setActivePlanningSubTab("areas"); handleTabChange("planning"); }}
+                className={cn(
+                  "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                  activeTab === "planning" && activePlanningSubTab === "areas"
+                    ? "bg-white/10 text-white shadow-sm border border-white/10"
+                    : "text-white/60 hover:text-white hover:bg-white/5",
+                )}
+              >
+                <LayoutGrid
+                  size={16}
+                  className={cn(
+                    "flex-shrink-0 transition-colors",
+                    activeTab === "planning" && activePlanningSubTab === "areas" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                  )}
+                />
+                <span className="hidden md:inline">Cadastrar Áreas Temáticas</span>
+              </button>
+              <button
+                onClick={() => { setActivePlanningSubTab("categories"); handleTabChange("planning"); }}
+                className={cn(
+                  "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                  activeTab === "planning" && activePlanningSubTab === "categories"
+                    ? "bg-white/10 text-white shadow-sm border border-white/10"
+                    : "text-white/60 hover:text-white hover:bg-white/5",
+                )}
+              >
+                <LayoutGrid
+                  size={16}
+                  className={cn(
+                    "flex-shrink-0 transition-colors",
+                    activeTab === "planning" && activePlanningSubTab === "categories" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                  )}
+                />
+                <span className="hidden md:inline">Cadastrar Categorias</span>
+              </button>
+              <button
+                onClick={() => { setActivePlanningSubTab("responsibles"); handleTabChange("planning"); }}
+                className={cn(
+                  "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                  activeTab === "planning" && activePlanningSubTab === "responsibles"
+                    ? "bg-white/10 text-white shadow-sm border border-white/10"
+                    : "text-white/60 hover:text-white hover:bg-white/5",
+                )}
+              >
+                <LayoutGrid
+                  size={16}
+                  className={cn(
+                    "flex-shrink-0 transition-colors",
+                    activeTab === "planning" && activePlanningSubTab === "responsibles" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                  )}
+                />
+                <span className="hidden md:inline">Cadastrar Responsáveis</span>
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <h4 className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1 flex items-center gap-1.5 px-2">
+              <Shield size={12} /> Fiscalização
+            </h4>
+            <div className="pl-3 border-l border-white/10 ml-3 space-y-2 mt-2 mb-3">
+              <h5 className="text-[9px] font-bold text-white/55 uppercase tracking-wider mb-1 flex items-center gap-1.5 px-1">
+                <Droplets size={10} /> Balanço Hídricos
+              </h5>
+              <div className="space-y-1">
+                <button
+                  onClick={() => handleTabChange("manage")}
+                  className={cn(
+                    "w-full px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                    activeTab === "manage"
+                      ? "bg-white/10 text-white shadow-sm border border-white/10"
+                      : "text-white/60 hover:text-white hover:bg-white/5",
+                  )}
+                >
+                  <LayoutGrid
+                    size={16}
+                    className={cn(
+                      "flex-shrink-0 transition-colors",
+                      activeTab === "manage" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    )}
+                  />
+                  <span className="hidden md:inline">Cadastrar Balanço</span>
+                </button>
+                <button
+                  onClick={() => handleTabChange("analyze")}
+                  className={cn(
+                    "w-full px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                    activeTab === "analyze"
+                      ? "bg-white/10 text-white shadow-sm border border-white/10"
+                      : "text-white/60 hover:text-white hover:bg-white/5",
+                  )}
+                >
+                  <TrendingUp
+                    size={16}
+                    className={cn(
+                      "flex-shrink-0 transition-colors",
+                      activeTab === "analyze" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    )}
+                  />
+                  <span className="hidden md:inline">Analisar Balanço</span>
+                </button>
+                <button
+                  onClick={() => handleTabChange("compare")}
+                  className={cn(
+                    "w-full px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                    activeTab === "compare"
+                      ? "bg-white/10 text-white shadow-sm border border-white/10"
+                      : "text-white/60 hover:text-white hover:bg-white/5",
+                  )}
+                >
+                  <ArrowRightLeft
+                    size={16}
+                    className={cn(
+                      "flex-shrink-0 transition-colors",
+                      activeTab === "compare" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    )}
+                  />
+                  <span className="hidden md:inline">Comparar Balanços</span>
+                </button>
+                <button
+                  onClick={() => handleTabChange("templates")}
+                  className={cn(
+                    "w-full px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                    activeTab === "templates"
+                      ? "bg-white/10 text-white shadow-sm border border-white/10"
+                      : "text-white/60 hover:text-white hover:bg-white/5",
+                  )}
+                >
+                  <FileText
+                    size={16}
+                    className={cn(
+                      "flex-shrink-0 transition-colors",
+                      activeTab === "templates" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    )}
+                  />
+                  <span className="hidden md:inline">Arquivos de Modelo</span>
+                </button>
+              </div>
+            </div>
+          </div>
         </nav>
 
         <div className="mt-auto hidden md:block space-y-4">
@@ -3240,26 +3581,36 @@ const renderSupplyTable = () => {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex-1 flex flex-col p-4 md:p-8 gap-6 overflow-y-auto">
-        <header className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-2">
-          <div>
-            <h1 className="text-3xl font-black text-slate-900 tracking-tighter leading-none mb-2">
-              {activeTab === "compare"
-                  ? "Comparar Balanços"
-                  : activeTab === "analyze"
-                    ? "Análise de Balanço Hídrico"
-                    : activeTab === "templates"
-                      ? "Arquivos Modelo"
+      <main className="flex-1 flex flex-col p-4 md:p-8 gap-6 overflow-y-auto w-full max-w-full">
+        {activeTab !== "home" && (
+          <header className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-2">
+            <div>
+              <h1 className="text-3xl font-black text-slate-900 tracking-tighter leading-none mb-2">
+                {activeTab === "compare"
+                ? "Comparar Balanços"
+                : activeTab === "analyze"
+                  ? "Análise de Balanço Hídrico"
+                  : activeTab === "templates"
+                    ? "Arquivos Modelo"
+                    : activeTab === "planning"
+                      ? (activePlanningSubTab === "dashboard" ? "Painel de Atividades" :
+                         activePlanningSubTab === "tasks" ? "Cadastrar Atividades" : 
+                         activePlanningSubTab === "plans" ? "Cadastrar Planos" : 
+                         activePlanningSubTab === "areas" ? "Cadastrar Áreas Temáticas" : 
+                         activePlanningSubTab === "categories" ? "Cadastrar Categorias" :
+                         "Cadastrar Responsáveis")
                       : "Cadastrar Balanço"}
             </h1>
             <p className="text-slate-500 text-sm font-medium">
               {activeTab === "compare"
-                  ? "Compare e analise a evolução da demanda e balanço."
-                  : activeTab === "analyze"
-                    ? "Visualize de forma isolada as projeções de oferta e demanda ao longo do tempo."
-                    : activeTab === "templates"
-                      ? "Gerencie e baixe os arquivos modelo para importação no sistema."
-                      : "Gerencie as informações do balanço hídrico, subsistemas, demandas e ofertas."}
+                ? "Compare e analise a evolução da demanda e balanço."
+                : activeTab === "analyze"
+                  ? "Visualize de forma isolada as projeções de oferta e demanda ao longo do tempo."
+                  : activeTab === "templates"
+                    ? "Gerencie e baixe os arquivos modelo para importação no sistema."
+                    : activeTab === "planning"
+                      ? "Gerencie o cronograma consolidado, planos, áreas e status de execução."
+                      : "Gerencie os balanços hídricos e cadastre novas informações."}
             </p>
           </div>
           <div className="flex flex-col md:flex-row items-center gap-3">
@@ -3278,9 +3629,25 @@ const renderSupplyTable = () => {
             </div>
           </div>
         </header>
+        )}
 
         <AnimatePresence mode="wait">
-          {activeTab === "analyze" ? (
+          {activeTab === "home" ? (
+            <motion.div
+              key="home"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.3 }}
+            >
+              <HomeTab 
+                setActiveTab={setActiveTab as any} 
+                setActivePlanningSubTab={setActivePlanningSubTab as any}
+                tasks={tasks} 
+                areas={areas} 
+              />
+            </motion.div>
+          ) : activeTab === "analyze" ? (
             <motion.div
               key="analyze"
               initial={{ opacity: 0, scale: 0.98 }}
@@ -6533,6 +6900,22 @@ const renderSupplyTable = () => {
                   </table>
                 </div>
               </div>
+            </motion.div>
+          ) : activeTab === "planning" ? (
+            <motion.div
+              key="planning"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="max-w-7xl mx-auto w-full"
+            >
+              <PlanningTab 
+                tasks={tasks}
+                setTasks={setTasks}
+                showToast={showToast}
+                activeSubTab={activePlanningSubTab}
+              />
             </motion.div>
           ) : null}
         </AnimatePresence>

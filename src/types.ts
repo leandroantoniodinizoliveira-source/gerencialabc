@@ -84,3 +84,50 @@ export interface WaterBalance {
 export interface CalculationResult extends DemandEntry {
   projectedDemand: number; // L/s
 }
+
+export interface Task {
+  id: number;
+  title: string;
+  description: string;
+  startDate: string | null;
+  endDate: string | null;
+  status: 'pending' | 'in_progress' | 'completed' | string;
+  parentId: number | null;
+  progress: number;
+  priority?: string;
+  categoryIds?: number[];
+  assignedTo?: string;
+  createdBy?: string;
+  notes?: string;
+  planId?: number | null;
+  areaIds?: number[];
+  responsibleIds?: number[];
+  dependsOnTaskId?: number | null;
+}
+
+export interface Plan {
+  id: number;
+  name: string;
+  description: string;
+}
+
+export interface Area {
+  id: number;
+  name: string;
+  abbreviation?: string;
+}
+
+export interface Category {
+  id: number;
+  name: string;
+  areaIds: number[];
+}
+
+export interface Responsible {
+  id: number;
+  name: string;
+  email?: string;
+  role?: string;
+  areaIds: number[];
+}
+

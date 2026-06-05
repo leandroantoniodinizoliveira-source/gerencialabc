@@ -1,0 +1,382 @@
+import React, { useMemo } from "react";
+import { 
+  Droplets, 
+  Activity, 
+  GitCompare, 
+  FolderKanban, 
+  FileSpreadsheet, 
+  ArrowRight, 
+  BarChart3, 
+  ListTodo, 
+  BookmarkCheck, 
+  Users, 
+  Tags, 
+  ClipboardList 
+} from "lucide-react";
+import { motion } from "motion/react";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { Task, Area } from "../types";
+
+interface HomeTabProps {
+  setActiveTab: (tab: "edit" | "compare" | "manage" | "analyze" | "templates" | "planning") => void;
+  setActivePlanningSubTab: (subTab: "tasks" | "dashboard" | "plans" | "areas" | "categories" | "responsibles") => void;
+  tasks: Task[];
+  areas: Area[];
+}
+
+const normalizeStatus = (status: string | undefined): "Não iniciada" | "Em andamento" | "Concluída" => {
+  if (!status) return "Não iniciada";
+  const s = status.toLowerCase().trim();
+  if (s === "concluída" || s === "concluído" || s === "completed") return "Concluída";
+  if (s === "em andamento" || s === "in_progress" || s === "in progress") return "Em andamento";
+  return "Não iniciada";
+};
+
+export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas }: HomeTabProps) {
+  
+  // Quick navigation helper to switch tab + subtab
+  const navigateToPlanning = (subTab: "tasks" | "dashboard" | "plans" | "areas" | "categories" | "responsibles") => {
+    setActivePlanningSubTab(subTab);
+    setActiveTab("planning");
+  };
+
+  // Process data for the executive summary chart
+  const formattedData = useMemo(() => {
+    if (!areas || areas.length === 0) return [];
+
+    const result = areas.map(area => {
+      // Find all tasks that belong to this area
+      const areaTasks = tasks.filter(task => task.areaIds && task.areaIds.includes(area.id));
+      
+      let pending = 0;
+      let completed = 0;
+      let inProgress = 0;
+
+      areaTasks.forEach(task => {
+        const normStatus = normalizeStatus(task.status);
+        if (normStatus === "Concluída") {
+          completed++;
+        } else if (normStatus === "Em andamento") {
+          inProgress++;
+        } else {
+          pending++;
+        }
+      });
+
+      return {
+        name: area.abbreviation || area.name,
+        Pendentes: pending,
+        "Em andamento": inProgress,
+        Concluídas: completed,
+      };
+    });
+
+    return result.filter(item => item.Pendentes > 0 || item.Concluídas > 0 || item["Em andamento"] > 0);
+  }, [tasks, areas]);
+
+  // Count highlights for metadata badges next to headings
+  const totalTasks = tasks.length;
+  const completedTasks = tasks.filter(t => normalizeStatus(t.status) === "Concluída").length;
+
+  return (
+    <div className="space-y-10 max-w-5xl mx-auto pb-16">
+      {/* Dynamic Header Promo Banner */}
+      <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 rounded-3xl p-8 sm:p-12 text-white shadow-xl relative overflow-hidden border border-slate-700/30">
+        <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-white/5 blur-3xl"></div>
+        <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 rounded-full bg-blue-500/10 blur-3xl"></div>
+        
+        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
+          <div className="space-y-4 max-w-2xl">
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full border border-white/10 text-xs font-black uppercase tracking-widest text-blue-200">
+              <Droplets size={12} className="text-blue-400 animate-pulse" />
+              Gerencial SAE
+            </div>
+            <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-none">
+              Plataforma de Gestão e <br className="hidden sm:block" />
+              Relatórios da SAE
+            </h1>
+          </div>
+        </div>
+      </div>
+
+      {/* Module Group 1: Planejamento e Plano de Trabalho */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-1 px-2.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-black uppercase tracking-wider">
+              Módulo 1
+            </div>
+            <h2 className="text-lg font-black text-slate-800 tracking-tight">Dimensão de Planejamento e Cronogramas</h2>
+          </div>
+          <span className="text-[11px] font-bold text-slate-500 bg-slate-100/80 px-2.5 py-1 rounded-full border border-slate-200/50">
+            {completedTasks}/{totalTasks} Metas Concluídas
+          </span>
+        </div>
+
+        {/* Master Card & Direct Fast Shortcuts Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+          
+          {/* Main Workplan Card - taking 5 cols */}
+          <motion.div 
+            whileHover={{ y: -2 }}
+            onClick={() => navigateToPlanning("dashboard")}
+            className="lg:col-span-5 p-6 rounded-2xl border border-amber-200 bg-gradient-to-br from-white to-amber-50/20 shadow-sm cursor-pointer hover:shadow-md transition-all duration-300 flex flex-col justify-between group"
+          >
+            <div>
+              <div className="mb-4 p-3 rounded-xl bg-amber-50 text-amber-600 w-max border border-amber-100 group-hover:bg-amber-100 transition-colors">
+                <FolderKanban size={24} />
+              </div>
+              <h3 className="text-lg font-black text-slate-800 leading-tight mb-2">Painel de Monitoramento</h3>
+              <p className="text-slate-600 text-xs font-medium leading-relaxed mb-6">
+                Acompanhe o andamento geral das tarefas e metas. Visualize status, progressos acumulados e índices gerenciais por área operacional em gráficos de tempo real.
+              </p>
+            </div>
+            <div className="mt-auto flex items-center gap-2 text-xs font-bold text-amber-700">
+              Abrir Painel de Atividades <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
+            </div>
+          </motion.div>
+
+          {/* Quick Shortcuts Sub-grid list - taking 7 cols */}
+          <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
+            
+            {/* Shortcut A: Painel de Atividades */}
+            <div 
+              onClick={() => navigateToPlanning("dashboard")}
+              className="p-4 bg-white border border-slate-200 hover:border-amber-300 rounded-xl cursor-pointer group transition-all duration-200 flex items-start gap-3"
+            >
+              <div className="p-2 bg-slate-50 text-slate-600 rounded-lg group-hover:bg-amber-50 group-hover:text-amber-600 transition-colors mt-0.5">
+                <BarChart3 size={18} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-800 group-hover:text-amber-800 transition-colors">Painel de Atividades</h4>
+                <p className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">Gráficos de progresso, relatórios sintéticos e métricas unificadas.</p>
+              </div>
+            </div>
+
+            {/* Shortcut B: Atividades e Tarefas */}
+            <div 
+              onClick={() => navigateToPlanning("tasks")}
+              className="p-4 bg-white border border-slate-200 hover:border-amber-300 rounded-xl cursor-pointer group transition-all duration-200 flex items-start gap-3"
+            >
+              <div className="p-2 bg-slate-50 text-slate-600 rounded-lg group-hover:bg-amber-50 group-hover:text-amber-600 transition-colors mt-0.5">
+                <ListTodo size={18} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-800 group-hover:text-amber-800 transition-colors">Atividades & Tarefas</h4>
+                <p className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">Cadastrar, gerenciar e editar tarefas e cronogramas detalhados.</p>
+              </div>
+            </div>
+
+            {/* Shortcut C: Planos de Trabalho */}
+            <div 
+              onClick={() => navigateToPlanning("plans")}
+              className="p-4 bg-white border border-slate-200 hover:border-amber-300 rounded-xl cursor-pointer group transition-all duration-200 flex items-start gap-3"
+            >
+              <div className="p-2 bg-slate-50 text-slate-600 rounded-lg group-hover:bg-amber-50 group-hover:text-amber-600 transition-colors mt-0.5">
+                <ClipboardList size={18} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-800 group-hover:text-amber-800 transition-colors">Planos de Trabalho</h4>
+                <p className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">Configurar macrometas e planos estratégicos estruturados.</p>
+              </div>
+            </div>
+
+            {/* Shortcut D: Areas Tematicas */}
+            <div 
+              onClick={() => navigateToPlanning("areas")}
+              className="p-4 bg-white border border-slate-200 hover:border-amber-300 rounded-xl cursor-pointer group transition-all duration-200 flex items-start gap-3"
+            >
+              <div className="p-2 bg-slate-50 text-slate-600 rounded-lg group-hover:bg-amber-50 group-hover:text-amber-600 transition-colors mt-0.5">
+                <BookmarkCheck size={18} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-800 group-hover:text-amber-800 transition-colors">Áreas Temáticas</h4>
+                <p className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">Gerenciar áreas de atuação, siglas e descrições temáticas.</p>
+              </div>
+            </div>
+
+            {/* Shortcut E: Categorias */}
+            <div 
+              onClick={() => navigateToPlanning("categories")}
+              className="p-4 bg-white border border-slate-200 hover:border-amber-300 rounded-xl cursor-pointer group transition-all duration-200 flex items-start gap-3"
+            >
+              <div className="p-2 bg-slate-50 text-slate-600 rounded-lg group-hover:bg-amber-50 group-hover:text-amber-600 transition-colors mt-0.5">
+                <Tags size={18} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-800 group-hover:text-amber-800 transition-colors">Categorias de Tarefas</h4>
+                <p className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">Categorizar as atividades para rotular e analisar relatórios.</p>
+              </div>
+            </div>
+
+            {/* Shortcut F: Responsáveis */}
+            <div 
+              onClick={() => navigateToPlanning("responsibles")}
+              className="p-4 bg-white border border-slate-200 hover:border-amber-300 rounded-xl cursor-pointer group transition-all duration-200 flex items-start gap-3"
+            >
+              <div className="p-2 bg-slate-50 text-slate-600 rounded-lg group-hover:bg-amber-50 group-hover:text-amber-600 transition-colors mt-0.5">
+                <Users size={18} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-800 group-hover:text-amber-800 transition-colors">Atribuição de Responsáveis</h4>
+                <p className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">Cadastrar membros da equipe, cargos e e-mails de acompanhamento.</p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* Module Group 2: Balanço Hídrico */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+          <div className="p-1 px-2.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-black uppercase tracking-wider">
+            Módulo 2
+          </div>
+          <h2 className="text-lg font-black text-slate-800 tracking-tight">Dimensão de Recursos Hídricos e Balanços</h2>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Item 2.1: Gerenciar Balancos */}
+          <motion.div 
+            whileHover={{ y: -3 }}
+            onClick={() => setActiveTab("manage")}
+            className="p-6 rounded-2xl border border-slate-200 hover:border-blue-300 bg-white cursor-pointer group shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between"
+          >
+            <div>
+              <div className="mb-4 p-3 rounded-xl bg-blue-50 text-blue-500 w-max border border-blue-100 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                <Droplets size={24} />
+              </div>
+              <h3 className="text-base font-bold text-slate-800 mb-1.5 leading-tight">1. Gerenciar Balanços</h3>
+              <p className="text-slate-500 text-xs font-medium leading-relaxed mb-4">
+                Cadastro centralizado, duplicação rápida e controle histórico de todas as séries de balanço hídrico cadastradas.
+              </p>
+            </div>
+            <div className="flex items-center gap-1 text-xs font-bold text-blue-600 mt-2">
+              Acessar registros <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
+            </div>
+          </motion.div>
+
+          {/* Item 2.2: Análie Individual */}
+          <motion.div 
+            whileHover={{ y: -3 }}
+            onClick={() => setActiveTab("analyze")}
+            className="p-6 rounded-2xl border border-slate-200 hover:border-emerald-300 bg-white cursor-pointer group shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between"
+          >
+            <div>
+              <div className="mb-4 p-3 rounded-xl bg-emerald-50 text-emerald-500 w-max border border-emerald-100 group-hover:bg-emerald-100 group-hover:text-emerald-600 transition-colors">
+                <Activity size={24} />
+              </div>
+              <h3 className="text-base font-bold text-slate-800 mb-1.5 leading-tight">2. Análise Individual</h3>
+              <p className="text-slate-500 text-xs font-medium leading-relaxed mb-4">
+                Explore mapas interativos de balanço e visualize gráficos de projeções isoladas de oferta versus demandas projetadas de recursos.
+              </p>
+            </div>
+            <div className="flex items-center gap-1 text-xs font-bold text-emerald-600 mt-2">
+              Visualizar gráficos <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
+            </div>
+          </motion.div>
+
+          {/* Item 2.3: Comparar Balanços */}
+          <motion.div 
+            whileHover={{ y: -3 }}
+            onClick={() => setActiveTab("compare")}
+            className="p-6 rounded-2xl border border-slate-200 hover:border-purple-300 bg-white cursor-pointer group shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between"
+          >
+            <div>
+              <div className="mb-4 p-3 rounded-xl bg-purple-50 text-purple-500 w-max border border-purple-100 group-hover:bg-purple-100 group-hover:text-purple-600 transition-colors">
+                <GitCompare size={24} />
+              </div>
+              <h3 className="text-base font-bold text-slate-800 mb-1.5 leading-tight">3. Comparação de Cenários</h3>
+              <p className="text-slate-500 text-xs font-medium leading-relaxed mb-4">
+                Comparações agregadas de múltiplos balanços hídricos selecionados simultaneamente em formato de curvas comparativas consolidadas.
+              </p>
+            </div>
+            <div className="flex items-center gap-1 text-xs font-bold text-purple-600 mt-2">
+              Ver comparação <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
+            </div>
+          </motion.div>
+        </div>
+      </section>
+
+      {/* Module Group 3: Outros Recursos */}
+      <section className="space-y-4">
+        <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
+          <div className="p-1 px-2.5 bg-rose-50 text-rose-700 rounded-lg text-xs font-black uppercase tracking-wider">
+            Suporte
+          </div>
+          <h2 className="text-lg font-black text-slate-800 tracking-tight">Arquivos de Apoio e Templates</h2>
+        </div>
+
+        <motion.div 
+          whileHover={{ y: -2 }}
+          onClick={() => setActiveTab("templates")}
+          className="p-5 rounded-2xl border border-slate-200 hover:border-rose-300 bg-white cursor-pointer group shadow-sm transition-all duration-200 flex items-center justify-between"
+        >
+          <div className="flex items-center gap-4">
+            <div className="p-3 rounded-xl bg-rose-50 text-rose-500 group-hover:bg-rose-100 transition-colors">
+              <FileSpreadsheet size={24} />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-slate-800 leading-tight">Baixar Arquivos Modelo para Carga de Dados</h3>
+              <p className="text-slate-500 text-[11px] font-medium mt-0.5">Baixe formatos estruturados em Excel/CSV para preencher demandas com facilidade.</p>
+            </div>
+          </div>
+          <ArrowRight size={18} className="text-slate-400 group-hover:translate-x-1 transition-transform mr-2" />
+        </motion.div>
+      </section>
+
+      {/* Executive Summary Chart Section */}
+      {formattedData.length > 0 && (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5 }}
+        >
+          <div className="pt-2 px-2 flex items-center gap-3 mb-4">
+            <h2 className="text-xl font-black text-slate-800 tracking-tight">Resumo Executivo Gerencial</h2>
+            <div className="h-px bg-slate-200 flex-1"></div>
+          </div>
+          
+          <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="p-2.5 bg-slate-100 text-slate-700 rounded-xl">
+                <BarChart3 size={20} />
+              </div>
+              <div>
+                <h3 className="font-bold text-slate-800 text-lg leading-tight">Situação de Tarefas por Área Temática</h3>
+                <p className="text-sm font-medium text-slate-500">Acompanhamento consolidado do progresso das metas físicas e cronograma das equipes</p>
+              </div>
+            </div>
+
+            <div className="h-[320px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart
+                  data={formattedData}
+                  margin={{
+                    top: 20,
+                    right: 30,
+                    left: 0,
+                    bottom: 5,
+                  }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 13, fontWeight: 500}} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
+                  <Tooltip 
+                    cursor={{fill: '#f8fafc'}}
+                    contentStyle={{borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'}}
+                  />
+                  <Legend iconType="circle" wrapperStyle={{paddingTop: '20px'}} />
+                  <Bar dataKey="Concluídas" stackId="a" fill="#10b981" radius={[0, 0, 4, 4]} name="Concluídas" />
+                  <Bar dataKey="Em andamento" stackId="a" fill="#3b82f6" name="Em andamento" />
+                  <Bar dataKey="Pendentes" stackId="a" fill="#94a3b8" radius={[4, 4, 0, 0]} name="Pendentes" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </div>
+  );
+}
