@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React from "react";
 import { 
   Droplets, 
   Activity, 
@@ -6,15 +6,14 @@ import {
   FolderKanban, 
   FileSpreadsheet, 
   ArrowRight, 
-  BarChart3, 
   ListTodo, 
   BookmarkCheck, 
   Users, 
   Tags, 
-  ClipboardList 
+  ClipboardList,
+  BarChart3
 } from "lucide-react";
 import { motion } from "motion/react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { Task, Area } from "../types";
 
 interface HomeTabProps {
@@ -39,40 +38,6 @@ export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas }:
     setActivePlanningSubTab(subTab);
     setActiveTab("planning");
   };
-
-  // Process data for the executive summary chart
-  const formattedData = useMemo(() => {
-    if (!areas || areas.length === 0) return [];
-
-    const result = areas.map(area => {
-      // Find all tasks that belong to this area
-      const areaTasks = tasks.filter(task => task.areaIds && task.areaIds.includes(area.id));
-      
-      let pending = 0;
-      let completed = 0;
-      let inProgress = 0;
-
-      areaTasks.forEach(task => {
-        const normStatus = normalizeStatus(task.status);
-        if (normStatus === "Concluída") {
-          completed++;
-        } else if (normStatus === "Em andamento") {
-          inProgress++;
-        } else {
-          pending++;
-        }
-      });
-
-      return {
-        name: area.abbreviation || area.name,
-        Pendentes: pending,
-        "Em andamento": inProgress,
-        Concluídas: completed,
-      };
-    });
-
-    return result.filter(item => item.Pendentes > 0 || item.Concluídas > 0 || item["Em andamento"] > 0);
-  }, [tasks, areas]);
 
   // Count highlights for metadata badges next to headings
   const totalTasks = tasks.length;
@@ -325,58 +290,6 @@ export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas }:
           <ArrowRight size={18} className="text-slate-400 group-hover:translate-x-1 transition-transform mr-2" />
         </motion.div>
       </section>
-
-      {/* Executive Summary Chart Section */}
-      {formattedData.length > 0 && (
-        <motion.div 
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-        >
-          <div className="pt-2 px-2 flex items-center gap-3 mb-4">
-            <h2 className="text-xl font-black text-slate-800 tracking-tight">Resumo Executivo Gerencial</h2>
-            <div className="h-px bg-slate-200 flex-1"></div>
-          </div>
-          
-          <div className="bg-white border border-slate-200 rounded-3xl p-6 md:p-8 shadow-sm">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="p-2.5 bg-slate-100 text-slate-700 rounded-xl">
-                <BarChart3 size={20} />
-              </div>
-              <div>
-                <h3 className="font-bold text-slate-800 text-lg leading-tight">Situação de Tarefas por Área Temática</h3>
-                <p className="text-sm font-medium text-slate-500">Acompanhamento consolidado do progresso das metas físicas e cronograma das equipes</p>
-              </div>
-            </div>
-
-            <div className="h-[320px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={formattedData}
-                  margin={{
-                    top: 20,
-                    right: 30,
-                    left: 0,
-                    bottom: 5,
-                  }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 13, fontWeight: 500}} dy={10} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
-                  <Tooltip 
-                    cursor={{fill: '#f8fafc'}}
-                    contentStyle={{borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)'}}
-                  />
-                  <Legend iconType="circle" wrapperStyle={{paddingTop: '20px'}} />
-                  <Bar dataKey="Concluídas" stackId="a" fill="#10b981" radius={[0, 0, 4, 4]} name="Concluídas" />
-                  <Bar dataKey="Em andamento" stackId="a" fill="#3b82f6" name="Em andamento" />
-                  <Bar dataKey="Pendentes" stackId="a" fill="#94a3b8" radius={[4, 4, 0, 0]} name="Pendentes" />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        </motion.div>
-      )}
     </div>
   );
 }

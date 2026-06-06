@@ -404,37 +404,15 @@ async function seedTasks(client: any) {
 }
 
 async function runStartupMigration() {
-  const markerPath = path.join(process.cwd(), "db_schema_migrated.txt");
-  if (fs.existsSync(markerPath)) {
-    console.log("Database schema was already migrated. Skipping reset.");
-    return;
-  }
-
-  console.log("Migrating database schema: Dropping old tables and recreating with INTEGER auto-increment IDs...");
+  console.log("Migrating database schema: Creating tables safely if they do not exist...");
   try {
     const pool = getDbPool();
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
 
-      // Drop all existing tables with CASCADE
-      await client.query("DROP TABLE IF EXISTS pl_tasks CASCADE");
-      await client.query("DROP TABLE IF EXISTS wb_water_balance_maps CASCADE");
-      await client.query("DROP TABLE IF EXISTS wb_risk_references CASCADE");
-      await client.query("DROP TABLE IF EXISTS wb_template_files CASCADE");
-      await client.query("DROP TABLE IF EXISTS wb_demand_entries CASCADE");
-      await client.query("DROP TABLE IF EXISTS wb_demands CASCADE");
-      await client.query("DROP TABLE IF EXISTS wb_supply_sources CASCADE");
-      await client.query("DROP TABLE IF EXISTS wb_operational_adjustments CASCADE");
-      await client.query("DROP TABLE IF EXISTS wb_regions CASCADE");
-      await client.query("DROP TABLE IF EXISTS wb_systems CASCADE");
-      await client.query("DROP TABLE IF EXISTS wb_water_balances CASCADE");
-      await client.query("DROP TABLE IF EXISTS scenario_entries CASCADE");
-      await client.query("DROP TABLE IF EXISTS scenarios CASCADE");
-
-      // Recreate tables with clean INTEGER / SERIAL schemas
       await client.query(`
-        CREATE TABLE wb_water_balances (
+        CREATE TABLE IF NOT EXISTS wb_water_balances (
           id SERIAL PRIMARY KEY,
           description TEXT NOT NULL,
           responsible VARCHAR(255) NOT NULL,
@@ -446,7 +424,7 @@ async function runStartupMigration() {
       `);
 
       await client.query(`
-        CREATE TABLE wb_systems (
+        CREATE TABLE IF NOT EXISTS wb_systems (
           id SERIAL PRIMARY KEY,
           code VARCHAR(50),
           name VARCHAR(255) NOT NULL,
@@ -455,7 +433,7 @@ async function runStartupMigration() {
       `);
 
       await client.query(`
-        CREATE TABLE wb_regions (
+        CREATE TABLE IF NOT EXISTS wb_regions (
           id SERIAL PRIMARY KEY,
           code VARCHAR(255),
           name VARCHAR(255) NOT NULL,
@@ -466,7 +444,7 @@ async function runStartupMigration() {
       `);
 
       await client.query(`
-        CREATE TABLE wb_demands (
+        CREATE TABLE IF NOT EXISTS wb_demands (
           id SERIAL PRIMARY KEY,
           name VARCHAR(255) NOT NULL,
           description TEXT,
@@ -479,7 +457,7 @@ async function runStartupMigration() {
       `);
 
       await client.query(`
-        CREATE TABLE wb_demand_entries (
+        CREATE TABLE IF NOT EXISTS wb_demand_entries (
           id SERIAL PRIMARY KEY,
           demand_id INTEGER REFERENCES wb_demands(id) ON DELETE CASCADE,
           region_id INTEGER REFERENCES wb_regions(id) ON DELETE CASCADE,
@@ -492,7 +470,7 @@ async function runStartupMigration() {
       `);
 
       await client.query(`
-        CREATE TABLE wb_supply_sources (
+        CREATE TABLE IF NOT EXISTS wb_supply_sources (
           id SERIAL PRIMARY KEY,
           code VARCHAR(255),
           system_id INTEGER REFERENCES wb_systems(id) ON DELETE CASCADE,
@@ -507,7 +485,7 @@ async function runStartupMigration() {
       `);
 
       await client.query(`
-        CREATE TABLE wb_operational_adjustments (
+        CREATE TABLE IF NOT EXISTS wb_operational_adjustments (
           id SERIAL PRIMARY KEY,
           system_id INTEGER REFERENCES wb_systems(id) ON DELETE CASCADE,
           type VARCHAR(100) NOT NULL,
@@ -521,7 +499,7 @@ async function runStartupMigration() {
       `);
 
       await client.query(`
-        CREATE TABLE wb_template_files (
+        CREATE TABLE IF NOT EXISTS wb_template_files (
           id SERIAL PRIMARY KEY,
           name VARCHAR(255) NOT NULL,
           description TEXT,
@@ -530,7 +508,7 @@ async function runStartupMigration() {
       `);
 
       await client.query(`
-        CREATE TABLE wb_water_balance_maps (
+        CREATE TABLE IF NOT EXISTS wb_water_balance_maps (
           id SERIAL PRIMARY KEY,
           water_balance_id INTEGER REFERENCES wb_water_balances(id) ON DELETE CASCADE UNIQUE,
           geojson_data JSONB
@@ -538,7 +516,7 @@ async function runStartupMigration() {
       `);
 
       await client.query(`
-        CREATE TABLE wb_risk_references (
+        CREATE TABLE IF NOT EXISTS wb_risk_references (
           id SERIAL PRIMARY KEY,
           iad VARCHAR(100) NOT NULL,
           risk_classification VARCHAR(255) NOT NULL,
@@ -546,14 +524,16 @@ async function runStartupMigration() {
         );
       `);
 
-      await client.query(`
-        INSERT INTO wb_risk_references (iad, risk_classification, justification) VALUES
-        ('< 120%', 'Risco Alto (Crítico)', '**Inadequação Normativa e Insegurança de Pico.** O critério internacional de estresse severo (WEI+ da Agência Europeia do Ambiente) define insustentabilidade a longo prazo quando a demanda sufoca a oferta renovável. Urbanamente, o coeficiente de variação de consumo diário (K1) é fixado internacionalmente e na ABNT NBR 12218 como 1,2. Uma relação abaixo de 1,2 indica que o sistema não suportará o dia de maior consumo do ano, resultando em desabastecimento imediato de bairros e falha hidráulica.'),
-        ('120% a 130%', 'Risco Médio (Alerta)', '**Perda da Margem de Contingência Operacional.** Nesta faixa, a oferta atende estritamente à demanda no dia de pico urbano (K1 = 1,2), mas a "sobra" física do sistema cai para menos de 10%. Manuais de operação de saneamento e relatórios de risco hídrico apontam que trabalhar com menos de 10% de folga impede paradas para manutenções emergenciais (como queima de bombas) e desprotege a rede contra picos severos de perdas físicas por vazamentos na distribuição.'),
-        ('> 130%', 'Risco Baixo (Adequado)', '**Resiliência e Segurança Hídrica Plena.** Garante o pleno atendimento das flutuações sazonais urbanas recomendadas pela engenharia civil clássica. A margem mínima acima de 30% absorve os coeficientes de pico de consumo, compensa variações na qualidade da água bruta (como turbidez severa em chuvas que reduzem o ritmo das ETAs) e mantém o sistema operando em segurança contínua, em alinhamento com as zonas confortáveis prescritas pela ANA (Agência Nacional de Águas).')
-      `);
+      const riskCountRes = await client.query("SELECT COUNT(*) FROM wb_risk_references");
+      if (parseInt(riskCountRes.rows[0].count, 10) === 0) {
+        await client.query(`
+          INSERT INTO wb_risk_references (iad, risk_classification, justification) VALUES
+          ('< 120%', 'Risco Alto (Crítico)', '**Inadequação Normativa e Insegurança de Pico.** O critério internacional de estresse severo (WEI+ da Agência Europeia do Ambiente) define insustentabilidade a longo prazo quando a demanda sufoca a oferta renovável. Urbanamente, o coeficiente de variação de consumo diário (K1) é fixado internacionalmente e na ABNT NBR 12218 como 1,2. Uma relação abaixo de 1,2 indica que o sistema não suportará o dia de maior consumo do ano, resultando em desabastecimento imediato de bairros e falha hidráulica.'),
+          ('120% a 130%', 'Risco Médio (Alerta)', '**Perda da Margem de Contingência Operacional.** Nesta faixa, a oferta atende estritamente à demanda no dia de pico urbano (K1 = 1,2), mas a "sobra" física do sistema cai para menos de 10%. Manuais de operação de saneamento e relatórios de risco hídrico apontam que trabalhar com menos de 10% de folga impede paradas para manutenções emergenciais (como queima de bombas) e desprotege a rede contra picos severos de perdas físicas por vazamentos na distribuição.'),
+          ('> 130%', 'Risco Baixo (Adequado)', '**Resiliência e Segurança Hídrica Plena.** Garante o pleno atendimento das flutuações sazonais urbanas recomendadas pela engenharia civil clássica. A margem mínima acima de 30% absorve os coeficientes de pico de consumo, compensa variações na qualidade da água bruta (como turbidez severa em chuvas que reduzem o ritmo das ETAs) e mantém o sistema operando em segurança contínua, em alinhamento com as zonas confortáveis prescritas pela ANA (Agência Nacional de Águas).')
+        `);
+      }
 
-      // Create tasks table
       await client.query(`
         CREATE TABLE IF NOT EXISTS pl_tasks (
           id SERIAL PRIMARY KEY,
@@ -604,13 +584,59 @@ async function runStartupMigration() {
           PRIMARY KEY (task_id, category_id)
         );
       `);
+      
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS pl_plans (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(255),
+          title VARCHAR(255),
+          description TEXT
+        );
+      `);
+      
+      await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS plan_id INTEGER REFERENCES pl_plans(id) ON DELETE SET NULL;`);
+      
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS pl_responsibles (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          email VARCHAR(255),
+          role VARCHAR(100)
+        );
+      `);
+      
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS pl_responsible_areas (
+          responsible_id INTEGER REFERENCES pl_responsibles(id) ON DELETE CASCADE,
+          area_id INTEGER REFERENCES pl_areas(id) ON DELETE CASCADE,
+          PRIMARY KEY (responsible_id, area_id)
+        );
+      `);
+      
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS pl_task_areas (
+          task_id INTEGER REFERENCES pl_tasks(id) ON DELETE CASCADE,
+          area_id INTEGER REFERENCES pl_areas(id) ON DELETE CASCADE,
+          PRIMARY KEY (task_id, area_id)
+        );
+      `);
+      
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS pl_task_responsibles (
+          task_id INTEGER REFERENCES pl_tasks(id) ON DELETE CASCADE,
+          responsible_id INTEGER REFERENCES pl_responsibles(id) ON DELETE CASCADE,
+          PRIMARY KEY (task_id, responsible_id)
+        );
+      `);
 
-      // Seed the tasks
+      // Seed the tasks (checks if it exists internally)
       await seedTasks(client);
 
+      // Verify that depends_on_task_id exists
+      await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS depends_on_task_id INTEGER REFERENCES pl_tasks(id) ON DELETE SET NULL;`);
+
       await client.query("COMMIT");
-      console.log("Database tables migrated successfully on server start!");
-      fs.writeFileSync(markerPath, "Migrated on start 2026-05-28", "utf8");
+      console.log("Database tables verified successfully on server start!");
     } catch (err) {
       await client.query("ROLLBACK");
       throw err;
@@ -618,11 +644,13 @@ async function runStartupMigration() {
       client.release();
     }
   } catch (err) {
-    console.error("Failed to migrate database schema on startup:", err);
+    console.error("Failed to verify/migrate database schema on startup:", err);
   }
 }
 
 async function startServer() {
+  await runStartupMigration();
+
   const app = express();
   const PORT = 3000;
 
@@ -1077,174 +1105,22 @@ async function startServer() {
       const pool = getDbPool();
       const client = await pool.connect();
       try {
-        await client.query("BEGIN");
-        await client.query("DROP TABLE IF EXISTS scenario_entries CASCADE");
-        await client.query("DROP TABLE IF EXISTS scenarios CASCADE");
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS wb_water_balances (
-            id SERIAL PRIMARY KEY,
-            description TEXT NOT NULL,
-            responsible VARCHAR(255) NOT NULL,
-            delivery_date TIMESTAMP,
-            received_by VARCHAR(255),
-            receipt_date TIMESTAMP,
-            status VARCHAR(50) NOT NULL
-          );
-        `);
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS wb_systems (
-            id SERIAL PRIMARY KEY,
-            code VARCHAR(50),
-            name VARCHAR(255) NOT NULL,
-            water_balance_id INTEGER REFERENCES wb_water_balances(id) ON DELETE CASCADE
-          );
-        `);
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS wb_regions (
-            id SERIAL PRIMARY KEY,
-            code VARCHAR(255),
-            name VARCHAR(255) NOT NULL,
-            system_id INTEGER REFERENCES wb_systems(id) ON DELETE CASCADE,
-            description TEXT,
-            water_balance_id INTEGER REFERENCES wb_water_balances(id) ON DELETE CASCADE
-          );
-        `);
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS wb_demands (
-            id SERIAL PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
-            description TEXT,
-            modifiers_population NUMERIC,
-            modifiers_coverage NUMERIC,
-            modifiers_per_capita NUMERIC,
-            modifiers_losses NUMERIC,
-            water_balance_id INTEGER REFERENCES wb_water_balances(id) ON DELETE CASCADE
-          );
-        `);
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS wb_demand_entries (
-            id SERIAL PRIMARY KEY,
-            demand_id INTEGER REFERENCES wb_demands(id) ON DELETE CASCADE,
-            region_id INTEGER REFERENCES wb_regions(id) ON DELETE CASCADE,
-            year INTEGER NOT NULL,
-            population NUMERIC NOT NULL,
-            coverage NUMERIC NOT NULL,
-            per_capita_consumption NUMERIC NOT NULL,
-            losses NUMERIC NOT NULL
-          );
-        `);
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS wb_supply_sources (
-            id SERIAL PRIMARY KEY,
-            code VARCHAR(255),
-            system_id INTEGER REFERENCES wb_systems(id) ON DELETE CASCADE,
-            name VARCHAR(255) NOT NULL,
-            type VARCHAR(255) NOT NULL,
-            granted_flow NUMERIC NOT NULL,
-            operational_flow NUMERIC NOT NULL,
-            unavailable_flow NUMERIC NOT NULL,
-            unavailability_reason TEXT,
-            water_balance_id INTEGER REFERENCES wb_water_balances(id) ON DELETE CASCADE
-          );
-        `);
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS wb_operational_adjustments (
-            id SERIAL PRIMARY KEY,
-            system_id INTEGER REFERENCES wb_systems(id) ON DELETE CASCADE,
-            type VARCHAR(100) NOT NULL,
-            description TEXT NOT NULL,
-            start_year INTEGER NOT NULL,
-            end_year INTEGER NOT NULL,
-            flow_value NUMERIC NOT NULL,
-            water_balance_id INTEGER REFERENCES wb_water_balances(id) ON DELETE CASCADE,
-            linked_adjustment_id INTEGER REFERENCES wb_operational_adjustments(id) ON DELETE SET NULL
-          );
-        `);
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS wb_template_files (
-            id SERIAL PRIMARY KEY,
-            name VARCHAR(255) NOT NULL,
-            description TEXT,
-            url TEXT
-          );
-        `);
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS wb_water_balance_maps (
-            id SERIAL PRIMARY KEY,
-            water_balance_id INTEGER REFERENCES wb_water_balances(id) ON DELETE CASCADE UNIQUE,
-            geojson_data JSONB
-          );
-        `);
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS wb_risk_references (
-            id SERIAL PRIMARY KEY,
-            iad VARCHAR(100) NOT NULL,
-            risk_classification VARCHAR(255) NOT NULL,
-            justification TEXT NOT NULL
-          );
-        `);
-        const countResult = await client.query("SELECT COUNT(*) FROM wb_risk_references");
-        if (parseInt(countResult.rows[0].count, 10) === 0) {
-          await client.query(`
-            INSERT INTO wb_risk_references (iad, risk_classification, justification) VALUES
-            ('< 120%', 'Risco Alto (Crítico)', '**Inadequação Normativa e Insegurança de Pico.** O critério internacional de estresse severo (WEI+ da Agência Europeia do Ambiente) define insustentabilidade a longo prazo quando a demanda sufoca a oferta renovável. Urbanamente, o coeficiente de variação de consumo diário (K1) é fixado internacionalmente e na ABNT NBR 12218 como 1,2. Uma relação abaixo de 1,2 indica que o sistema não suportará o dia de maior consumo do ano, resultando em desabastecimento imediato de bairros e falha hidráulica.'),
-            ('120% a 130%', 'Risco Médio (Alerta)', '**Perda da Margem de Contingência Operacional.** Nesta faixa, a oferta atende estritamente à demanda no dia de pico urbano (K1 = 1,2), mas a "sobra" física do sistema cai para menos de 10%. Manuais de operação de saneamento e relatórios de risco hídrico apontam que trabalhar com menos de 10% de folga impede paradas para manutenções emergenciais (como queima de bombas) e desprotege a rede contra picos severos de perdas físicas por vazamentos na distribuição.'),
-            ('> 130%', 'Risco Baixo (Adequado)', '**Resiliência e Segurança Hídrica Plena.** Garante o pleno atendimento das flutuações sazonais urbanas recomendadas pela engenharia civil clássica. A margem mínima acima de 30% absorve os coeficientes de pico de consumo, compensa variações na qualidade da água bruta (como turbidez severa em chuvas que reduzem o ritmo das ETAs) e mantém o sistema operando em segurança contínua, em alinhamento com as zonas confortáveis prescritas pela ANA (Agência Nacional de Águas).')
-          `);
-        }
-
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS pl_tasks (
-            id SERIAL PRIMARY KEY,
-            title TEXT NOT NULL,
-            description TEXT,
-            start_date TIMESTAMP,
-            end_date TIMESTAMP,
-            status VARCHAR(50) NOT NULL DEFAULT 'pending',
-            parent_id INTEGER REFERENCES pl_tasks(id) ON DELETE CASCADE,
-            progress INTEGER DEFAULT 0,
-            priority VARCHAR(50),
-            category VARCHAR(100),
-            assigned_to VARCHAR(255),
-            created_by VARCHAR(255),
-            notes TEXT
-          );
-        `);
-        await client.query("CREATE INDEX IF NOT EXISTS idx_tasks_parent_id ON pl_tasks(parent_id);");
-        await seedTasks(client);
-
-        await client.query(`
-          UPDATE wb_demands SET modifiers_coverage = NULL WHERE modifiers_coverage = 0;
-        `);
-        await client.query(`
-          UPDATE wb_demands SET modifiers_losses = NULL WHERE modifiers_losses = 0;
-        `);
-        await client.query("COMMIT");
-      } catch (err) {
-        await client.query("ROLLBACK");
-        console.error("Erro no INIT DB inline", err);
-      } finally {
-        client.release();
-      }
-
-      const clientRead = await pool.connect();
-      try {
-        const dbWaterBalances = await clientRead.query("SELECT * FROM wb_water_balances");
-        const dbSystems = await clientRead.query("SELECT * FROM wb_systems");
-        const dbRegions = await clientRead.query("SELECT * FROM wb_regions");
-        const dbDemands = await clientRead.query("SELECT * FROM wb_demands");
-        const dbDemandEntries = await clientRead.query("SELECT * FROM wb_demand_entries");
-        const dbSupplySources = await clientRead.query("SELECT * FROM wb_supply_sources");
-        const dbOperationalAdjustments = await clientRead.query("SELECT * FROM wb_operational_adjustments");
-        const dbTemplateFiles = await clientRead.query("SELECT * FROM wb_template_files");
-        const dbRiskReferences = await clientRead.query("SELECT * FROM wb_risk_references ORDER BY id ASC");
-        const dbTasks = await clientRead.query("SELECT * FROM pl_tasks ORDER BY id ASC");
-        const dbPlans = await clientRead.query("SELECT * FROM pl_plans ORDER BY id ASC");
-        const dbAreas = await clientRead.query("SELECT * FROM pl_areas ORDER BY id ASC");
-        const dbResponsibles = await clientRead.query("SELECT * FROM pl_responsibles ORDER BY id ASC");
-        const dbResponsibleAreas = await clientRead.query("SELECT * FROM pl_responsible_areas");
-        const dbTaskAreas = await clientRead.query("SELECT * FROM pl_task_areas");
-        const dbTaskResponsibles = await clientRead.query("SELECT * FROM pl_task_responsibles");
+        const dbWaterBalances = await client.query("SELECT * FROM wb_water_balances");
+        const dbSystems = await client.query("SELECT * FROM wb_systems");
+        const dbRegions = await client.query("SELECT * FROM wb_regions");
+        const dbDemands = await client.query("SELECT * FROM wb_demands");
+        const dbDemandEntries = await client.query("SELECT * FROM wb_demand_entries");
+        const dbSupplySources = await client.query("SELECT * FROM wb_supply_sources");
+        const dbOperationalAdjustments = await client.query("SELECT * FROM wb_operational_adjustments");
+        const dbTemplateFiles = await client.query("SELECT * FROM wb_template_files");
+        const dbRiskReferences = await client.query("SELECT * FROM wb_risk_references ORDER BY id ASC");
+        const dbTasks = await client.query("SELECT * FROM pl_tasks ORDER BY id ASC");
+        const dbPlans = await client.query("SELECT * FROM pl_plans ORDER BY id ASC");
+        const dbAreas = await client.query("SELECT * FROM pl_areas ORDER BY id ASC");
+        const dbResponsibles = await client.query("SELECT * FROM pl_responsibles ORDER BY id ASC");
+        const dbResponsibleAreas = await client.query("SELECT * FROM pl_responsible_areas");
+        const dbTaskAreas = await client.query("SELECT * FROM pl_task_areas");
+        const dbTaskResponsibles = await client.query("SELECT * FROM pl_task_responsibles");
 
         const responsibleAreasMap: Record<number, number[]> = {};
         dbResponsibleAreas.rows.forEach(r => {
@@ -1397,7 +1273,7 @@ async function startServer() {
 
         res.json({ success: true, data: payload });
       } finally {
-        clientRead.release();
+        client.release();
       }
     } catch (error: any) {
       if (error && error.message === "A variável DATABASE_URL (Neon PostgreSQL) está ausente no ambiente.") {
@@ -2932,20 +2808,6 @@ async function startServer() {
        if (req.path.startsWith('/api')) return res.status(404).end();
        res.sendFile(path.join(distPath, 'index.html'));
     });
-  }
-
-  // Add dependency column safely
-  try {
-    const pool = getDbPool();
-    const client = await pool.connect();
-    try {
-      await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS depends_on_task_id INTEGER REFERENCES pl_tasks(id) ON DELETE SET NULL;`);
-      await client.query(`ALTER TABLE pl_areas ADD COLUMN IF NOT EXISTS abbreviation VARCHAR(2);`);
-    } finally {
-      client.release();
-    }
-  } catch (error) {
-    console.error("Migration failed:", error);
   }
 
   app.listen(PORT, "0.0.0.0", () => {

@@ -40,7 +40,17 @@ import {
   Briefcase,
   Calendar,
   Home,
-  Shield
+  Shield,
+  PanelLeftClose,
+  PanelLeftOpen,
+  LayoutDashboard,
+  Map as MapIcon,
+  Layers,
+  Tags,
+  Users,
+  FilePlus,
+  BarChart2,
+  GitCompare
 } from "lucide-react";
 import {
   LineChart,
@@ -347,6 +357,7 @@ export default function App() {
     "list" | "balance" | "systems" | "demand" | "supply"
   >("list");
   
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [templateFiles, setTemplateFiles] = useState<{ id: number | string, name: string, description: string, url: string }[]>([]);
   const [demandSubTab, setDemandSubTab] = useState<"edit" | "view">("edit");
   const [supplySubTab, setSupplySubTab] = useState<"edit" | "view">("edit");
@@ -1417,6 +1428,11 @@ export default function App() {
     return analyzeBalanceSystemSaldoDataAllYears[analyzeBalanceYear] || [];
   }, [analyzeBalanceYear, analyzeBalanceSystemSaldoDataAllYears]);
 
+  /**
+   * Calculates the evolution of water supply over time.
+   * Time Complexity: O(Y * S + Adj) instead of O(Y * S * Adj) because of pre-computation
+   * Space Complexity: O(Y * S) to store the supply map
+   */
   const analyzeSupplyData = useMemo(() => {
     const activeWb = waterBalances.find(wb => wb.id === analyzeBalanceId);
     if (!activeWb) return { evolution: [], overview: null, systemIncrement: [], systemDistributionStart: [], systemDistributionEnd: [] };
@@ -1444,15 +1460,24 @@ export default function App() {
 
     let startSupplyTotal = 0;
     
+    // Pre-calculate initial supply and adjustments per system to improve O(Y*S*A) -> O(S + Y*S*A(reduced))
+    const sysDataMap = new Map<string, { initialSupply: number, adjs: typeof wbAdjs }>();
+    wbSystems.forEach(sys => {
+      const initialSupply = wbSources.filter(s => s.systemId === sys.id).reduce((acc, curr) => acc + curr.operationalFlow, 0);
+      const sysAdjs = wbAdjs.filter(a => a.systemId === sys.id);
+      sysDataMap.set(sys.id, { initialSupply, adjs: sysAdjs });
+    });
+    
     years.forEach(year => {
       let totalSupply = 0;
       if (!systemSupplyMap[year]) systemSupplyMap[year] = {};
       
       wbSystems.forEach(sys => {
-        const initialSupply = wbSources.filter(s => s.systemId === sys.id).reduce((acc, curr) => acc + curr.operationalFlow, 0);
-        let currentSupply = initialSupply;
-        const sysAdjs = wbAdjs.filter(a => a.systemId === sys.id);
-        sysAdjs.forEach(adj => {
+        const sysData = sysDataMap.get(sys.id);
+        if (!sysData) return;
+        
+        let currentSupply = sysData.initialSupply;
+        sysData.adjs.forEach(adj => {
           if (year >= adj.startYear && year <= adj.endYear) {
             if (adj.type === "Aumento da vazão" || adj.type === "Transferência") currentSupply += adj.flowValue;
             else if (adj.type === "Redução da vazão") currentSupply -= adj.flowValue;
@@ -3235,35 +3260,35 @@ const renderSupplyTable = () => {
                     onClick={() => { setActivePlanningSubTab("dashboard"); handleTabChange("planning"); }}
                     className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "planning" && activePlanningSubTab === "dashboard" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
                   >
-                    <BarChart3 size={20} className={activeTab === "planning" && activePlanningSubTab === "dashboard" ? "text-adasa-mid" : "text-white/60"} />
+                    <LayoutDashboard size={20} className={activeTab === "planning" && activePlanningSubTab === "dashboard" ? "text-adasa-mid" : "text-white/60"} />
                     Painel de Atividades
                   </button>
                   <button
                     onClick={() => { setActivePlanningSubTab("plans"); handleTabChange("planning"); }}
                     className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "planning" && activePlanningSubTab === "plans" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
                   >
-                    <LayoutGrid size={20} className={activeTab === "planning" && activePlanningSubTab === "plans" ? "text-adasa-mid" : "text-white/60"} />
+                    <MapIcon size={20} className={activeTab === "planning" && activePlanningSubTab === "plans" ? "text-adasa-mid" : "text-white/60"} />
                     Cadastrar Planos
                   </button>
                   <button
                     onClick={() => { setActivePlanningSubTab("areas"); handleTabChange("planning"); }}
                     className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "planning" && activePlanningSubTab === "areas" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
                   >
-                    <LayoutGrid size={20} className={activeTab === "planning" && activePlanningSubTab === "areas" ? "text-adasa-mid" : "text-white/60"} />
+                    <Layers size={20} className={activeTab === "planning" && activePlanningSubTab === "areas" ? "text-adasa-mid" : "text-white/60"} />
                     Cadastrar Áreas Temáticas
                   </button>
                   <button
                     onClick={() => { setActivePlanningSubTab("categories"); handleTabChange("planning"); }}
                     className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "planning" && activePlanningSubTab === "categories" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
                   >
-                    <LayoutGrid size={20} className={activeTab === "planning" && activePlanningSubTab === "categories" ? "text-adasa-mid" : "text-white/60"} />
+                    <Tags size={20} className={activeTab === "planning" && activePlanningSubTab === "categories" ? "text-adasa-mid" : "text-white/60"} />
                     Cadastrar Categorias
                   </button>
                   <button
                     onClick={() => { setActivePlanningSubTab("responsibles"); handleTabChange("planning"); }}
                     className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "planning" && activePlanningSubTab === "responsibles" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
                   >
-                    <LayoutGrid size={20} className={activeTab === "planning" && activePlanningSubTab === "responsibles" ? "text-adasa-mid" : "text-white/60"} />
+                    <Users size={20} className={activeTab === "planning" && activePlanningSubTab === "responsibles" ? "text-adasa-mid" : "text-white/60"} />
                     Cadastrar Responsáveis
                   </button>
                 </div>
@@ -3282,21 +3307,21 @@ const renderSupplyTable = () => {
                       onClick={() => handleTabChange("manage")}
                       className={cn("w-full px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "manage" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
                     >
-                      <LayoutGrid size={20} className={activeTab === "manage" ? "text-adasa-mid" : "text-white/60"} />
+                      <FilePlus size={20} className={activeTab === "manage" ? "text-adasa-mid" : "text-white/60"} />
                       Cadastrar Balanço
                     </button>
                     <button
                       onClick={() => handleTabChange("analyze")}
                       className={cn("w-full px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "analyze" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
                     >
-                      <TrendingUp size={20} className={activeTab === "analyze" ? "text-adasa-mid" : "text-white/60"} />
+                      <BarChart2 size={20} className={activeTab === "analyze" ? "text-adasa-mid" : "text-white/60"} />
                       Analisar Balanço
                     </button>
                     <button
                       onClick={() => handleTabChange("compare")}
                       className={cn("w-full px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "compare" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
                     >
-                      <ArrowRightLeft size={20} className={activeTab === "compare" ? "text-adasa-mid" : "text-white/60"} />
+                      <GitCompare size={20} className={activeTab === "compare" ? "text-adasa-mid" : "text-white/60"} />
                       Comparar Balanço
                     </button>
                     <button
@@ -3315,27 +3340,42 @@ const renderSupplyTable = () => {
       </AnimatePresence>
 
       {/* Sidebar Navigation */}
-      <aside className="hidden md:flex w-64 bg-adasa-dark flex-col p-6 transition-all border-r border-adasa-dark/20 h-screen sticky top-0 z-20">
-        <div className="flex items-center gap-3 mb-10 overflow-hidden">
+      <aside
+        className={cn(
+          "hidden md:flex bg-adasa-dark flex-col p-6 transition-all border-r border-adasa-dark/20 h-screen sticky top-0 z-20",
+          isSidebarCollapsed ? "w-20 p-4 items-center" : "w-64"
+        )}
+      >
+        <button
+          onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+          className="absolute -right-3 top-10 bg-adasa-dark text-white rounded-full p-1 shadow-md border border-white/10 hover:bg-adasa-mid transition-colors z-50"
+        >
+          {isSidebarCollapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+        </button>
+
+        <div className={cn("flex items-center gap-3 mb-10 overflow-hidden", isSidebarCollapsed ? "justify-center" : "")}>
           <div className="w-10 h-10 bg-adasa-mid rounded-xl flex-shrink-0 flex items-center justify-center font-bold text-white shadow-lg shadow-adasa-mid/20">
             <TrendingUp size={22} />
           </div>
-          <div className="hidden md:block">
-            <div className="flex flex-col">
-              <span className="text-xl font-black text-white tracking-tight block leading-tight">
-                Gerencial SAE
-              </span>
-              <span className="text-[10px] font-medium text-white/40 block mt-1 tracking-widest uppercase">
-                Gerenciamento ABC
-              </span>
+          {!isSidebarCollapsed && (
+            <div className="hidden md:block">
+              <div className="flex flex-col">
+                <span className="text-xl font-black text-white tracking-tight block leading-tight">
+                  Gerencial SAE
+                </span>
+                <span className="text-[10px] font-medium text-white/40 block mt-1 tracking-widest uppercase">
+                  Gerenciamento ABC
+                </span>
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
-        <nav className="space-y-4 flex-1 text-white overflow-y-auto pb-4 custom-scrollbar pr-2">
+        <nav className="space-y-4 flex-1 w-full text-white overflow-y-auto pb-4 custom-scrollbar pr-2">
           <div>
             <div className="space-y-1 mb-2">
               <button
+                title={isSidebarCollapsed ? "Início" : undefined}
                 onClick={() => handleTabChange("home")}
                 className={cn(
                   "w-full px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
@@ -3351,17 +3391,20 @@ const renderSupplyTable = () => {
                     activeTab === "home" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
                   )}
                 />
-                <span className="hidden md:inline">Início</span>
+                {!isSidebarCollapsed && <span className="hidden md:inline">Início</span>}
               </button>
             </div>
           </div>
 
           <div>
-            <h4 className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-2 flex items-center gap-1.5 px-2 mt-2">
-              <ListTodo size={12} /> Plano de Atividades
-            </h4>
+            {!isSidebarCollapsed && (
+              <h4 className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-2 flex items-center gap-1.5 px-2 mt-2">
+                <ListTodo size={12} /> Plano de Atividades
+              </h4>
+            )}
             <div className="space-y-1">
               <button
+                title={isSidebarCollapsed ? "Cadastrar Atividades" : undefined}
                 onClick={() => { setActivePlanningSubTab("tasks"); handleTabChange("planning"); }}
                 className={cn(
                   "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
@@ -3377,9 +3420,10 @@ const renderSupplyTable = () => {
                     activeTab === "planning" && activePlanningSubTab === "tasks" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
                   )}
                 />
-                <span className="hidden md:inline">Cadastrar Atividades</span>
+                {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Atividades</span>}
               </button>
               <button
+                title={isSidebarCollapsed ? "Painel de Atividades" : undefined}
                 onClick={() => { setActivePlanningSubTab("dashboard"); handleTabChange("planning"); }}
                 className={cn(
                   "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
@@ -3388,16 +3432,17 @@ const renderSupplyTable = () => {
                     : "text-white/60 hover:text-white hover:bg-white/5",
                 )}
               >
-                <BarChart3
+                <LayoutDashboard
                   size={16}
                   className={cn(
                     "flex-shrink-0 transition-colors",
                     activeTab === "planning" && activePlanningSubTab === "dashboard" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
                   )}
                 />
-                <span className="hidden md:inline">Painel de Atividades</span>
+                {!isSidebarCollapsed && <span className="hidden md:inline">Painel de Atividades</span>}
               </button>
               <button
+                title={isSidebarCollapsed ? "Cadastrar Planos" : undefined}
                 onClick={() => { setActivePlanningSubTab("plans"); handleTabChange("planning"); }}
                 className={cn(
                   "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
@@ -3406,16 +3451,17 @@ const renderSupplyTable = () => {
                     : "text-white/60 hover:text-white hover:bg-white/5",
                 )}
               >
-                <LayoutGrid
+                <MapIcon
                   size={16}
                   className={cn(
                     "flex-shrink-0 transition-colors",
                     activeTab === "planning" && activePlanningSubTab === "plans" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
                   )}
                 />
-                <span className="hidden md:inline">Cadastrar Planos</span>
+                {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Planos</span>}
               </button>
               <button
+                title={isSidebarCollapsed ? "Cadastrar Áreas Temáticas" : undefined}
                 onClick={() => { setActivePlanningSubTab("areas"); handleTabChange("planning"); }}
                 className={cn(
                   "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
@@ -3424,16 +3470,17 @@ const renderSupplyTable = () => {
                     : "text-white/60 hover:text-white hover:bg-white/5",
                 )}
               >
-                <LayoutGrid
+                <Layers
                   size={16}
                   className={cn(
                     "flex-shrink-0 transition-colors",
                     activeTab === "planning" && activePlanningSubTab === "areas" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
                   )}
                 />
-                <span className="hidden md:inline">Cadastrar Áreas Temáticas</span>
+                {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Áreas Temáticas</span>}
               </button>
               <button
+                title={isSidebarCollapsed ? "Cadastrar Categorias" : undefined}
                 onClick={() => { setActivePlanningSubTab("categories"); handleTabChange("planning"); }}
                 className={cn(
                   "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
@@ -3442,16 +3489,17 @@ const renderSupplyTable = () => {
                     : "text-white/60 hover:text-white hover:bg-white/5",
                 )}
               >
-                <LayoutGrid
+                <Tags
                   size={16}
                   className={cn(
                     "flex-shrink-0 transition-colors",
                     activeTab === "planning" && activePlanningSubTab === "categories" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
                   )}
                 />
-                <span className="hidden md:inline">Cadastrar Categorias</span>
+                {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Categorias</span>}
               </button>
               <button
+                title={isSidebarCollapsed ? "Cadastrar Responsáveis" : undefined}
                 onClick={() => { setActivePlanningSubTab("responsibles"); handleTabChange("planning"); }}
                 className={cn(
                   "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
@@ -3460,28 +3508,33 @@ const renderSupplyTable = () => {
                     : "text-white/60 hover:text-white hover:bg-white/5",
                 )}
               >
-                <LayoutGrid
+                <Users
                   size={16}
                   className={cn(
                     "flex-shrink-0 transition-colors",
                     activeTab === "planning" && activePlanningSubTab === "responsibles" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
                   )}
                 />
-                <span className="hidden md:inline">Cadastrar Responsáveis</span>
+                {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Responsáveis</span>}
               </button>
             </div>
           </div>
 
           <div>
-            <h4 className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1 flex items-center gap-1.5 px-2">
-              <Shield size={12} /> Fiscalização
-            </h4>
-            <div className="pl-3 border-l border-white/10 ml-3 space-y-2 mt-2 mb-3">
-              <h5 className="text-[9px] font-bold text-white/55 uppercase tracking-wider mb-1 flex items-center gap-1.5 px-1">
-                <Droplets size={10} /> Balanço Hídricos
-              </h5>
+            {!isSidebarCollapsed && (
+              <h4 className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1 flex items-center gap-1.5 px-2">
+                <Shield size={12} /> Fiscalização
+              </h4>
+            )}
+            <div className={cn(isSidebarCollapsed ? "" : "pl-3 border-l border-white/10 ml-3", "space-y-2 mt-2 mb-3")}>
+              {!isSidebarCollapsed && (
+                <h5 className="text-[9px] font-bold text-white/55 uppercase tracking-wider mb-1 flex items-center gap-1.5 px-1">
+                  <Droplets size={10} /> Balanço Hídricos
+                </h5>
+              )}
               <div className="space-y-1">
                 <button
+                  title={isSidebarCollapsed ? "Cadastrar Balanço" : undefined}
                   onClick={() => handleTabChange("manage")}
                   className={cn(
                     "w-full px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
@@ -3490,16 +3543,17 @@ const renderSupplyTable = () => {
                       : "text-white/60 hover:text-white hover:bg-white/5",
                   )}
                 >
-                  <LayoutGrid
+                  <FilePlus
                     size={16}
                     className={cn(
                       "flex-shrink-0 transition-colors",
                       activeTab === "manage" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
                     )}
                   />
-                  <span className="hidden md:inline">Cadastrar Balanço</span>
+                  {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Balanço</span>}
                 </button>
                 <button
+                  title={isSidebarCollapsed ? "Analisar Balanço" : undefined}
                   onClick={() => handleTabChange("analyze")}
                   className={cn(
                     "w-full px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
@@ -3508,16 +3562,17 @@ const renderSupplyTable = () => {
                       : "text-white/60 hover:text-white hover:bg-white/5",
                   )}
                 >
-                  <TrendingUp
+                  <BarChart2
                     size={16}
                     className={cn(
                       "flex-shrink-0 transition-colors",
                       activeTab === "analyze" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
                     )}
                   />
-                  <span className="hidden md:inline">Analisar Balanço</span>
+                  {!isSidebarCollapsed && <span className="hidden md:inline">Analisar Balanço</span>}
                 </button>
                 <button
+                  title={isSidebarCollapsed ? "Comparar Balanços" : undefined}
                   onClick={() => handleTabChange("compare")}
                   className={cn(
                     "w-full px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
@@ -3526,16 +3581,17 @@ const renderSupplyTable = () => {
                       : "text-white/60 hover:text-white hover:bg-white/5",
                   )}
                 >
-                  <ArrowRightLeft
+                  <GitCompare
                     size={16}
                     className={cn(
                       "flex-shrink-0 transition-colors",
                       activeTab === "compare" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
                     )}
                   />
-                  <span className="hidden md:inline">Comparar Balanços</span>
+                  {!isSidebarCollapsed && <span className="hidden md:inline">Comparar Balanços</span>}
                 </button>
                 <button
+                  title={isSidebarCollapsed ? "Arquivos de Modelo" : undefined}
                   onClick={() => handleTabChange("templates")}
                   className={cn(
                     "w-full px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
@@ -3551,7 +3607,7 @@ const renderSupplyTable = () => {
                       activeTab === "templates" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
                     )}
                   />
-                  <span className="hidden md:inline">Arquivos de Modelo</span>
+                  {!isSidebarCollapsed && <span className="hidden md:inline">Arquivos de Modelo</span>}
                 </button>
               </div>
             </div>
@@ -3566,17 +3622,6 @@ const renderSupplyTable = () => {
           >
             <RefreshCw size={14} /> Sync
           </button>
-          <div className="p-4 bg-white/5 rounded-2xl border border-white/10">
-            <p className="text-[10px] text-white/40 mb-2 font-black uppercase tracking-widest">
-              Status do Sistema
-            </p>
-            <div className="flex items-center gap-2">
-              <div className="w-2 h-2 bg-adasa-green rounded-full animate-pulse shadow-[0_0_8px_rgba(0,150,64,0.5)]"></div>
-              <span className="text-[10px] text-white/80 font-bold uppercase tracking-wider">
-                Operacional
-              </span>
-            </div>
-          </div>
         </div>
       </aside>
 

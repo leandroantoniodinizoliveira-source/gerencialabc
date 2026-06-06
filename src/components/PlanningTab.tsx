@@ -111,7 +111,7 @@ const CustomAreaTooltip = ({ active, payload }: any) => {
           <div 
             className={cn(
               "h-full rounded-full",
-              data["Progresso Médio (%)"] === 100 ? "bg-emerald-500" : data["Progresso Médio (%)"] >= 50 ? "bg-blue-500" : "bg-amber-500"
+              data["Progresso Médio (%)"] === 100 ? "bg-emerald-500" : data["Progresso Médio (%)"] >= 50 ? "bg-blue-500" : data["Progresso Médio (%)"] > 0 ? "bg-slate-400" : "bg-slate-300"
             )}
             style={{ width: `${data["Progresso Médio (%)"]}%` }}
           />
@@ -708,12 +708,16 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
       const areaTasks = filteredTasks.filter(t => t.areaIds?.includes(area.id));
       const total = areaTasks.length;
       const completed = areaTasks.filter(t => normalizeStatus(t.status) === "Concluída").length;
+      const inProgress = areaTasks.filter(t => normalizeStatus(t.status) === "Em andamento").length;
+      const pending = areaTasks.filter(t => normalizeStatus(t.status) === "Não iniciada").length;
       const avgProg = total > 0 ? Math.round(areaTasks.reduce((acc, t) => acc + (t.progress || 0), 0) / total) : 0;
       return {
         name: area.name,
         fullName: area.name,
         "Progresso Médio (%)": avgProg,
         "Total de Tarefas": total,
+        "Não iniciada": pending,
+        "Em andamento": inProgress,
         "Concluídas": completed
       };
     }).filter(d => d["Total de Tarefas"] > 0);
@@ -1307,31 +1311,34 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
     return list;
   }, [groupedPlanQuarterAreaData, expandedPlanQuarterAreaGroups]);
 
-  const areaTimelineData = useMemo(() => {
-    const areaMap: Record<number, any> = {};
+  const planAreaTimelineData = useMemo(() => {
+    const planMap: Record<number, { plan: Plan; tasks: Task[]; areaMap: Record<number, { area: Pick<Area, "id"|"name">; tasks: Task[] }> }> = {};
     
-    areas.forEach(a => {
-      areaMap[a.id] = {
-        id: a.id,
-        name: a.name,
-        quarters: {
-          1: { total: 0, pending: 0, inProgress: 0, completed: 0, sumProgress: 0, progress: 0 },
-          2: { total: 0, pending: 0, inProgress: 0, completed: 0, sumProgress: 0, progress: 0 },
-          3: { total: 0, pending: 0, inProgress: 0, completed: 0, sumProgress: 0, progress: 0 },
-          4: { total: 0, pending: 0, inProgress: 0, completed: 0, sumProgress: 0, progress: 0 }
-        }
-      };
+    plans.forEach(p => {
+      planMap[p.id] = { plan: p, tasks: [], areaMap: {} };
     });
-    areaMap[0] = {
-      id: 0,
-      name: "Outras Áreas / Sem Área",
-      quarters: {
-        1: { total: 0, pending: 0, inProgress: 0, completed: 0, sumProgress: 0, progress: 0 },
-        2: { total: 0, pending: 0, inProgress: 0, completed: 0, sumProgress: 0, progress: 0 },
-        3: { total: 0, pending: 0, inProgress: 0, completed: 0, sumProgress: 0, progress: 0 },
-        4: { total: 0, pending: 0, inProgress: 0, completed: 0, sumProgress: 0, progress: 0 }
-      }
-    };
+    const NO_PLAN_ID = 0;
+    planMap[NO_PLAN_ID] = { plan: { id: 0, name: "Sem Plano Vinculado", description: "" }, tasks: [], areaMap: {} };
+
+    // Group tasks
+    filteredTasks.forEach(t => {
+      const pId = t.planId || NO_PLAN_ID;
+      if (!planMap[pId]) return;
+      planMap[pId].tasks.push(t);
+      
+      const hasArea = t.areaIds && t.areaIds.length > 0;
+      const areaList = hasArea ? t.areaIds : [0];
+      
+      areaList.forEach(aId => {
+        if (!planMap[pId].areaMap[aId]) {
+           planMap[pId].areaMap[aId] = {
+             area: aId ? areas.find(a => a.id === aId) || { id: 0, name: "Sem Área" } : { id: 0, name: "Sem Área" },
+             tasks: []
+           };
+        }
+        planMap[pId].areaMap[aId].tasks.push(t);
+      });
+    });
 
     const taskInQuarter = (tk: Task, q: number): boolean => {
       if (!tk.endDate) return false;
@@ -1350,36 +1357,120 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
       return false;
     };
 
-    filteredTasks.forEach(t => {
-      const aId = t.areaId && areaMap[t.areaId] ? t.areaId : 0;
-      for (let q = 1; q <= 4; q++) {
-        if (taskInQuarter(t, q)) {
-          const stats = areaMap[aId].quarters[q];
-          stats.total++;
-          const status = normalizeStatus(t.status);
-          if (status === "Concluída") stats.completed++;
-          else if (status === "Em andamento") stats.inProgress++;
-          else stats.pending++;
-          
-          stats.sumProgress += (t.progress || 0);
-          break;
+    const getQuarterStats = (taskList: Task[]) => {
+      const quarters: Record<number, any> = {
+        1: { total: 0, pending: 0, inProgress: 0, completed: 0, sumProgress: 0, progress: 0 },
+        2: { total: 0, pending: 0, inProgress: 0, completed: 0, sumProgress: 0, progress: 0 },
+        3: { total: 0, pending: 0, inProgress: 0, completed: 0, sumProgress: 0, progress: 0 },
+        4: { total: 0, pending: 0, inProgress: 0, completed: 0, sumProgress: 0, progress: 0 }
+      };
+
+      taskList.forEach(t => {
+        for (let q = 1; q <= 4; q++) {
+          if (taskInQuarter(t, q)) {
+            const stats = quarters[q];
+            stats.total++;
+            const status = normalizeStatus(t.status);
+            if (status === "Concluída") stats.completed++;
+            else if (status === "Em andamento") stats.inProgress++;
+            else stats.pending++;
+            
+            stats.sumProgress += (t.progress || 0);
+          }
         }
-      }
-    });
+      });
 
-    const result = Object.values(areaMap).filter(a => {
-      return a.quarters[1].total > 0 || a.quarters[2].total > 0 || a.quarters[3].total > 0 || a.quarters[4].total > 0;
-    });
+      [1,2,3,4].forEach(q => {
+        quarters[q].progress = quarters[q].total > 0 ? Math.round(quarters[q].sumProgress / quarters[q].total) : 0;
+      });
+      return quarters;
+    };
 
-    result.forEach(a => {
-      [1, 2, 3, 4].forEach(q => {
-        const stats = a.quarters[q];
-        stats.progress = stats.total > 0 ? Math.round(stats.sumProgress / stats.total) : 0;
+    const getMinMaxDates = (taskList: Task[]) => {
+      let min: Date | null = null;
+      let max: Date | null = null;
+      taskList.forEach(t => {
+        if (t.startDate) {
+          const d1 = new Date(t.startDate);
+          if (!isNaN(d1.getTime())) {
+            if (!min || d1 < min) min = d1;
+            if (!max || d1 > max) max = d1;
+          }
+        }
+        if (t.endDate) {
+          const d2 = new Date(t.endDate);
+          if (!isNaN(d2.getTime())) {
+            if (!min || d2 < min) min = d2;
+            if (!max || d2 > max) max = d2;
+          }
+        }
+      });
+      return {
+        startDate: min ? min.toISOString().split("T")[0] : null,
+        endDate: max ? max.toISOString().split("T")[0] : null
+      };
+    };
+
+    const tree: any[] = [];
+    Object.keys(planMap).forEach(pKey => {
+      const pId = Number(pKey);
+      const planEntry = planMap[pId];
+      if (planEntry.tasks.length === 0) return;
+
+      const planDates = getMinMaxDates(planEntry.tasks);
+      const planQuarters = getQuarterStats(planEntry.tasks);
+
+      const areaNodes: any[] = [];
+      Object.keys(planEntry.areaMap).forEach(aKey => {
+         const aId = Number(aKey);
+         const areaEntry = planEntry.areaMap[aId];
+         if (areaEntry.tasks.length === 0) return;
+         
+         const areaDates = getMinMaxDates(areaEntry.tasks);
+         const areaQuarters = getQuarterStats(areaEntry.tasks);
+
+         areaNodes.push({
+           id: `pt-p${pId}-a${aId}`,
+           type: "area",
+           name: areaEntry.area.name,
+           startDate: areaDates.startDate,
+           endDate: areaDates.endDate,
+           quarters: areaQuarters,
+           children: []
+         });
+      });
+
+      areaNodes.sort((a,b) => a.name.localeCompare(b.name));
+
+      tree.push({
+        id: `pt-p-${pId}`,
+        type: "plan",
+        name: planEntry.plan.name,
+        startDate: planDates.startDate,
+        endDate: planDates.endDate,
+        quarters: planQuarters,
+        children: areaNodes
       });
     });
 
-    return result.sort((a, b) => a.name.localeCompare(b.name));
-  }, [filteredTasks, areas]);
+    tree.sort((a, b) => a.name.localeCompare(b.name));
+    return tree;
+  }, [filteredTasks, plans, areas]);
+
+  const [expandedTimelineGroups, setExpandedTimelineGroups] = useState<Record<string, boolean>>({});
+
+  const visibleTimelineRows = useMemo(() => {
+    const list: any[] = [];
+    const traverse = (node: any, depth: number) => {
+      list.push({ ...node, depth });
+      const isExpanded = expandedTimelineGroups[node.id] !== undefined ? expandedTimelineGroups[node.id] : depth < 1;
+      if (isExpanded && node.children && node.children.length > 0) {
+        node.children.forEach((child: any) => traverse(child, depth + 1));
+      }
+    };
+    planAreaTimelineData.forEach(node => traverse(node, 0));
+    return list;
+  }, [planAreaTimelineData, expandedTimelineGroups]);
 
   // Format dates elegantly for Portuguese/Brazilian locale or ISO
   const formatDate = (dateStr: string | null) => {
@@ -2381,7 +2472,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                       <Tooltip content={<CustomAreaTooltip />} cursor={{ fill: 'rgba(2f, 41, 58, 0.04)' }} />
                       <Bar dataKey="Progresso Médio (%)" fill="url(#colorProgress)" radius={[0, 8, 8, 0]} maxBarSize={20} background={{ fill: '#f1f5f9', radius: [0, 8, 8, 0] }}>
                         {areaChartData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry["Progresso Médio (%)"] === 100 ? "#10b981" : (index % 2 === 0 ? "#4f46e5" : "#0ea5e9")} />
+                          <Cell key={`cell-${index}`} fill={entry["Progresso Médio (%)"] === 100 ? "#10b981" : entry["Progresso Médio (%)"] >= 50 ? "#3b82f6" : entry["Progresso Médio (%)"] > 0 ? "#94a3b8" : "#cbd5e1"} />
                         ))}
                         <LabelList dataKey="Progresso Médio (%)" position="right" formatter={(value: number) => `${value}%`} fill="#475569" fontSize={13} fontWeight="900" />
                       </Bar>
@@ -2440,6 +2531,8 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                       <tr className="bg-slate-50 text-slate-400 border-b border-slate-100">
                         <th className="px-3.5 py-2 font-black uppercase text-[9px] tracking-wider">Área</th>
                         <th className="px-3.5 py-2 font-black uppercase text-[9px] tracking-wider">Total Tarefas</th>
+                        <th className="px-3.5 py-2 font-black uppercase text-[9px] tracking-wider">Qtde Não Iniciada</th>
+                        <th className="px-3.5 py-2 font-black uppercase text-[9px] tracking-wider">Qtde Em Andamento</th>
                         <th className="px-3.5 py-2 font-black uppercase text-[9px] tracking-wider">Qtde Concluídas</th>
                         <th className="px-3.5 py-2 font-black uppercase text-[9px] tracking-wider">Progresso Médio</th>
                         <th className="px-3.5 py-2 font-black uppercase text-[9px] tracking-wider">Status Indicativo</th>
@@ -2450,6 +2543,8 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                         <tr key={idx} className="hover:bg-slate-50/50 transition-colors">
                           <td className="px-3.5 py-2 font-black text-slate-800 uppercase" title={row.fullName}>{row.name}</td>
                           <td className="px-3.5 py-2 font-bold">{row["Total de Tarefas"]}</td>
+                          <td className="px-3.5 py-2 font-bold text-slate-500">{row["Não iniciada"]}</td>
+                          <td className="px-3.5 py-2 font-bold text-blue-500">{row["Em andamento"]}</td>
                           <td className="px-3.5 py-2 font-bold text-emerald-600">{row["Concluídas"]}</td>
                           <td className="px-3.5 py-2 font-black text-indigo-600">{row["Progresso Médio (%)"]}%</td>
                           <td className="px-3.5 py-2">
@@ -2461,7 +2556,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                                     ? "bg-emerald-500" 
                                     : row["Progresso Médio (%)"] >= 50 
                                       ? "bg-blue-500"
-                                      : "bg-amber-500"
+                                      : row["Progresso Médio (%)"] > 0 ? "bg-slate-400" : "bg-slate-300"
                                 )}
                                 style={{ width: `${row["Progresso Médio (%)"]}%` }}
                               ></div>
@@ -2471,7 +2566,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                       ))}
                       {areaChartData.length === 0 && (
                         <tr>
-                          <td colSpan={5} className="p-8 text-center text-slate-400 italic">Nenhum dado por área.</td>
+                          <td colSpan={7} className="p-8 text-center text-slate-400 italic">Nenhum dado por área.</td>
                         </tr>
                       )}
                     </tbody>
@@ -2488,15 +2583,50 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   <dt className="text-xs font-black tracking-widest text-slate-400 uppercase">Acompanhamento Temporal</dt>
                   <h4 className="text-lg font-black text-slate-800 mt-1 font-sans">Evolução por Área e Trimestre</h4>
                   <p className="text-xs font-medium text-slate-500 mt-0.5 leading-snug">
-                    Gráfico estilo linha do tempo com percentual de conclusão das tarefas de cada área por trimestre.
+                    Gráfico estilo linha do tempo com percentual de conclusão das tarefas de cada área por trimestre. Clique no plano para expandir as áreas.
                   </p>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const expanded: Record<string, boolean> = {};
+                      const traverse = (node: any) => {
+                        expanded[node.id] = true;
+                        if (node.children) node.children.forEach(traverse);
+                      };
+                      planAreaTimelineData.forEach(traverse);
+                      setExpandedTimelineGroups(expanded);
+                    }}
+                    className="px-3 py-1.5 text-xs bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold rounded-xl hover:bg-indigo-100/80 transition-colors uppercase tracking-wider cursor-pointer"
+                  >
+                    Expandir Todos
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const collapsed: Record<string, boolean> = {};
+                      visibleTimelineRows.forEach(r => {
+                        if (r.type !== "area") {
+                          collapsed[r.id] = false;
+                        }
+                      });
+                      setExpandedTimelineGroups(collapsed);
+                    }}
+                    className="px-3 py-1.5 text-xs bg-slate-100 border border-slate-200 text-slate-700 font-bold rounded-xl hover:bg-slate-200/80 transition-colors uppercase tracking-wider cursor-pointer"
+                  >
+                    Recolher Todos
+                  </button>
                 </div>
               </div>
 
-              <div className="overflow-x-auto">
-                <div className="min-w-[800px] py-2">
-                  <div className="grid grid-cols-[220px_1fr_1fr_1fr_1fr] gap-4 mb-3 border-b border-slate-100 pb-3">
-                    <div className="font-black text-[10px] uppercase text-slate-400 tracking-widest self-end pb-1 pl-2">Área / Categoria</div>
+              <div className="overflow-x-auto pb-6">
+                <div className="min-w-[1000px] py-4">
+                  <div className="grid grid-cols-[220px_90px_90px_1fr_1fr_1fr_1fr] gap-4 mb-3 border-b border-slate-100 pb-3">
+                    <div className="font-black text-[10px] uppercase text-slate-400 tracking-widest self-end pb-1 pl-2">Plano / Área</div>
+                    <div className="font-black text-[10px] uppercase text-slate-400 tracking-widest self-end pb-1 text-center">Data Início</div>
+                    <div className="font-black text-[10px] uppercase text-slate-400 tracking-widest self-end pb-1 text-center">Data Fim</div>
                     <div className="text-center flex flex-col items-center justify-end">
                       <span className="font-black text-[10px] uppercase text-slate-600 tracking-wider bg-slate-100 px-3 py-1 rounded-full mb-1 border border-slate-200">1º Trimestre</span>
                       <span className="text-[9px] font-bold text-slate-400 tracking-wider">Jan - Mar</span>
@@ -2515,70 +2645,107 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                     </div>
                   </div>
 
-                  <div className="space-y-4">
-                    {areaTimelineData.length === 0 ? (
+                  <div className="space-y-3 pb-32">
+                    {visibleTimelineRows.length === 0 ? (
                       <div className="py-8 text-center text-slate-400 text-sm font-medium italic border border-slate-100 border-dashed rounded-xl">Nenhuma tarefa atribuída aos trimestres.</div>
                     ) : (
-                      areaTimelineData.map((area, idx) => (
-                        <div key={idx} className="grid grid-cols-[220px_1fr_1fr_1fr_1fr] gap-4 items-center bg-white p-3 rounded-2xl hover:bg-slate-50 transition-colors border border-slate-100 shadow-sm relative">
-                          {/* Timeline connector visual line behind blocks */}
-                          <div className="absolute top-1/2 left-[250px] right-8 h-0.5 bg-slate-100 -translate-y-1/2 z-0 hidden sm:block pointer-events-none" />
-                          
-                          <div className="font-bold text-[13px] text-slate-700 truncate pr-4 pl-2 z-10" title={area.name}>
-                            {area.name}
-                          </div>
-                          
-                          {[1, 2, 3, 4].map((q: number) => {
-                            const stats = area.quarters[q as 1|2|3|4];
-                            if (stats.total === 0) return (
-                              <div key={q} className="flex justify-center items-center z-10 h-8">
-                                <span className="w-1.5 h-1.5 rounded-full bg-slate-200"></span>
-                              </div>
-                            );
+                      visibleTimelineRows.map((row) => {
+                        const isExpanded = expandedTimelineGroups[row.id] !== undefined ? expandedTimelineGroups[row.id] : row.depth < 1;
+                        const isPlan = row.type === "plan";
+                        
+                        return (
+                          <div 
+                            key={row.id} 
+                            className={cn(
+                              "grid grid-cols-[220px_90px_90px_1fr_1fr_1fr_1fr] gap-4 items-center p-3 rounded-2xl transition-colors border shadow-sm relative group/row hover:z-50",
+                              isPlan 
+                                ? "bg-slate-50 hover:bg-indigo-50/20 text-slate-800 border-l-[3px] border-l-indigo-500 border-t-slate-100 border-r-slate-100 border-b-slate-100 cursor-pointer" 
+                                : "bg-white hover:bg-slate-50 text-slate-700 border-slate-100"
+                            )}
+                            onClick={() => {
+                              if (isPlan) {
+                                setExpandedTimelineGroups(prev => ({
+                                  ...prev,
+                                  [row.id]: !isExpanded
+                                }));
+                              }
+                            }}
+                          >
+                            {/* Timeline connector visual line behind blocks */}
+                            <div className="absolute top-1/2 left-[440px] right-8 h-0.5 bg-slate-100 -translate-y-1/2 z-0 hidden sm:block pointer-events-none" />
                             
-                            return (
-                              <div key={q} className="group relative flex items-center justify-center cursor-default z-10">
-                                <div className="w-[85%] h-7 bg-slate-100/80 rounded-xl overflow-hidden relative border border-slate-200/50 shadow-[inset_0px_1px_3px_rgba(0,0,0,0.02)] backdrop-blur-sm">
-                                  <div 
-                                    className={cn(
-                                      "h-full transition-all duration-700 ease-out",
-                                      stats.progress === 100 ? "bg-emerald-500" : stats.progress > 0 ? "bg-indigo-500" : "bg-slate-300"
-                                    )}
-                                    style={{ width: `${stats.progress}%` }}
-                                  />
-                                  <span className={cn(
-                                    "absolute inset-0 flex items-center justify-center text-[11px] font-black pointer-events-none drop-shadow-sm",
-                                    stats.progress > 45 ? "text-white" : "text-slate-500"
-                                  )}>
-                                    {stats.progress}%
-                                  </span>
+                            <div className="flex items-center gap-1.5 z-10 pr-2 pl-2" style={{ paddingLeft: `${row.depth * 1.5 + 0.5}rem` }}>
+                               {isPlan ? (
+                                <span className="text-slate-400 group-hover/row:text-indigo-600 transition-colors p-0.5">
+                                  {isExpanded ? <ChevronDown size={14} className="stroke-[2.5]" /> : <ChevronRight size={14} className="stroke-[2.5]" />}
+                                </span>
+                               ) : (
+                                <span className="w-1.5 h-1.5 bg-slate-200 rounded-full ml-1 mr-1" />
+                               )}
+                               <span className={cn("truncate", isPlan ? "font-black text-sm" : "font-semibold text-[13px]")} title={row.name}>
+                                 {row.name}
+                               </span>
+                            </div>
+                            
+                            <div className="text-center font-medium text-xs text-slate-500 z-10">
+                               {formatDate(row.startDate)}
+                            </div>
+                            <div className="text-center font-medium text-xs text-slate-500 z-10">
+                               {formatDate(row.endDate)}
+                            </div>
+
+                            {[1, 2, 3, 4].map((q: number) => {
+                              const stats = row.quarters[q as 1|2|3|4];
+                              if (stats.total === 0) return (
+                                <div key={q} className="flex justify-center items-center z-10 h-8">
+                                  <span className="w-1.5 h-1.5 rounded-full bg-slate-200"></span>
                                 </div>
-                                <div className="hidden group-hover:flex absolute bottom-[120%] mb-1 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-700 rounded-xl p-3.5 shadow-2xl z-[60] flex-col gap-2 min-w-[200px] animate-in fade-in zoom-in-95 duration-150">
-                                  <p className="text-white text-xs font-black border-b border-slate-700/60 pb-2 mb-1 uppercase text-center tracking-wider flex items-center justify-center gap-2">
-                                    Trimestre {q}
-                                  </p>
-                                  <div className="flex justify-between items-center text-xs">
-                                    <span className="text-slate-400 font-medium tracking-wider text-[10px] uppercase">Total de Tarefas</span>
-                                    <span className="text-white font-black">{stats.total}</span>
+                              );
+                              
+                              return (
+                                <div key={q} className="group relative flex items-center justify-center cursor-default z-10">
+                                  <div className="w-[85%] h-7 bg-slate-100/80 rounded-xl overflow-hidden relative border border-slate-200/50 shadow-[inset_0px_1px_3px_rgba(0,0,0,0.02)] backdrop-blur-sm">
+                                    <div 
+                                      className={cn(
+                                        "h-full transition-all duration-700 ease-out",
+                                        stats.progress === 100 ? "bg-emerald-500" : stats.progress >= 50 ? "bg-blue-500" : stats.progress > 0 ? "bg-slate-400" : "bg-slate-300"
+                                      )}
+                                      style={{ width: `${stats.progress}%` }}
+                                    />
+                                    <span className={cn(
+                                      "absolute inset-0 flex items-center justify-center text-[11px] font-black pointer-events-none drop-shadow-sm",
+                                      stats.progress > 45 ? "text-white" : "text-slate-500"
+                                    )}>
+                                      {stats.progress}%
+                                    </span>
                                   </div>
-                                  <div className="flex justify-between items-center text-xs">
-                                    <span className="text-slate-400 font-medium tracking-wider text-[10px] uppercase">Não Iniciada</span>
-                                    <span className="text-slate-300 font-bold">{stats.pending}</span>
-                                  </div>
-                                  <div className="flex justify-between items-center text-xs">
-                                    <span className="text-slate-400 font-medium tracking-wider text-[10px] uppercase">Em Andamento</span>
-                                    <span className="text-sky-400 font-bold">{stats.inProgress}</span>
-                                  </div>
-                                  <div className="flex justify-between items-center text-xs font-medium">
-                                    <span className="text-slate-400 tracking-wider text-[10px] uppercase">Concluídas</span>
-                                    <span className="text-emerald-400 font-bold">{stats.completed}</span>
+                                  <div className="hidden group-hover:flex absolute top-full mt-3 left-1/2 -translate-x-1/2 bg-slate-900 border border-slate-700 rounded-xl p-3.5 shadow-2xl z-[90] flex-col gap-2 min-w-[200px] animate-in fade-in slide-in-from-top-2 duration-150">
+                                    <p className="text-white text-xs font-black border-b border-slate-700/60 pb-2 mb-1 uppercase text-center tracking-wider flex items-center justify-center gap-2">
+                                      {row.name} - Trimestre {q}
+                                    </p>
+                                    <div className="flex justify-between items-center text-xs">
+                                      <span className="text-slate-400 font-medium tracking-wider text-[10px] uppercase">Total de Tarefas</span>
+                                      <span className="text-white font-black">{stats.total}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-xs">
+                                      <span className="text-slate-400 font-medium tracking-wider text-[10px] uppercase">Não Iniciada</span>
+                                      <span className="text-slate-300 font-bold">{stats.pending}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-xs">
+                                      <span className="text-slate-400 font-medium tracking-wider text-[10px] uppercase">Em Andamento</span>
+                                      <span className="text-sky-400 font-bold">{stats.inProgress}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center text-xs font-medium">
+                                      <span className="text-slate-400 tracking-wider text-[10px] uppercase">Concluídas</span>
+                                      <span className="text-emerald-400 font-bold">{stats.completed}</span>
+                                    </div>
                                   </div>
                                 </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      ))
+                              );
+                            })}
+                          </div>
+                        );
+                      })
                     )}
                   </div>
                 </div>
@@ -2733,7 +2900,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                                       ? "bg-emerald-500"
                                       : row.avgProgress >= 50
                                         ? "bg-blue-500"
-                                        : "bg-amber-500"
+                                        : row.avgProgress > 0 ? "bg-slate-400" : "bg-slate-300"
                                   )}
                                   style={{ width: `${row.avgProgress}%` }}
                                 />
@@ -2744,7 +2911,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                                   ? "text-emerald-700 animate-pulse"
                                   : row.avgProgress >= 50
                                     ? "text-blue-700"
-                                    : "text-amber-700"
+                                    : row.avgProgress > 0 ? "text-slate-600" : "text-slate-400"
                               )}>
                                 {row.avgProgress}%
                               </span>
@@ -2913,7 +3080,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                                       ? "bg-emerald-500"
                                       : row.avgProgress >= 50
                                         ? "bg-blue-500"
-                                        : "bg-amber-500"
+                                        : row.avgProgress > 0 ? "bg-slate-400" : "bg-slate-300"
                                   )}
                                   style={{ width: `${row.avgProgress}%` }}
                                 />
@@ -2924,7 +3091,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                                   ? "text-emerald-700 animate-pulse"
                                   : row.avgProgress >= 50
                                     ? "text-blue-700"
-                                    : "text-amber-700"
+                                    : row.avgProgress > 0 ? "text-slate-600" : "text-slate-400"
                               )}>
                                 {row.avgProgress}%
                               </span>
@@ -3121,7 +3288,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                                       ? "bg-emerald-500"
                                       : row.avgProgress >= 50
                                         ? "bg-blue-500"
-                                        : "bg-amber-500"
+                                        : row.avgProgress > 0 ? "bg-slate-400" : "bg-slate-300"
                                   )}
                                   style={{ width: `${row.avgProgress}%` }}
                                 />
@@ -3132,7 +3299,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                                   ? "text-emerald-700 animate-pulse"
                                   : row.avgProgress >= 50
                                     ? "text-blue-700"
-                                    : "text-amber-700"
+                                    : row.avgProgress > 0 ? "text-slate-600" : "text-slate-400"
                               )}>
                                 {row.avgProgress}%
                               </span>
