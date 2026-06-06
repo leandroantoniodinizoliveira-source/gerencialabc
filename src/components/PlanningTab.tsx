@@ -16,6 +16,7 @@ import {
   Plus,
   Trash2,
   Edit2,
+  Edit3,
   Clock,
   User,
   Tag,
@@ -4467,20 +4468,20 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   e.stopPropagation();
                   handleEditTask(task);
                 }}
-                className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition"
+                className="p-2 text-sky-500 bg-sky-50 rounded-xl hover:bg-sky-100 transition-all border border-sky-100"
                 title="Editar"
               >
-                <Edit2 size={12} />
+                <Edit3 size={14} />
               </button>
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   handleDeleteTask(task.id);
                 }}
-                className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                className="p-2 text-rose-500 bg-rose-50 rounded-xl hover:bg-rose-100 transition-all border border-rose-100"
                 title="Excluir"
               >
-                <Trash2 size={12} />
+                <Trash2 size={14} />
               </button>
             </div>
           </div>
