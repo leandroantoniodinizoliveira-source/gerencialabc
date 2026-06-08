@@ -4657,16 +4657,26 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                             <div className="flex flex-wrap items-center gap-2">
                               {isTarget && <span className="text-[10px] font-black tracking-widest uppercase text-white bg-indigo-500 px-2.5 py-0.5 rounded-md flex items-center gap-1 shadow-sm"><Activity size={10} className="text-indigo-100" /> Selecionada</span>}
                               <span className="text-[10px] font-black tracking-widest uppercase text-slate-400 bg-slate-200/50 px-2 py-0.5 rounded-md">ID: {task.id}</span>
-                              <span className={`text-[9px] font-bold uppercase py-0.5 px-2 rounded-md border ${getPriorityBadgeClass(task.priority)}`}>{task.priority}</span>
+                              <span className={`text-[9px] font-bold uppercase py-0.5 px-2 rounded-md border flex items-center gap-1 ${getPriorityBadgeClass(task.priority)}`}>
+                                <Flag size={10} className={task.priority === "Alta" ? "fill-rose-100" : task.priority === "Média" ? "fill-amber-100" : ""} />
+                                {task.priority}
+                              </span>
 
                               {(() => {
                                 const normStatus = normalizeStatus(task.status);
                                 let statusClasses = "bg-slate-100 text-slate-600 border-slate-200";
-                                if (normStatus === "Concluída") statusClasses = "bg-emerald-50 text-emerald-700 border-emerald-200";
-                                else if (normStatus === "Em andamento") statusClasses = "bg-blue-50 text-blue-700 border-blue-200";
+                                let StatusIcon = Circle;
+                                if (normStatus === "Concluída") {
+                                  statusClasses = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                                  StatusIcon = CheckCircle2;
+                                } else if (normStatus === "Em andamento") {
+                                  statusClasses = "bg-blue-50 text-blue-700 border-blue-200";
+                                  StatusIcon = Clock;
+                                }
 
                                 return (
-                                  <span className={`text-[9px] font-black uppercase py-0.5 px-2 rounded-md border ${statusClasses}`}>
+                                  <span className={`text-[9px] font-black uppercase py-0.5 px-2 rounded-md border flex items-center gap-1 ${statusClasses}`}>
+                                    <StatusIcon size={10} />
                                     {normStatus}
                                   </span>
                                 );
@@ -4676,12 +4686,21 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                                 if (normalizeStatus(task.status) === "Concluída") return null;
                                 const dlStatus = getDeadlineStatus(task.endDate, task.status);
                                 let dlClasses = "bg-slate-550 text-slate-500 border-slate-200";
-                                if (dlStatus === "Atrasada") dlClasses = "bg-rose-500 text-white border-rose-500 font-extrabold shadow-xs";
-                                else if (dlStatus === "Crítica") dlClasses = "bg-amber-500 text-white border-amber-500 font-extrabold shadow-xs";
-                                else dlClasses = "bg-emerald-50 text-emerald-800 border-emerald-200 font-semibold";
+                                let DlIcon = CheckCircle2;
+                                if (dlStatus === "Atrasada") {
+                                  dlClasses = "bg-rose-500 text-white border-rose-500 font-extrabold shadow-xs";
+                                  DlIcon = AlertCircle;
+                                } else if (dlStatus === "Crítica") {
+                                  dlClasses = "bg-amber-500 text-white border-amber-500 font-extrabold shadow-xs";
+                                  DlIcon = AlertTriangle;
+                                } else {
+                                  dlClasses = "bg-emerald-50 text-emerald-800 border-emerald-200 font-semibold";
+                                  DlIcon = CheckCircle2;
+                                }
 
                                 return (
-                                  <span className={`text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-md border ${dlClasses}`}>
+                                  <span className={`text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-md border flex items-center gap-1 ${dlClasses}`}>
+                                    <DlIcon size={10} />
                                     {dlStatus}
                                   </span>
                                 );
@@ -5323,6 +5342,13 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                                       {formatDate(task.endDate)}
                                     </td>
                                     <td className="px-4 py-3 border-r border-slate-50 text-center">
+                                      {task.priority && (
+                                        <div className={`inline-flex items-center gap-1 ${task.priority === "Alta" ? "text-rose-500" : task.priority === "Média" ? "text-amber-500" : "text-slate-500"}`} title={`Prioridade: ${task.priority}`}>
+                                          <Flag size={14} className={task.priority === "Alta" ? "fill-rose-100" : task.priority === "Média" ? "fill-amber-100" : ""} />
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-3 border-r border-slate-50 text-center">
                                       {normStatus === "Concluída" ? (
                                         <div className="inline-flex items-center justify-center text-emerald-500" title="Status: Concluída">
                                           <CheckCircle2 size={16} />
@@ -5955,16 +5981,26 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                           <div className="flex flex-wrap items-center gap-2">
                             {isTarget && <span className="text-[10px] font-black tracking-widest uppercase text-white bg-indigo-500 px-2.5 py-0.5 rounded-md flex items-center gap-1 shadow-sm"><Activity size={10} className="text-indigo-100" /> Selecionada</span>}
                             <span className="text-[10px] font-black tracking-widest uppercase text-slate-400 bg-slate-200/50 px-2 py-0.5 rounded-md">ID: {task.id}</span>
-                            <span className={`text-[9px] font-bold uppercase py-0.5 px-2 rounded-md border ${getPriorityBadgeClass(task.priority)}`}>{task.priority}</span>
+                            <span className={`text-[9px] font-bold uppercase py-0.5 px-2 rounded-md border flex items-center gap-1 ${getPriorityBadgeClass(task.priority)}`}>
+                              <Flag size={10} className={task.priority === "Alta" ? "fill-rose-100" : task.priority === "Média" ? "fill-amber-100" : ""} />
+                              {task.priority}
+                            </span>
 
                             {(() => {
                               const normStatus = normalizeStatus(task.status);
                               let statusClasses = "bg-slate-100 text-slate-600 border-slate-200";
-                              if (normStatus === "Concluída") statusClasses = "bg-emerald-50 text-emerald-700 border-emerald-200";
-                              else if (normStatus === "Em andamento") statusClasses = "bg-blue-50 text-blue-700 border-blue-200";
+                              let StatusIcon = Circle;
+                              if (normStatus === "Concluída") {
+                                statusClasses = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                                StatusIcon = CheckCircle2;
+                              } else if (normStatus === "Em andamento") {
+                                statusClasses = "bg-blue-50 text-blue-700 border-blue-200";
+                                StatusIcon = Clock;
+                              }
 
                               return (
-                                <span className={`text-[9px] font-black uppercase py-0.5 px-2 rounded-md border ${statusClasses}`}>
+                                <span className={`text-[9px] font-black uppercase py-0.5 px-2 rounded-md border flex items-center gap-1 ${statusClasses}`}>
+                                  <StatusIcon size={10} />
                                   {normStatus}
                                 </span>
                               );
@@ -5974,12 +6010,21 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                               if (normalizeStatus(task.status) === "Concluída") return null;
                               const dlStatus = getDeadlineStatus(task.endDate, task.status);
                               let dlClasses = "bg-slate-550 text-slate-500 border-slate-200";
-                              if (dlStatus === "Atrasada") dlClasses = "bg-rose-500 text-white border-rose-500 font-extrabold shadow-xs";
-                              else if (dlStatus === "Crítica") dlClasses = "bg-amber-500 text-white border-amber-500 font-extrabold shadow-xs";
-                              else dlClasses = "bg-emerald-50 text-emerald-800 border-emerald-200 font-semibold";
+                              let DlIcon = CheckCircle2;
+                              if (dlStatus === "Atrasada") {
+                                dlClasses = "bg-rose-500 text-white border-rose-500 font-extrabold shadow-xs";
+                                DlIcon = AlertCircle;
+                              } else if (dlStatus === "Crítica") {
+                                dlClasses = "bg-amber-500 text-white border-amber-500 font-extrabold shadow-xs";
+                                DlIcon = AlertTriangle;
+                              } else {
+                                dlClasses = "bg-emerald-50 text-emerald-800 border-emerald-200 font-semibold";
+                                DlIcon = CheckCircle2;
+                              }
 
                               return (
-                                <span className={`text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-md border ${dlClasses}`}>
+                                <span className={`text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-md border flex items-center gap-1 ${dlClasses}`}>
+                                  <DlIcon size={10} />
                                   {dlStatus}
                                 </span>
                               );
