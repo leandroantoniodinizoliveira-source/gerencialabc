@@ -3,6 +3,30 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+export type ActionType = 'view' | 'create' | 'edit' | 'delete';
+export type ModuleId = 'planning' | 'water_balances' | 'systems' | 'supply_sources' | 'demands' | 'dashboard' | 'users';
+
+export interface AppPermission {
+  moduleId: ModuleId;
+  actions: ActionType[];
+}
+
+export interface UserRole {
+  id: string;
+  name: string;
+  description: string;
+  permissions: AppPermission[];
+}
+
+export interface AppUser {
+  id: string;
+  name: string;
+  email: string;
+  roleId: string;
+  agency?: string;
+  status: 'active' | 'inactive';
+}
+
 export interface System {
   id: number;
   code?: string;
@@ -103,24 +127,32 @@ export interface Task {
   areaIds?: number[];
   responsibleIds?: number[];
   dependsOnTaskId?: number | null;
+  updatedAt?: string | null;
+  updatedBy?: string | null;
 }
 
 export interface Plan {
   id: number;
   name: string;
   description: string;
+  updatedAt?: string | null;
+  updatedBy?: string | null;
 }
 
 export interface Area {
   id: number;
   name: string;
   abbreviation?: string;
+  updatedAt?: string | null;
+  updatedBy?: string | null;
 }
 
 export interface Category {
   id: number;
   name: string;
   areaIds: number[];
+  updatedAt?: string | null;
+  updatedBy?: string | null;
 }
 
 export interface Responsible {
@@ -129,5 +161,7 @@ export interface Responsible {
   email?: string;
   role?: string;
   areaIds: number[];
+  updatedAt?: string | null;
+  updatedBy?: string | null;
 }
 

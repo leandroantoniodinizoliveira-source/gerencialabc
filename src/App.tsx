@@ -88,8 +88,10 @@ import {
 } from "./types";
 
 import { calculateDemand, formatNumber, formatInteger, cn } from "./lib/utils";
+import { RequirePermission, useAuth } from "./lib/auth";
 import { MapTab } from "./components/MapTab";
 import { PlanningTab } from "./components/PlanningTab";
+import { UserManagementTab } from "./components/UserManagementTab";
 import { HomeTab } from "./components/HomeTab";
 
 const formatSaldoValue = (val: number, type: 'percent' | 'hab' | 'ls', showSuffix = true) => {
@@ -310,6 +312,7 @@ const isSameWb = (itemWbId: number | string | null | undefined, filterWbId: numb
 };
 
 export default function App() {
+  const { currentUser, roles, checkPermission } = useAuth();
   const [systems, setSystems] = useState<System[]>(() => {
     const saved = localStorage.getItem("adasa-systems");
     return saved ? JSON.parse(saved) : SYSTEMS;
@@ -331,7 +334,7 @@ export default function App() {
     const saved = localStorage.getItem("adasa-demands");
     return saved ? JSON.parse(saved) : [INITIAL_DEMAND];
   });
-  const [activeTab, setActiveTab] = useState<"home" | "edit" | "compare" | "manage" | "analyze" | "templates" | "planning">(
+  const [activeTab, setActiveTab] = useState<"home" | "edit" | "compare" | "manage" | "analyze" | "templates" | "planning" | "users">(
     "home",
   );
   const [activePlanningSubTab, setActivePlanningSubTab] = useState<"tasks" | "dashboard" | "plans" | "areas" | "categories" | "responsibles">("dashboard");
@@ -362,7 +365,7 @@ export default function App() {
   const [demandSubTab, setDemandSubTab] = useState<"edit" | "view">("edit");
   const [supplySubTab, setSupplySubTab] = useState<"edit" | "view">("edit");
   
-  const [confirmState, setConfirmState] = useState<{ message: string; onConfirm: () => void } | null>(null);
+  const [confirmState, setConfirmState] = useState<{ title?: string; message: string; type?: "confirm" | "alert"; onConfirm?: () => void } | null>(null);
   
   const [waterBalances, setWaterBalances] = useState<import("./types").WaterBalance[]>(() => {
     const saved = localStorage.getItem("adasa-water-balances");
@@ -798,7 +801,7 @@ export default function App() {
         } else if (resData.error === "DATABASE_URL_MISSING") {
           setHasPendingChanges(false); // mock save
           if (!isSilent) {
-            showToast("Aviso", "Banco de dados não configurado (DATABASE_URL ausente).", "error");
+            showToast("Aviso", "Banco de dados não configurado (DATABASE_URL ausente). Pode continuar usando localmente.", "warning");
           }
         } else {
           throw new Error(resData.error);
@@ -812,7 +815,7 @@ export default function App() {
       if (!isSilent) {
         showToast("Erro", e.message || "Erro ao salvar no banco", "error");
       } else {
-        showToast("Aviso", "Falha no salvamento automático. As alterações podem não ter sido salvas.", "error");
+        showToast("Aviso", "Falha no salvamento automático. As alterações podem não ter sido salvas.", "warning");
         console.error("Auto-save falhou: ", e);
       }
     } finally {
@@ -2094,9 +2097,9 @@ export default function App() {
     }
   };
 
-  const [toastMessage, setToastMessage] = useState<{title: string, message: string, type: "success" | "error"} | null>(null);
+  const [toastMessage, setToastMessage] = useState<{title: string, message: string, type: "success" | "error" | "warning" | "info"} | null>(null);
 
-  const showToast = (title: string, message: string, type: "success" | "error") => {
+  const showToast = (title: string, message: string, type: "success" | "error" | "warning" | "info") => {
     setToastMessage({ title, message, type });
     setTimeout(() => setToastMessage(null), 5000);
   };
@@ -2135,7 +2138,7 @@ export default function App() {
   const handleImportSystemsCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedWaterBalanceId) {
-      if (!selectedWaterBalanceId) showToast("Erro", "Nenhum balanço hídrico selecionado.", "error");
+      if (!selectedWaterBalanceId) showToast("Aviso", "Nenhum balanço hídrico selecionado.", "warning");
       return;
     }
 
@@ -2143,7 +2146,7 @@ export default function App() {
     reader.onload = (event) => {
       const text = event.target?.result as string;
       if (!text) {
-        showToast("Erro", "O arquivo está vazio ou não pôde ser lido.", "error");
+        showToast("Aviso", "O arquivo está vazio ou não pôde ser lido.", "warning");
         return;
       }
 
@@ -2225,7 +2228,7 @@ export default function App() {
         setRegions(newRegions);
         showToast("Sucesso", `Associação de Subsistemas importada com sucesso! ${importedCount} registros processados.`, "success");
       } else {
-        showToast("Atenção", "Nenhum dado válido foi encontrado. Verifique o formato do arquivo e se o separador é ponto-e-vírgula (;).", "error");
+        showToast("Atenção", "Nenhum dado válido foi encontrado. Verifique o formato do arquivo e se o separador é ponto-e-vírgula (;).", "warning");
       }
     };
 
@@ -2271,7 +2274,7 @@ export default function App() {
   const handleImportSupplyCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedWaterBalanceId) {
-      if (!selectedWaterBalanceId) showToast("Erro", "Nenhum balanço hídrico selecionado.", "error");
+      if (!selectedWaterBalanceId) showToast("Aviso", "Nenhum balanço hídrico selecionado.", "warning");
       return;
     }
 
@@ -2279,7 +2282,7 @@ export default function App() {
     reader.onload = (event) => {
       const text = event.target?.result as string;
       if (!text) {
-        showToast("Erro", "O arquivo está vazio ou não pôde ser lido.", "error");
+        showToast("Aviso", "O arquivo está vazio ou não pôde ser lido.", "warning");
         return;
       }
 
@@ -2350,7 +2353,7 @@ export default function App() {
         setSupplySources(newSupplySources);
         showToast("Sucesso", `Planilha de Oferta importada com sucesso! ${importedCount} fontes de oferta foram importadas.`, "success");
       } else {
-        showToast("Atenção", "Nenhum dado de oferta válido foi encontrado. Verifique o formato do arquivo e se o separador é ponto-e-vírgula (;), e se as colunas estão corretas.", "error");
+        showToast("Atenção", "Nenhum dado de oferta válido foi encontrado. Verifique o formato do arquivo e se o separador é ponto-e-vírgula (;), e se as colunas estão corretas.", "warning");
       }
     };
 
@@ -2361,7 +2364,7 @@ export default function App() {
   const handleImportCSV = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !selectedWaterBalanceId) {
-      if (!selectedWaterBalanceId) showToast("Erro", "Nenhum balanço hídrico selecionado.", "error");
+      if (!selectedWaterBalanceId) showToast("Aviso", "Nenhum balanço hídrico selecionado.", "warning");
       return;
     }
 
@@ -2369,13 +2372,13 @@ export default function App() {
     reader.onload = (event) => {
       const text = event.target?.result as string;
       if (!text) {
-        showToast("Erro", "O arquivo está vazio.", "error");
+        showToast("Aviso", "O arquivo está vazio.", "warning");
         return;
       }
 
       const lines = text.split("\n");
       if (lines.length < 2) {
-        showToast("Erro", "O arquivo não contém dados suficientes. É necessário ter um cabeçalho e pelo menos uma linha de dados.", "error");
+        showToast("Aviso", "O arquivo não contém dados suficientes. É necessário ter um cabeçalho e pelo menos uma linha de dados.", "warning");
         return;
       }
 
@@ -2462,7 +2465,7 @@ export default function App() {
         setDemands(updatedDemands);
         showToast("Sucesso", `Planilha de Demanda importada com sucesso! ${importedCount} registros foram importados ou atualizados.`, "success");
       } else {
-        showToast("Atenção", "Nenhum dado de demanda válido foi importado. Verifique se o separador usado é ponto e vírgula (;) e as posições das colunas.", "error");
+        showToast("Atenção", "Nenhum dado de demanda válido foi importado. Verifique se o separador usado é ponto e vírgula (;) e as posições das colunas.", "warning");
       }
     };
 
@@ -2486,17 +2489,19 @@ export default function App() {
             <Calculator size={16} className="text-adasa-mid" />
             Modificadores da Demanda
           </h4>
-          <button
-            onClick={() => handleSaveModule("demands", { demands })}
-            className={cn(
-              "flex items-center gap-2 px-4 py-2 font-bold text-xs rounded-xl shadow-sm transition-colors",
-              hasPendingChanges ? "bg-amber-500 hover:bg-amber-600 text-white animate-pulse" : "bg-adasa-mid text-white hover:bg-adasa-dark"
-            )}
-            title={hasPendingChanges ? "Existem alterações não salvas" : ""}
-          >
-            <Save size={14} />
-            Salvar Demanda
-          </button>
+          <RequirePermission moduleId="demands" action="edit">
+            <button
+              onClick={() => handleSaveModule("demands", { demands })}
+              className={cn(
+                "flex items-center gap-2 px-4 py-2 font-bold text-xs rounded-xl shadow-sm transition-colors",
+                hasPendingChanges ? "bg-amber-500 hover:bg-amber-600 text-white animate-pulse" : "bg-adasa-mid text-white hover:bg-adasa-dark"
+              )}
+              title={hasPendingChanges ? "Existem alterações não salvas" : ""}
+            >
+              <Save size={14} />
+              Salvar Demanda
+            </button>
+          </RequirePermission>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {[
@@ -3194,9 +3199,22 @@ const renderSupplyTable = () => {
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-adasa-light selection:text-adasa-dark">
       {toastMessage && (
-        <div className={`fixed bottom-4 right-4 z-50 px-6 py-4 rounded-xl shadow-xl border flex items-center gap-3 transition-all ${toastMessage.type === "success" ? "bg-green-50/95 border-green-200 text-green-800" : "bg-red-50/95 border-red-200 text-red-800"}`}>
-          <div className={`p-2 rounded-lg ${toastMessage.type === "success" ? "bg-green-500" : "bg-red-500"}`}>
-            {toastMessage.type === "success" ? <Check size={16} className="text-white" /> : <AlertTriangle size={16} className="text-white" />}
+        <div className={`fixed bottom-4 right-4 z-50 px-6 py-4 rounded-xl shadow-xl border flex items-center gap-3 transition-all ${
+          toastMessage.type === "success" ? "bg-green-50/95 border-green-200 text-green-800" : 
+          toastMessage.type === "error" ? "bg-red-50/95 border-red-200 text-red-800" :
+          toastMessage.type === "warning" ? "bg-amber-50/95 border-amber-200 text-amber-800" :
+          "bg-blue-50/95 border-blue-200 text-blue-800"
+        }`}>
+          <div className={`p-2 rounded-lg ${
+            toastMessage.type === "success" ? "bg-green-500" : 
+            toastMessage.type === "error" ? "bg-red-500" :
+            toastMessage.type === "warning" ? "bg-amber-500" :
+            "bg-blue-500"
+          }`}>
+            {toastMessage.type === "success" ? <Check size={16} className="text-white" /> : 
+             toastMessage.type === "error" ? <AlertTriangle size={16} className="text-white" /> :
+             toastMessage.type === "warning" ? <AlertTriangle size={16} className="text-white" /> :
+             <Info size={16} className="text-white" />}
           </div>
           <div>
             <p className="font-black text-xs uppercase tracking-widest">{toastMessage.title}</p>
@@ -3334,6 +3352,23 @@ const renderSupplyTable = () => {
                   </div>
                 </div>
               </div>
+
+              <RequirePermission moduleId="users" action="view">
+                <div>
+                  <h4 className="text-xs font-black text-white/50 uppercase tracking-widest mb-2 flex items-center gap-1.5 px-2 mt-2">
+                    <Shield size={14} /> Gestão de Usuários
+                  </h4>
+                  <div className="space-y-1">
+                    <button
+                      onClick={() => handleTabChange("users")}
+                      className={cn("w-full px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "users" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                    >
+                      <Users size={20} className={activeTab === "users" ? "text-adasa-mid" : "text-white/60"} />
+                      Usuários e Permissões
+                    </button>
+                  </div>
+                </div>
+              </RequirePermission>
             </nav>
           </motion.div>
         )}
@@ -3612,6 +3647,37 @@ const renderSupplyTable = () => {
               </div>
             </div>
           </div>
+
+          <RequirePermission moduleId="users" action="view">
+            <div>
+              {!isSidebarCollapsed && (
+                <h4 className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1 flex items-center gap-1.5 px-2">
+                  <Shield size={12} /> Gestão de Usuários
+                </h4>
+              )}
+              <div className="space-y-1 mt-2">
+                <button
+                  title={isSidebarCollapsed ? "Gestão de Usuários" : undefined}
+                  onClick={() => handleTabChange("users")}
+                  className={cn(
+                    "w-full px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                    activeTab === "users"
+                      ? "bg-white/10 text-white shadow-sm border border-white/10"
+                      : "text-white/60 hover:text-white hover:bg-white/5",
+                  )}
+                >
+                  <Users
+                    size={16}
+                    className={cn(
+                      "flex-shrink-0 transition-colors",
+                      activeTab === "users" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    )}
+                  />
+                  {!isSidebarCollapsed && <span className="hidden md:inline">Usuários e Permissões</span>}
+                </button>
+              </div>
+            </div>
+          </RequirePermission>
         </nav>
 
         <div className="mt-auto hidden md:block space-y-4">
@@ -3637,6 +3703,8 @@ const renderSupplyTable = () => {
                   ? "Análise de Balanço Hídrico"
                   : activeTab === "templates"
                     ? "Arquivos Modelo"
+                    : activeTab === "users"
+                      ? "Gestão de Usuários"
                     : activeTab === "planning"
                       ? (activePlanningSubTab === "dashboard" ? "Painel de Atividades" :
                          activePlanningSubTab === "tasks" ? "Cadastrar Atividades" : 
@@ -3653,23 +3721,25 @@ const renderSupplyTable = () => {
                   ? "Visualize de forma isolada as projeções de oferta e demanda ao longo do tempo."
                   : activeTab === "templates"
                     ? "Gerencie e baixe os arquivos modelo para importação no sistema."
+                    : activeTab === "users"
+                      ? "Gerencie as contas de usuários, papéis e níveis de acesso (RBAC)."
                     : activeTab === "planning"
                       ? "Gerencie o cronograma consolidado, planos, áreas e status de execução."
                       : "Gerencie os balanços hídricos e cadastre novas informações."}
             </p>
           </div>
           <div className="flex flex-col md:flex-row items-center gap-3">
-            <div className="flex items-center gap-3 bg-white px-4 py-2 bg-white rounded-2xl border border-slate-200 shadow-sm transition-all hover:border-adasa-mid hidden md:flex">
+            <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-2xl border border-slate-200 shadow-sm transition-all hover:border-adasa-mid hidden md:flex">
               <div className="text-right">
                 <p className="text-xs font-black text-adasa-dark leading-none">
-                  Analista de Planejamento
+                  {currentUser?.name || "Usuário não logado"}
                 </p>
                 <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-wider font-bold">
-                  Administrador
+                  {currentUser?.agency ? `${roles.find(r => r.id === currentUser.roleId)?.name || 'N/A'} - ${currentUser.agency}` : roles.find(r => r.id === currentUser?.roleId)?.name || 'N/A'}
                 </p>
               </div>
               <div className="w-10 h-10 bg-adasa-light/10 rounded-xl flex items-center justify-center text-adasa-dark font-black text-sm shadow-inner">
-                SP
+                {currentUser?.name ? currentUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : '?'}
               </div>
             </div>
           </div>
@@ -5871,18 +5941,20 @@ const renderSupplyTable = () => {
                         </select>
                       </div>
                       <div className="col-span-1 md:col-span-2 flex justify-end mt-4">
-                        <button
-                          onClick={() => handleSaveModule("water-balances", { waterBalances })}
-                          className={cn(
-                            "px-8 py-3 font-black uppercase tracking-widest text-xs rounded-xl shadow-sm hover:shadow transition-all flex items-center justify-center gap-2",
-                            hasPendingChanges
-                              ? "bg-amber-500 hover:bg-amber-600 text-white animate-pulse"
-                              : "bg-adasa-mid hover:bg-adasa-dark text-white"
-                          )}
-                          title={hasPendingChanges ? "Existem alterações não salvas" : ""}
-                        >
-                          <Save size={16} /> Salvar Balanço
-                        </button>
+                        <RequirePermission moduleId="water_balances" action="edit">
+                          <button
+                            onClick={() => handleSaveModule("water-balances", { waterBalances })}
+                            className={cn(
+                              "px-8 py-3 font-black uppercase tracking-widest text-xs rounded-xl shadow-sm hover:shadow transition-all flex items-center justify-center gap-2",
+                              hasPendingChanges
+                                ? "bg-amber-500 hover:bg-amber-600 text-white animate-pulse"
+                                : "bg-adasa-mid hover:bg-adasa-dark text-white"
+                            )}
+                            title={hasPendingChanges ? "Existem alterações não salvas" : ""}
+                          >
+                            <Save size={16} /> Salvar Balanço
+                          </button>
+                        </RequirePermission>
                       </div>
                     </div>
                   </div>
@@ -6946,6 +7018,17 @@ const renderSupplyTable = () => {
                 </div>
               </div>
             </motion.div>
+          ) : activeTab === "users" ? (
+            <motion.div
+              key="users"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="max-w-7xl mx-auto w-full"
+            >
+              <UserManagementTab />
+            </motion.div>
           ) : activeTab === "planning" ? (
             <motion.div
               key="planning"
@@ -6960,6 +7043,7 @@ const renderSupplyTable = () => {
                 setTasks={setTasks}
                 showToast={showToast}
                 activeSubTab={activePlanningSubTab}
+                setConfirmState={setConfirmState}
               />
             </motion.div>
           ) : null}
@@ -6976,26 +7060,46 @@ const renderSupplyTable = () => {
       </footer>
 
       {confirmState && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl p-6 shadow-xl max-w-sm w-full animate-in fade-in zoom-in-95 duration-200">
-            <h3 className="text-lg font-black text-slate-800 mb-2">Confirmar Ação</h3>
-            <p className="text-sm font-medium text-slate-600 mb-6">{confirmState.message}</p>
-            <div className="flex justify-end gap-3">
-              <button
-                onClick={() => setConfirmState(null)}
-                className="px-4 py-2 font-bold text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => {
-                  confirmState.onConfirm();
-                  setConfirmState(null);
-                  }}
-                className="px-4 py-2 font-bold text-sm text-white bg-rose-500 hover:bg-rose-600 rounded-xl transition-colors"
-              >
-                Confirmar
-              </button>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm" onClick={() => setConfirmState(null)} />
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full animate-in fade-in zoom-in-95 duration-200 relative z-10 overflow-hidden border border-slate-200">
+            <div className={`${confirmState.type === 'alert' ? 'bg-amber-50/50' : 'bg-rose-50/50'} p-5 border-b border-slate-100 flex items-start gap-4`}>
+              <div className={`p-3 bg-white rounded-xl shadow-sm border ${confirmState.type === 'alert' ? 'text-amber-500 border-amber-100' : 'text-rose-500 border-rose-100'}`}>
+                <AlertTriangle size={24} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-800">{confirmState.title || (confirmState.type === 'alert' ? "Atenção" : "Confirmar Ação")}</h3>
+                <p className="text-sm font-medium text-slate-600 mt-1 whitespace-pre-wrap leading-relaxed">{confirmState.message}</p>
+              </div>
+            </div>
+            
+            <div className="p-4 bg-slate-50 flex justify-end gap-3">
+              {confirmState.type === 'alert' ? (
+                <button
+                  onClick={() => setConfirmState(null)}
+                  className="px-5 py-2 font-bold text-sm text-white bg-amber-500 hover:bg-amber-600 rounded-xl transition-colors shadow-sm shadow-amber-500/20"
+                >
+                  Entendi
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => setConfirmState(null)}
+                    className="px-4 py-2 font-bold text-sm text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirmState.onConfirm) confirmState.onConfirm();
+                      setConfirmState(null);
+                    }}
+                    className="px-5 py-2 font-bold text-sm text-white bg-rose-500 hover:bg-rose-600 rounded-xl transition-colors shadow-sm shadow-rose-500/20"
+                  >
+                    Confirmar
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>

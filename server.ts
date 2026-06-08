@@ -70,7 +70,20 @@ async function rollUpTask(client: any, parentId: number | null) {
     [parentId]
   );
   
-  if (res.rows.length === 0) return;
+  if (res.rows.length === 0) {
+    await client.query(
+      `UPDATE pl_tasks 
+       SET progress = 0, status = 'Não iniciada', start_date = NULL, end_date = NULL
+       WHERE id = $1`,
+      [parentId]
+    );
+
+    const parentRes = await client.query("SELECT parent_id FROM pl_tasks WHERE id = $1", [parentId]);
+    if (parentRes.rows.length > 0 && parentRes.rows[0].parent_id) {
+      await rollUpTask(client, parentRes.rows[0].parent_id);
+    }
+    return;
+  }
 
   let minStart: Date | null = null;
   let maxEnd: Date | null = null;
@@ -169,7 +182,8 @@ async function seedTasks(client: any) {
     return;
   }
 
-  if (fs.existsSync(path.join(process.cwd(), "tasks_cleared_marker.txt"))) {
+  const markerPath = process.env.VERCEL ? "/tmp/tasks_cleared_marker.txt" : path.join("/tmp", "tasks_cleared_marker.txt");
+  if (fs.existsSync(markerPath)) {
     console.log("[LOG] seedTasks: pulando semeadura porque o arquivo tasks_cleared_marker.txt existe.");
     return;
   }
@@ -634,6 +648,13 @@ async function runStartupMigration() {
 
       // Verify that depends_on_task_id exists
       await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS depends_on_task_id INTEGER REFERENCES pl_tasks(id) ON DELETE SET NULL;`);
+      
+      // Add updated_at and updated_by to tables
+      await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
+      await client.query(`ALTER TABLE pl_plans ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
+      await client.query(`ALTER TABLE pl_areas ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
+      await client.query(`ALTER TABLE pl_responsibles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
+      await client.query(`ALTER TABLE pl_categories ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
 
       await client.query("COMMIT");
       console.log("Database tables verified successfully on server start!");
@@ -1295,7 +1316,7 @@ async function startServer() {
       try {
         await client.query("BEGIN");
         
-        await client.query("TRUNCATE TABLE wb_demand_entries, operational_adjustments, supply_sources, demands, regions, systems, water_balances CASCADE");
+        await client.query("TRUNCATE TABLE wb_demand_entries, wb_operational_adjustments, wb_supply_sources, wb_demands, wb_regions, wb_systems, wb_water_balances CASCADE");
 
         const { waterBalances, systems, regions, demands, supplySources, operationalAdjustments } = data;
 
@@ -2041,13 +2062,13 @@ async function startServer() {
   // REST endpoints for plans
   app.post("/api/plans", async (req, res) => {
     try {
-      const { name, description } = req.body;
+      const { name, description, updatedBy } = req.body;
       const pool = getDbPool();
       const result = await pool.query(
-        "INSERT INTO pl_plans (name, title, description) VALUES ($1, $1, $2) RETURNING *",
-        [name || "Plano Sem Nome", description || ""]
+        "INSERT INTO pl_plans (name, title, description, updated_at, updated_by) VALUES ($1, $1, $2, NOW(), $3) RETURNING *",
+        [name || "Plano Sem Nome", description || "", updatedBy || "SGI Pro"]
       );
-      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name || result.rows[0].title || "Plano Sem Nome", description: result.rows[0].description } });
+      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name || result.rows[0].title || "Plano Sem Nome", description: result.rows[0].description, updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
     } catch (error: any) {
       console.error("Erro ao criar plano:", error);
       res.status(500).json({ success: false, error: error.message });
@@ -2057,16 +2078,16 @@ async function startServer() {
   app.put("/api/plans/:id", async (req, res) => {
     try {
       const planId = parseInt(req.params.id);
-      const { name, description } = req.body;
+      const { name, description, updatedBy } = req.body;
       const pool = getDbPool();
       const result = await pool.query(
-        "UPDATE pl_plans SET name = $1, title = $1, description = $2 WHERE id = $3 RETURNING *",
-        [name || "Plano Sem Nome", description || "", planId]
+        "UPDATE pl_plans SET name = $1, title = $1, description = $2, updated_at = NOW(), updated_by = $3 WHERE id = $4 RETURNING *",
+        [name || "Plano Sem Nome", description || "", updatedBy || "SGI Pro", planId]
       );
       if (result.rows.length === 0) {
         return res.status(404).json({ success: false, error: "Plano não encontrado" });
       }
-      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name || result.rows[0].title || "Plano Sem Nome", description: result.rows[0].description } });
+      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name || result.rows[0].title || "Plano Sem Nome", description: result.rows[0].description, updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
     } catch (error: any) {
       console.error("Erro ao atualizar plano:", error);
       res.status(500).json({ success: false, error: error.message });
@@ -2088,13 +2109,13 @@ async function startServer() {
   // REST endpoints for areas
   app.post("/api/areas", async (req, res) => {
     try {
-      const { name, abbreviation } = req.body;
+      const { name, abbreviation, updatedBy } = req.body;
       const pool = getDbPool();
       const result = await pool.query(
-        "INSERT INTO pl_areas (name, abbreviation) VALUES ($1, $2) RETURNING *",
-        [name || "Área Sem Nome", abbreviation || ""]
+        "INSERT INTO pl_areas (name, abbreviation, updated_at, updated_by) VALUES ($1, $2, NOW(), $3) RETURNING *",
+        [name || "Área Sem Nome", abbreviation || "", updatedBy || "SGI Pro"]
       );
-      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name, abbreviation: result.rows[0].abbreviation, planId: null } });
+      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name, abbreviation: result.rows[0].abbreviation, planId: null, updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
     } catch (error: any) {
       console.error("Erro ao criar área:", error);
       res.status(500).json({ success: false, error: error.message });
@@ -2104,16 +2125,16 @@ async function startServer() {
   app.put("/api/areas/:id", async (req, res) => {
     try {
       const areaId = parseInt(req.params.id);
-      const { name, abbreviation } = req.body;
+      const { name, abbreviation, updatedBy } = req.body;
       const pool = getDbPool();
       const result = await pool.query(
-        "UPDATE pl_areas SET name = $1, abbreviation = $2 WHERE id = $3 RETURNING *",
-        [name, abbreviation || "", areaId]
+        "UPDATE pl_areas SET name = $1, abbreviation = $2, updated_at = NOW(), updated_by = $3 WHERE id = $4 RETURNING *",
+        [name, abbreviation || "", updatedBy || "SGI Pro", areaId]
       );
       if (result.rows.length === 0) {
         return res.status(404).json({ success: false, error: "Área não encontrada" });
       }
-      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name, abbreviation: result.rows[0].abbreviation, planId: null } });
+      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name, abbreviation: result.rows[0].abbreviation, planId: null, updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
     } catch (error: any) {
       console.error("Erro ao atualizar área:", error);
       res.status(500).json({ success: false, error: error.message });
@@ -2135,16 +2156,18 @@ async function startServer() {
   // REST endpoints for responsibles
   app.post("/api/responsibles", async (req, res) => {
     try {
-      const { name, email, role, areaIds } = req.body;
+      const { name, email, role, areaIds, updatedBy } = req.body;
       const pool = getDbPool();
       let createdId;
+      let finalResult;
       try {
         await pool.query("BEGIN");
         const result = await pool.query(
-          "INSERT INTO pl_responsibles (name, email, role) VALUES ($1, $2, $3) RETURNING *",
-          [name || "Responsável Sem Nome", email || "", role || ""]
+          "INSERT INTO pl_responsibles (name, email, role, updated_at, updated_by) VALUES ($1, $2, $3, NOW(), $4) RETURNING *",
+          [name || "Responsável Sem Nome", email || "", role || "", updatedBy || "SGI Pro"]
         );
         createdId = result.rows[0].id;
+        finalResult = result;
         
         if (Array.isArray(areaIds) && areaIds.length > 0) {
           for (const aId of areaIds) {
@@ -2156,7 +2179,7 @@ async function startServer() {
         await pool.query("ROLLBACK");
         throw err;
       }
-      res.json({ success: true, data: { id: Number(createdId), name: name, email: email, role: role, areaIds: areaIds || [] } });
+      res.json({ success: true, data: { id: Number(createdId), name: finalResult.rows[0].name, email: finalResult.rows[0].email, role: finalResult.rows[0].role, areaIds: areaIds || [], updatedAt: finalResult.rows[0].updated_at, updatedBy: finalResult.rows[0].updated_by } });
     } catch (error: any) {
       console.error("Erro ao criar responsável:", error);
       res.status(500).json({ success: false, error: error.message });
@@ -2166,14 +2189,14 @@ async function startServer() {
   app.put("/api/responsibles/:id", async (req, res) => {
     try {
       const respId = parseInt(req.params.id);
-      const { name, email, role, areaIds } = req.body;
+      const { name, email, role, areaIds, updatedBy } = req.body;
       const pool = getDbPool();
       let result;
       try {
         await pool.query("BEGIN");
         result = await pool.query(
-          "UPDATE pl_responsibles SET name = $1, email = $2, role = $3 WHERE id = $4 RETURNING *",
-          [name, email, role, respId]
+          "UPDATE pl_responsibles SET name = $1, email = $2, role = $3, updated_at = NOW(), updated_by = $4 WHERE id = $5 RETURNING *",
+          [name, email, role, updatedBy || "SGI Pro", respId]
         );
         if (result.rows.length === 0) {
           await pool.query("ROLLBACK");
@@ -2191,7 +2214,7 @@ async function startServer() {
         await pool.query("ROLLBACK");
         throw err;
       }
-      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name, email: result.rows[0].email, role: result.rows[0].role, areaIds: areaIds || [] } });
+      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name, email: result.rows[0].email, role: result.rows[0].role, areaIds: areaIds || [], updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
     } catch (error: any) {
       console.error("Erro ao atualizar responsável:", error);
       res.status(500).json({ success: false, error: error.message });
@@ -2214,7 +2237,7 @@ async function startServer() {
   app.get("/api/categories", async (req, res) => {
     try {
       const pool = getDbPool();
-      const result = await pool.query("SELECT id, name FROM pl_categories ORDER BY id ASC");
+      const result = await pool.query("SELECT id, name, updated_at, updated_by FROM pl_categories ORDER BY id ASC");
       const mapping = await pool.query("SELECT category_id, area_id FROM pl_category_areas");
       
       const areaMap: Record<number, number[]> = {};
@@ -2229,6 +2252,8 @@ async function startServer() {
         data: result.rows.map(c => ({
           id: Number(c.id),
           name: c.name,
+          updatedAt: c.updated_at,
+          updatedBy: c.updated_by,
           areaIds: areaMap[Number(c.id)] || []
         }))
       });
@@ -2240,16 +2265,18 @@ async function startServer() {
 
   app.post("/api/categories", async (req, res) => {
     try {
-      const { name, areaIds } = req.body;
+      const { name, areaIds, updatedBy } = req.body;
       const pool = getDbPool();
       let createdId;
+      let finalResult;
       try {
         await pool.query("BEGIN");
         const result = await pool.query(
-          "INSERT INTO pl_categories (name) VALUES ($1) RETURNING *",
-          [name || "Categoria Sem Nome"]
+          "INSERT INTO pl_categories (name, updated_at, updated_by) VALUES ($1, NOW(), $2) RETURNING *",
+          [name || "Categoria Sem Nome", updatedBy || "SGI Pro"]
         );
         createdId = result.rows[0].id;
+        finalResult = result;
         
         if (Array.isArray(areaIds) && areaIds.length > 0) {
           for (const aId of areaIds) {
@@ -2266,8 +2293,10 @@ async function startServer() {
         success: true,
         data: {
           id: Number(createdId),
-          name: name,
-          areaIds: areaIds || []
+          name: finalResult.rows[0].name,
+          areaIds: areaIds || [],
+          updatedAt: finalResult.rows[0].updated_at,
+          updatedBy: finalResult.rows[0].updated_by
         }
       });
     } catch (error: any) {
@@ -2279,14 +2308,14 @@ async function startServer() {
   app.put("/api/categories/:id", async (req, res) => {
     try {
       const catId = parseInt(req.params.id);
-      const { name, areaIds } = req.body;
+      const { name, areaIds, updatedBy } = req.body;
       const pool = getDbPool();
       let result;
       try {
         await pool.query("BEGIN");
         result = await pool.query(
-          "UPDATE pl_categories SET name = $1 WHERE id = $2 RETURNING *",
-          [name, catId]
+          "UPDATE pl_categories SET name = $1, updated_at = NOW(), updated_by = $2 WHERE id = $3 RETURNING *",
+          [name, updatedBy || "SGI Pro", catId]
         );
         if (result.rows.length === 0) {
           await pool.query("ROLLBACK");
@@ -2310,7 +2339,9 @@ async function startServer() {
         data: {
           id: Number(result.rows[0].id),
           name: result.rows[0].name,
-          areaIds: areaIds || []
+          areaIds: areaIds || [],
+          updatedAt: result.rows[0].updated_at,
+          updatedBy: result.rows[0].updated_by
         }
       });
     } catch (error: any) {
@@ -2338,11 +2369,11 @@ async function startServer() {
       try {
         const result = await client.query(`
           WITH RECURSIVE task_tree AS (
-            SELECT id, title, description, start_date, end_date, status, parent_id, progress, priority, category, assigned_to, created_by, notes, plan_id, depends_on_task_id, 1 AS depth
+            SELECT id, title, description, start_date, end_date, status, parent_id, progress, priority, category, assigned_to, created_by, notes, plan_id, depends_on_task_id, updated_at, updated_by, 1 AS depth
             FROM pl_tasks
             WHERE parent_id IS NULL
             UNION ALL
-            SELECT t.id, t.title, t.description, t.start_date, t.end_date, t.status, t.parent_id, t.progress, t.priority, t.category, t.assigned_to, t.created_by, t.notes, t.plan_id, t.depends_on_task_id, tt.depth + 1
+            SELECT t.id, t.title, t.description, t.start_date, t.end_date, t.status, t.parent_id, t.progress, t.priority, t.category, t.assigned_to, t.created_by, t.notes, t.plan_id, t.depends_on_task_id, t.updated_at, t.updated_by, tt.depth + 1
             FROM pl_tasks t
             INNER JOIN task_tree tt ON t.parent_id = tt.id
           )
@@ -2414,6 +2445,8 @@ async function startServer() {
           notes: t.notes,
           planId: t.plan_id ? Number(t.plan_id) : null,
           dependsOnTaskId: t.depends_on_task_id ? Number(t.depends_on_task_id) : null,
+          updatedAt: t.updated_at,
+          updatedBy: t.updated_by,
           areaIds: taskAreasMap[Number(t.id)] || [],
           responsibleIds: taskResponsiblesMap[Number(t.id)] || [],
           categoryIds: taskCategoriesMap[Number(t.id)] || []
@@ -2426,25 +2459,33 @@ async function startServer() {
             id: Number(p.id),
             name: p.name || p.title || "Plano Sem Nome",
             title: p.title || p.name || "Plano Sem Nome",
-            description: p.description
+            description: p.description,
+            updatedAt: p.updated_at,
+            updatedBy: p.updated_by
           })),
           areas: dbAreas.rows.map(a => ({
             id: Number(a.id),
             name: a.name,
             abbreviation: a.abbreviation,
-            planId: null
+            planId: null,
+            updatedAt: a.updated_at,
+            updatedBy: a.updated_by
           })),
           responsibles: dbResponsibles.rows.map(r => ({
             id: Number(r.id),
             name: r.name,
             email: r.email,
             role: r.role,
-            areaIds: responsibleAreasMap[Number(r.id)] || []
+            areaIds: responsibleAreasMap[Number(r.id)] || [],
+            updatedAt: r.updated_at,
+            updatedBy: r.updated_by
           })),
           categories: dbCategories.rows.map(c => ({
             id: Number(c.id),
             name: c.name,
-            areaIds: categoryAreasMap[Number(c.id)] || []
+            areaIds: categoryAreasMap[Number(c.id)] || [],
+            updatedAt: c.updated_at,
+            updatedBy: c.updated_by
           }))
         });
       } finally {
@@ -2483,8 +2524,8 @@ async function startServer() {
         }
         
         const result = await client.query(
-          `INSERT INTO pl_tasks (title, description, start_date, end_date, status, parent_id, progress, priority, category, assigned_to, notes, plan_id, depends_on_task_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+          `INSERT INTO pl_tasks (title, description, start_date, end_date, status, parent_id, progress, priority, category, assigned_to, notes, plan_id, depends_on_task_id, updated_at, updated_by)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), $14)
            RETURNING *`,
           [
             title || "Sem título",
@@ -2499,7 +2540,8 @@ async function startServer() {
             "", // assigned_to will be updated below
             notes || "",
             planId ? parseInt(planId) : null,
-            dependsOnTaskId ? parseInt(dependsOnTaskId) : null
+            dependsOnTaskId ? parseInt(dependsOnTaskId) : null,
+            req.body.updatedBy || "SGI Pro"
           ]
         );
         
@@ -2623,8 +2665,8 @@ async function startServer() {
 
         const result = await client.query(
           `UPDATE pl_tasks 
-           SET title = $1, description = $2, start_date = $3, end_date = $4, status = $5, progress = $6, priority = $7, category = $8, assigned_to = $9, notes = $10, parent_id = $11, plan_id = $12, depends_on_task_id = $13
-           WHERE id = $14
+           SET title = $1, description = $2, start_date = $3, end_date = $4, status = $5, progress = $6, priority = $7, category = $8, assigned_to = $9, notes = $10, parent_id = $11, plan_id = $12, depends_on_task_id = $13, updated_at = NOW(), updated_by = $14
+           WHERE id = $15
            RETURNING *`,
           [
             title || "Sem título",
@@ -2640,6 +2682,7 @@ async function startServer() {
             parentId ? parseInt(parentId) : null,
             planId ? parseInt(planId) : null,
             dependsOnTaskId ? parseInt(dependsOnTaskId) : null,
+            req.body.updatedBy || "SGI Pro",
             taskId
           ]
         );
@@ -2682,6 +2725,10 @@ async function startServer() {
 
         // Trigger cascade to override children
         await cascadeAreasAndCategories(client, taskId, finalAreaIds, finalCategoryIds);
+
+        if (hasChildren) {
+          await rollUpTask(client, taskId);
+        }
 
         if (updatedTask.parent_id) {
           await rollUpTask(client, updatedTask.parent_id);
@@ -2770,7 +2817,7 @@ async function startServer() {
         await client.query("BEGIN");
         const result = await client.query("DELETE FROM pl_tasks");
         
-        const markerPath = path.join(process.cwd(), "tasks_cleared_marker.txt");
+        const markerPath = process.env.VERCEL ? "/tmp/tasks_cleared_marker.txt" : path.join("/tmp", "tasks_cleared_marker.txt");
         fs.writeFileSync(markerPath, "tasks_cleared_" + Date.now(), "utf8");
         
         await client.query("COMMIT");

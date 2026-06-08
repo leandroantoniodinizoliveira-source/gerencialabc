@@ -71,7 +71,7 @@ export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas }:
             <div className="p-1 px-2.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-black uppercase tracking-wider">
               Módulo 1
             </div>
-            <h2 className="text-lg font-black text-slate-800 tracking-tight">Dimensão de Planejamento e Cronogramas</h2>
+            <h2 className="text-lg font-black text-slate-800 tracking-tight">Planejamento e Cronogramas</h2>
           </div>
           <span className="text-[11px] font-bold text-slate-500 bg-slate-100/80 px-2.5 py-1 rounded-full border border-slate-200/50">
             {completedTasks}/{totalTasks} Metas Concluídas
@@ -198,7 +198,7 @@ export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas }:
           <div className="p-1 px-2.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-black uppercase tracking-wider">
             Módulo 2
           </div>
-          <h2 className="text-lg font-black text-slate-800 tracking-tight">Dimensão de Recursos Hídricos e Balanços</h2>
+          <h2 className="text-lg font-black text-slate-800 tracking-tight">Balanço Hídrico dos Sistemas de Abastecimento de Água</h2>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

@@ -12,7 +12,7 @@ interface PlanningModuleProps {
   activeSubTab?: "tasks" | "dashboard" | "plans" | "areas" | "categories" | "responsibles";
   legacyTasks?: Task[];
   legacySetTasks?: any;
-  showToast: (title: string, message: string, type: "success" | "error" | "info") => void;
+  showToast: (title: string, message: string, type: "success" | "error" | "warning" | "info") => void;
 }
 
 export const PlanningModule: React.FC<PlanningModuleProps> = ({ 

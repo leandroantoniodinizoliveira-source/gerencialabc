@@ -3,7 +3,7 @@
  * Apache-2.0
  */
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import {
   FolderKanban,
@@ -12,6 +12,8 @@ import {
   Layers,
   ChevronDown,
   ChevronUp,
+  ChevronsDown,
+  ChevronsUp,
   ChevronRight,
   Plus,
   Trash2,
@@ -21,14 +23,17 @@ import {
   User,
   Tag,
   AlertCircle,
+  AlertTriangle,
   TrendingUp,
   Search,
   Filter,
   RefreshCw,
   CheckCircle2,
+  Circle,
   Info,
   X,
   FileText,
+  Table,
   CalendarRange,
   LayoutGrid,
   Briefcase,
@@ -42,13 +47,15 @@ import {
 } from "lucide-react";
 import { Task, Plan, Area, Category, Responsible } from "../types";
 import { cn } from "../lib/utils";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, PieChart, Pie, Cell, CartesianGrid, LabelList } from "recharts";
+import { useAuth } from "../lib/auth";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, PieChart, Pie, Cell, CartesianGrid, LabelList, LineChart, Line } from "recharts";
  
 interface PlanningTabProps {
   tasks: Task[];
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
-  showToast: (title: string, message: string, type: "success" | "error" | "info") => void;
+  showToast: (title: string, message: string, type: "success" | "error" | "warning" | "info") => void;
   activeSubTab?: "tasks" | "dashboard" | "plans" | "areas" | "categories" | "responsibles";
+  setConfirmState?: React.Dispatch<React.SetStateAction<{ title?: string; message: string; type?: "confirm" | "alert"; onConfirm?: () => void } | null>>;
 }
  
 const normalizeStatus = (status: string | undefined): "Não iniciada" | "Em andamento" | "Concluída" => {
@@ -57,6 +64,41 @@ const normalizeStatus = (status: string | undefined): "Não iniciada" | "Em anda
   if (s === "concluída" || s === "concluído" || s === "completed") return "Concluída";
   if (s === "em andamento" || s === "in_progress" || s === "in progress") return "Em andamento";
   return "Não iniciada";
+};
+
+const getDeadlineStatus = (endDate: string | null | undefined, status: string | undefined): "Atrasada" | "Crítica" | "No Prazo" => {
+  const normStatus = normalizeStatus(status);
+  if (normStatus === "Concluída") return "No Prazo";
+  if (!endDate) return "No Prazo";
+  
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    let dEnd: Date;
+    if (endDate.includes("-")) {
+      const parts = endDate.split('T')[0].split('-');
+      dEnd = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+    } else {
+      dEnd = new Date(endDate);
+    }
+    
+    if (isNaN(dEnd.getTime())) return "No Prazo";
+    dEnd.setHours(0, 0, 0, 0);
+    
+    const diffTime = dEnd.getTime() - today.getTime();
+    const diffDays = Math.round(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays < 0) {
+      return "Atrasada";
+    } else if (diffDays <= 7) {
+      return "Crítica";
+    } else {
+      return "No Prazo";
+    }
+  } catch (e) {
+    return "No Prazo";
+  }
 };
 
 // Custom Tooltips for Charts
@@ -152,11 +194,54 @@ const CustomPriorityTooltip = ({ active, payload }: any) => {
   return null;
 };
 
-export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks" }: PlanningTabProps) {
+const CustomAreaStatusTooltip = ({ active, payload, label }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    const total = (data["Não iniciada"] || 0) + (data["Em andamento"] || 0) + (data["Concluídas"] || 0);
+    return (
+      <div className="bg-white border border-slate-200 p-3.5 rounded-2xl shadow-xl flex flex-col gap-2 min-w-[200px] z-50">
+        <p className="text-slate-800 font-black text-xs uppercase tracking-wide border-b border-slate-100 pb-2 mb-1">
+          {label}
+        </p>
+        <div className="flex justify-between items-center gap-6">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-sm bg-[#94a3b8]"></span>
+            <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Não iniciada</span>
+          </div>
+          <span className="text-slate-700 font-black text-sm">{data["Não iniciada"] || 0}</span>
+        </div>
+        <div className="flex justify-between items-center gap-6">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-sm bg-[#3b82f6]"></span>
+            <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Em andamento</span>
+          </div>
+          <span className="text-slate-700 font-black text-sm">{data["Em andamento"] || 0}</span>
+        </div>
+        <div className="flex justify-between items-center gap-6">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-sm bg-[#10b981]"></span>
+            <span className="text-slate-500 text-[10px] font-bold uppercase tracking-wider">Concluídas</span>
+          </div>
+          <span className="text-slate-700 font-black text-sm">{data["Concluídas"] || 0}</span>
+        </div>
+        <div className="flex justify-between items-center gap-6 border-t border-slate-100 pt-2 mt-1">
+          <span className="text-slate-800 text-[10px] font-black uppercase tracking-wider">Total</span>
+          <span className="text-slate-900 font-black text-base">{total}</span>
+        </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks", setConfirmState = () => {} }: PlanningTabProps) {
+  const { currentUser } = useAuth();
   // Navigation, search & filter state
   const [isDashboardFiltersExpanded, setIsDashboardFiltersExpanded] = useState(false);
+  const [isTasksFiltersExpanded, setIsTasksFiltersExpanded] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [situationFilter, setSituationFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
   
@@ -168,6 +253,30 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
   // Period / cronograma filters for dashboard
   const [periodTypeFilter, setPeriodTypeFilter] = useState<"all" | "month" | "quarter" | "semester">("all");
   const [periodValueFilter, setPeriodValueFilter] = useState<string>("all");
+
+  const isAnyFilterActive = useMemo(() => {
+    return (
+      statusFilter !== "all" ||
+      situationFilter !== "all" ||
+      priorityFilter !== "all" ||
+      categoryFilter !== "all" ||
+      searchTerm.trim() !== "" ||
+      (planFilter !== "all" && planFilter !== "") ||
+      selectedAreaIds.length > 0 ||
+      selectedResponsibleIds.length > 0 ||
+      periodTypeFilter !== "all"
+    );
+  }, [
+    statusFilter,
+    situationFilter,
+    priorityFilter,
+    categoryFilter,
+    searchTerm,
+    planFilter,
+    selectedAreaIds,
+    selectedResponsibleIds,
+    periodTypeFilter
+  ]);
 
   // Registry lists loaded from the server
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -181,6 +290,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
   const [regDesc, setRegDesc] = useState("");
   const [regEmail, setRegEmail] = useState("");
   const [regRole, setRegRole] = useState("");
+  const [regUpdatedBy, setRegUpdatedBy] = useState("");
   const [regPlanId, setRegPlanId] = useState<string>("");
   const [regAreaIds, setRegAreaIds] = useState<number[]>([]);
   const [editingRegId, setEditingRegId] = useState<number | null>(null);
@@ -192,10 +302,16 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
   const [expandedQuarterGroups, setExpandedQuarterGroups] = useState<Record<string, boolean>>({});
   const [expandedPlanQuarterAreaGroups, setExpandedPlanQuarterAreaGroups] = useState<Record<string, boolean>>({});
-  
+  const [collapsedAreas, setCollapsedAreas] = useState<Record<string, boolean>>({});
+  const [areaTableSort, setAreaTableSort] = useState<{ field: string, dir: "asc" | "desc" } | null>({ field: "end", dir: "asc" });
+  const [collapsedTableCategories, setCollapsedTableCategories] = useState<Record<string, boolean>>({});
+  const [quarterChartType, setQuarterChartType] = useState<"small-multiples" | "heatmap">("small-multiples");
+
   // Modal/Form State for adding/editing tasks
   const [timelineTaskId, setTimelineTaskId] = useState<number | null>(null);
-  const [viewMode, setViewMode] = useState<"tree" | "status" | "category" | "area" | "responsible">("category");
+  const [viewMode, setViewMode] = useState<"tree" | "table" | "status" | "category" | "area" | "responsible" | "board">("category");
+  const [tableSort, setTableSort] = useState<{ field: string, dir: "asc" | "desc" } | null>({ field: "end", dir: "asc" });
+  const [boardGroupBy, setBoardGroupBy] = useState<"status" | "category">("category");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isRegModalOpen, setIsRegModalOpen] = useState(false);
   const [formMode, setFormMode] = useState<"create" | "edit">("create");
@@ -203,6 +319,169 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
   
   // Quick status sync loader
   const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleAreaTableSort = (field: string) => {
+    setAreaTableSort(prev => {
+      if (prev?.field === field) {
+        return { field, dir: prev.dir === "asc" ? "desc" : "asc" };
+      }
+      return { field, dir: "asc" };
+    });
+  };
+
+  const AreaTableSortIcon = ({ field }: { field: string }) => {
+    if (areaTableSort?.field !== field) return <ChevronDown size={12} className="opacity-35 inline ml-1" />;
+    return areaTableSort.dir === "asc" 
+      ? <ChevronUp size={12} className="text-indigo-600 inline ml-1 font-bold" /> 
+      : <ChevronDown size={12} className="text-indigo-600 inline ml-1 font-bold" />;
+  };
+
+  const sortAreaTaskList = (taskList: Task[]) => {
+    if (!areaTableSort) return taskList;
+    const sorted = [...taskList];
+    sorted.sort((a, b) => {
+      let valA: any = "";
+      let valB: any = "";
+      
+      if (areaTableSort.field === "title") {
+        valA = getTaskDisplayName(a);
+        valB = getTaskDisplayName(b);
+      } else if (areaTableSort.field === "start") {
+        valA = a.startDate || "9999-99-99";
+        valB = b.startDate || "9999-99-99";
+      } else if (areaTableSort.field === "end") {
+        valA = a.endDate || "9999-99-99";
+        valB = b.endDate || "9999-99-99";
+      } else if (areaTableSort.field === "quarter") {
+        const getQ = (tk: Task) => {
+          if (!tk.endDate) return 5;
+          const d = new Date(tk.endDate);
+          if (isNaN(d.getTime())) return 5;
+          return Math.floor(d.getUTCMonth() / 3) + 1;
+        };
+        valA = getQ(a);
+        valB = getQ(b);
+      } else if (areaTableSort.field === "month") {
+        const getM = (tk: Task) => {
+          if (!tk.endDate) return 13;
+          const d = new Date(tk.endDate);
+          if (isNaN(d.getTime())) return 13;
+          return d.getUTCMonth();
+        };
+        valA = getM(a);
+        valB = getM(b);
+      } else if (areaTableSort.field === "status") {
+        valA = normalizeStatus(a.status);
+        valB = normalizeStatus(b.status);
+      } else if (areaTableSort.field === "situation") {
+        valA = getDeadlineStatus(a.endDate, a.status);
+        valB = getDeadlineStatus(b.endDate, b.status);
+      } else if (areaTableSort.field === "priority") {
+        const getPrioValue = (tk: Task) => {
+          if (tk.priority === "Alta") return 1;
+          if (tk.priority === "Média") return 2;
+          if (tk.priority === "Baixa") return 3;
+          return 4;
+        };
+        valA = getPrioValue(a);
+        valB = getPrioValue(b);
+      } else if (areaTableSort.field === "progress") {
+        valA = a.progress || 0;
+        valB = b.progress || 0;
+      }
+
+      if (areaTableSort.field === "title" || areaTableSort.field === "status" || areaTableSort.field === "situation") {
+        const strA = String(valA || "");
+        const strB = String(valB || "");
+        return areaTableSort.dir === "asc" 
+          ? strA.localeCompare(strB, "pt-BR") 
+          : strB.localeCompare(strA, "pt-BR");
+      }
+
+      if (valA < valB) return areaTableSort.dir === "asc" ? -1 : 1;
+      if (valA > valB) return areaTableSort.dir === "asc" ? 1 : -1;
+      return 0;
+    });
+    return sorted;
+  };
+
+  // Refs and state for synchronized scrolling in Kanban board (Quadro)
+  const topScrollRef = useRef<HTMLDivElement>(null);
+  const contentScrollRef = useRef<HTMLDivElement>(null);
+  const [boardScrollWidth, setBoardScrollWidth] = useState(0);
+
+  useEffect(() => {
+    if (viewMode === "board" && contentScrollRef.current) {
+      const el = contentScrollRef.current;
+      const updateWidth = () => {
+        setBoardScrollWidth(el.scrollWidth);
+      };
+      
+      const handle = requestAnimationFrame(updateWidth);
+      const observer = new ResizeObserver(updateWidth);
+      observer.observe(el);
+      
+      return () => {
+        cancelAnimationFrame(handle);
+        observer.disconnect();
+      };
+    }
+  }, [viewMode, boardGroupBy, tasks, categories]);
+
+  const handleTopScroll = () => {
+    if (topScrollRef.current && contentScrollRef.current) {
+      if (Math.abs(contentScrollRef.current.scrollLeft - topScrollRef.current.scrollLeft) > 1) {
+        contentScrollRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+      }
+    }
+  };
+
+  const handleContentScroll = () => {
+    if (topScrollRef.current && contentScrollRef.current) {
+      if (Math.abs(topScrollRef.current.scrollLeft - contentScrollRef.current.scrollLeft) > 1) {
+        topScrollRef.current.scrollLeft = contentScrollRef.current.scrollLeft;
+      }
+    }
+  };
+
+  // Refs and state for synchronized scrolling in Table view (Tabela)
+  const topScrollTableRef = useRef<HTMLDivElement>(null);
+  const contentScrollTableRef = useRef<HTMLDivElement>(null);
+  const [tableScrollWidth, setTableScrollWidth] = useState(0);
+
+  useEffect(() => {
+    if (viewMode === "table" && contentScrollTableRef.current) {
+      const el = contentScrollTableRef.current;
+      const updateWidth = () => {
+        setTableScrollWidth(el.scrollWidth);
+      };
+      
+      const handle = requestAnimationFrame(updateWidth);
+      const observer = new ResizeObserver(updateWidth);
+      observer.observe(el);
+      
+      return () => {
+        cancelAnimationFrame(handle);
+        observer.disconnect();
+      };
+    }
+  }, [viewMode, tasks, categories]);
+
+  const handleTopTableScroll = () => {
+    if (topScrollTableRef.current && contentScrollTableRef.current) {
+      if (Math.abs(contentScrollTableRef.current.scrollLeft - topScrollTableRef.current.scrollLeft) > 1) {
+        contentScrollTableRef.current.scrollLeft = topScrollTableRef.current.scrollLeft;
+      }
+    }
+  };
+
+  const handleContentTableScroll = () => {
+    if (topScrollTableRef.current && contentScrollTableRef.current) {
+      if (Math.abs(topScrollTableRef.current.scrollLeft - contentScrollTableRef.current.scrollLeft) > 1) {
+        topScrollTableRef.current.scrollLeft = contentScrollTableRef.current.scrollLeft;
+      }
+    }
+  };
 
   // Reload registries independently of tasks
   const loadRegistriesOnly = async () => {
@@ -231,7 +510,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: regName, description: regDesc })
+        body: JSON.stringify({ name: regName, description: regDesc, updatedBy: regUpdatedBy })
       });
       const data = await res.json();
       if (data.success) {
@@ -252,31 +531,47 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
 
   // Handle plan delete
   const handlePlanDelete = async (id: number) => {
-    if (!window.confirm("Aviso: Excluir um plano pode deixar tarefas órfãs ou remover as áreas vinculadas a ele. Deseja continuar?")) return;
-    try {
-      const res = await fetch(`/api/plans/${id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (data.success) {
-        showToast("Sucesso", "Plano excluído", "success");
-        if (editingRegId === id) {
-          setRegName("");
-          setRegDesc("");
-          setEditingRegId(null);
-          setIsRegModalOpen(false);
-        }
-        await loadRegistriesOnly();
-        await reloadTasks();
-      }
-    } catch (err) {
-      showToast("Erro", "Erro ao excluir plano.", "error");
+    const tasksForPlan = tasks.filter(t => t.planId === id);
+    if (tasksForPlan.length > 0) {
+      setConfirmState({
+        title: "Bloqueio de Exclusão",
+        message: `Não é possível excluir este plano.\n\nExistem ${tasksForPlan.length} tarefa(s) associada(s) a ele. Remova ou reatribua as tarefas antes de excluir o plano.`,
+        type: "alert"
+      });
+      return;
     }
+
+    setConfirmState({
+      type: "confirm",
+      title: "Confirmar Exclusão do Plano",
+      message: "Certeza que deseja excluir este plano?",
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/plans/${id}`, { method: "DELETE" });
+          const data = await res.json();
+          if (data.success) {
+            showToast("Sucesso", "Plano excluído", "success");
+            if (editingRegId === id) {
+              setRegName("");
+              setRegDesc("");
+              setEditingRegId(null);
+              setIsRegModalOpen(false);
+            }
+            await loadRegistriesOnly();
+            await reloadTasks();
+          }
+        } catch (err) {
+          showToast("Erro", "Erro ao excluir plano.", "error");
+        }
+      }
+    });
   };
 
   // Handle area submit
   const handleAreaSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!regName.trim()) {
-      showToast("Validação", "Preencha o nome da área.", "error");
+      showToast("Validação", "Preencha o nome da área.", "warning");
       return;
     }
     try {
@@ -286,7 +581,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: regName, abbreviation: regAbbreviation.substring(0, 2).toUpperCase() })
+        body: JSON.stringify({ name: regName, abbreviation: regAbbreviation.substring(0, 2).toUpperCase(), updatedBy: regUpdatedBy })
       });
       const data = await res.json();
       if (data.success) {
@@ -307,29 +602,45 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
 
   // Handle area delete
   const handleAreaDelete = async (id: number) => {
-    if (!window.confirm("Certeza que deseja excluir esta área?")) return;
-    try {
-      const res = await fetch(`/api/areas/${id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (data.success) {
-        showToast("Sucesso", "Área excluída com sucesso.", "success");
-        if (editingRegId === id) {
-          setRegName("");
-          setEditingRegId(null);
-          setIsRegModalOpen(false);
-        }
-        await loadRegistriesOnly();
-        await reloadTasks();
-      }
-    } catch (err) {
-      showToast("Erro", "Erro ao excluir área.", "error");
+    const tasksForArea = tasks.filter(t => t.areaIds?.includes(id));
+    if (tasksForArea.length > 0) {
+      setConfirmState({
+        title: "Bloqueio de Exclusão",
+        message: `Não é possível excluir esta área.\n\nExistem ${tasksForArea.length} tarefa(s) associada(s) a ela. Remova ou reatribua as tarefas antes de excluir a área.`,
+        type: "alert"
+      });
+      return;
     }
+
+    setConfirmState({
+      type: "confirm",
+      title: "Excluir Área",
+      message: "Certeza que deseja excluir esta área?",
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/areas/${id}`, { method: "DELETE" });
+          const data = await res.json();
+          if (data.success) {
+            showToast("Sucesso", "Área excluída com sucesso.", "success");
+            if (editingRegId === id) {
+              setRegName("");
+              setEditingRegId(null);
+              setIsRegModalOpen(false);
+            }
+            await loadRegistriesOnly();
+            await reloadTasks();
+          }
+        } catch (err) {
+          showToast("Erro", "Erro ao excluir área.", "error");
+        }
+      }
+    });
   };
 
   const handleCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!regName.trim() || regAreaIds.length === 0) {
-      showToast("Aviso", "Nome da categoria e pelo menos uma Área são obrigatórios.", "info");
+      showToast("Aviso", "Nome da categoria e pelo menos uma Área são obrigatórios.", "warning");
       return;
     }
     const isEdit = editingRegId !== null;
@@ -339,7 +650,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: regName, areaIds: regAreaIds })
+        body: JSON.stringify({ name: regName, areaIds: regAreaIds, updatedBy: regUpdatedBy })
       });
       const data = await res.json();
       if (data.success) {
@@ -359,31 +670,47 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
   };
 
   const handleCategoryDelete = async (id: number) => {
-    if (!window.confirm("Certeza que deseja excluir esta categoria?")) return;
-    try {
-      const res = await fetch(`/api/categories/${id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (data.success) {
-        showToast("Sucesso", "Categoria excluída com sucesso.", "success");
-        if (editingRegId === id) {
-          setRegName("");
-          setRegAreaIds([]);
-          setEditingRegId(null);
-          setIsRegModalOpen(false);
-        }
-        await loadRegistriesOnly();
-        await reloadTasks();
-      }
-    } catch (err) {
-      showToast("Erro", "Erro ao excluir categoria.", "error");
+    const tasksForCategory = tasks.filter(t => t.categoryIds?.includes(id));
+    if (tasksForCategory.length > 0) {
+      setConfirmState({
+        title: "Bloqueio de Exclusão",
+        message: `Não é possível excluir esta categoria.\n\nExistem ${tasksForCategory.length} tarefa(s) associada(s) a ela. Remova ou reatribua as tarefas antes de excluir a categoria.`,
+        type: "alert"
+      });
+      return;
     }
+
+    setConfirmState({
+      type: "confirm",
+      title: "Excluir Categoria",
+      message: "Certeza que deseja excluir esta categoria?",
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/categories/${id}`, { method: "DELETE" });
+          const data = await res.json();
+          if (data.success) {
+            showToast("Sucesso", "Categoria excluída com sucesso.", "success");
+            if (editingRegId === id) {
+              setRegName("");
+              setRegAreaIds([]);
+              setEditingRegId(null);
+              setIsRegModalOpen(false);
+            }
+            await loadRegistriesOnly();
+            await reloadTasks();
+          }
+        } catch (err) {
+          showToast("Erro", "Erro ao excluir categoria.", "error");
+        }
+      }
+    });
   };
 
   // Handle responsible submit
   const handleResponsibleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!regName.trim()) {
-      showToast("Validação", "Nome do responsável é obrigatório.", "error");
+      showToast("Validação", "Nome do responsável é obrigatório.", "warning");
       return;
     }
     try {
@@ -393,7 +720,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
       const res = await fetch(url, {
         method,
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: regName, email: regEmail, role: regRole, areaIds: regAreaIds })
+        body: JSON.stringify({ name: regName, email: regEmail, role: regRole, areaIds: regAreaIds, updatedBy: regUpdatedBy })
       });
       const data = await res.json();
       if (data.success) {
@@ -416,25 +743,41 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
 
   // Handle responsible delete
   const handleResponsibleDelete = async (id: number) => {
-    if (!window.confirm("Certeza que deseja desvincular e excluir este responsável?")) return;
-    try {
-      const res = await fetch(`/api/responsibles/${id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (data.success) {
-        showToast("Sucesso", "Responsável excluído com sucesso.", "success");
-        if (editingRegId === id) {
-          setRegName("");
-          setRegEmail("");
-          setRegRole("");
-          setEditingRegId(null);
-          setIsRegModalOpen(false);
-        }
-        await loadRegistriesOnly();
-        await reloadTasks();
-      }
-    } catch (err) {
-      showToast("Erro", "Erro ao excluir responsável.", "error");
+    const tasksForResponsible = tasks.filter(t => t.responsibleIds?.includes(id));
+    if (tasksForResponsible.length > 0) {
+      setConfirmState({
+        title: "Bloqueio de Exclusão",
+        message: `Não é possível excluir este responsável.\n\nExistem ${tasksForResponsible.length} tarefa(s) atribuída(s) a ele. Remova ou reatribua as tarefas antes de excluí-lo.`,
+        type: "alert"
+      });
+      return;
     }
+
+    setConfirmState({
+      type: "confirm",
+      title: "Excluir Responsável",
+      message: "Certeza que deseja excluir este responsável?",
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/responsibles/${id}`, { method: "DELETE" });
+          const data = await res.json();
+          if (data.success) {
+            showToast("Sucesso", "Responsável excluído com sucesso.", "success");
+            if (editingRegId === id) {
+              setRegName("");
+              setRegEmail("");
+              setRegRole("");
+              setEditingRegId(null);
+              setIsRegModalOpen(false);
+            }
+            await loadRegistriesOnly();
+            await reloadTasks();
+          }
+        } catch (err) {
+          showToast("Erro", "Erro ao excluir responsável.", "error");
+        }
+      }
+    });
   };
 
   // Sync / reload tasks from server
@@ -493,6 +836,11 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
       if (normalizeStatus(t.status) !== statusFilter) return false;
     }
 
+    // Check situation
+    if (situationFilter !== "all") {
+      if (getDeadlineStatus(t.endDate, t.status) !== situationFilter) return false;
+    }
+
     // Check priority
     if (priorityFilter !== "all" && t.priority !== priorityFilter) {
       return false;
@@ -522,43 +870,188 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
       }
     }
 
+    // Check Period (Month / Quarter / Semester)
+    if (periodTypeFilter !== "all" && periodValueFilter !== "all") {
+      const valNum = parseInt(periodValueFilter, 10);
+      if (!isNaN(valNum)) {
+        if (periodTypeFilter === "month") {
+          const taskInMonth = (tk: Task, m: number): boolean => {
+            if (!tk.endDate) return false;
+            const padM = m.toString().padStart(2, "0");
+            if (tk.endDate.includes(`-${padM}-`)) return true;
+            const d = new Date(tk.endDate);
+            if (!isNaN(d.getTime()) && (d.getUTCMonth() + 1 === m)) return true;
+            return false;
+          };
+          if (!taskInMonth(t, valNum)) return false;
+        } else if (periodTypeFilter === "quarter") {
+          const taskInQuarter = (tk: Task, q: number): boolean => {
+            if (!tk.endDate) return false;
+            const startMonth = (q - 1) * 3 + 1;
+            const padM1 = startMonth.toString().padStart(2, "0");
+            const padM2 = (startMonth + 1).toString().padStart(2, "0");
+            const padM3 = (startMonth + 2).toString().padStart(2, "0");
+            if (tk.endDate.includes(`-${padM1}-`) || tk.endDate.includes(`-${padM2}-`) || tk.endDate.includes(`-${padM3}-`)) return true;
+            const d = new Date(tk.endDate);
+            if (!isNaN(d.getTime())) {
+              const m = d.getUTCMonth() + 1;
+              if (m >= startMonth && m <= startMonth + 2) return true;
+            }
+            return false;
+          };
+          if (!taskInQuarter(t, valNum)) return false;
+        } else if (periodTypeFilter === "semester") {
+          const taskInSemester = (tk: Task, s: number): boolean => {
+            if (!tk.endDate) return false;
+            const startMonth = (s - 1) * 6 + 1;
+            const padMs = Array.from({ length: 6 }, (_, idx) => (startMonth + idx).toString().padStart(2, "0"));
+            if (padMs.some(padM => tk.endDate!.includes(`-${padM}-`))) return true;
+            const d = new Date(tk.endDate);
+            if (!isNaN(d.getTime())) {
+              const m = d.getUTCMonth() + 1;
+              if (m >= startMonth && m <= startMonth + 5) return true;
+            }
+            return false;
+          };
+          if (!taskInSemester(t, valNum)) return false;
+        }
+      }
+    }
+
     return true;
   };
 
-  // Build recursive mapping from plain arrays
-  const taskById = useMemo(() => {
-    const map: Record<number, Task> = {};
+  // Calculate computed tasks to rollup dates and progress for parent tasks
+  const { enhancedTasks, taskById, childrenMap } = useMemo(() => {
+    const tMap: Record<number, Task> = {};
+    const cMap: Record<number, Task[]> = {};
+    
+    // Clone all tasks
     tasks.forEach(t => {
-      map[t.id] = t;
+      tMap[t.id] = { ...t };
     });
-    return map;
-  }, [tasks]);
-
-  // Get children mapping
-  const childrenMap = useMemo(() => {
-    const map: Record<number, Task[]> = {};
-    tasks.forEach(t => {
+    
+    // Build children mapping using the clones
+    Object.values(tMap).forEach(t => {
       if (t.parentId) {
-        if (!map[t.parentId]) map[t.parentId] = [];
-        map[t.parentId].push(t);
+        if (!cMap[t.parentId]) cMap[t.parentId] = [];
+        cMap[t.parentId].push(t);
       }
     });
     
-    // Sort children by ID
-    Object.keys(map).forEach(key => {
-      map[Number(key)].sort((a,b) => a.id - b.id);
+    // Sort children
+    Object.keys(cMap).forEach(key => {
+      cMap[Number(key)].sort((a,b) => a.id - b.id);
     });
-    return map;
+
+    const computeNode = (nodeId: number) => {
+      const node = tMap[nodeId];
+      const children = cMap[nodeId] || [];
+      if (children.length === 0) return node;
+
+      let minStart: Date | null = null;
+      let maxEnd: Date | null = null;
+      let totalProgress = 0;
+
+      children.forEach(child => {
+        const computedChild = computeNode(child.id);
+        totalProgress += computedChild.progress || 0;
+        
+        if (computedChild.startDate) {
+          const sd = new Date(computedChild.startDate);
+          if (!isNaN(sd.getTime())) {
+            if (!minStart || sd < minStart) minStart = sd;
+          }
+        }
+        if (computedChild.endDate) {
+          const ed = new Date(computedChild.endDate);
+          if (!isNaN(ed.getTime())) {
+            if (!maxEnd || ed > maxEnd) maxEnd = ed;
+          }
+        }
+      });
+
+      node.progress = Math.round(totalProgress / children.length);
+      
+      if (minStart) {
+        node.startDate = minStart.toISOString().split('T')[0];
+      }
+      if (maxEnd) {
+        node.endDate = maxEnd.toISOString().split('T')[0];
+      }
+
+      // Roll up status
+      if (node.progress === 100) {
+        node.status = "Concluída";
+      } else if (node.progress > 0) {
+        node.status = "Em andamento";
+      } else {
+        node.status = "Não iniciada";
+      }
+      
+      return node;
+    };
+
+    // Calculate all root tasks which cascades down
+    tasks.filter(t => !t.parentId).forEach(t => computeNode(t.id));
+    
+    return {
+      enhancedTasks: Object.values(tMap),
+      taskById: tMap,
+      childrenMap: cMap
+    };
   }, [tasks]);
 
   // Root level tasks
   const rootTasks = useMemo(() => {
-    return tasks.filter(t => !t.parentId).sort((a, b) => a.id - b.id);
-  }, [tasks]);
+    return enhancedTasks.filter(t => !t.parentId).sort((a, b) => a.id - b.id);
+  }, [enhancedTasks]);
 
   // Handle expand / collapse toggles
   const toggleExpand = (id: number) => {
-    setExpandedTasks(prev => ({ ...prev, [id]: !prev[id] }));
+    setExpandedTasks(prev => {
+      const current = prev[id] !== undefined ? prev[id] : (isAnyFilterActive ? true : false);
+      return { ...prev, [id]: !current };
+    });
+  };
+
+  // Groups expand/collapse containers state (keyed by `${viewMode}-${groupId}`)
+  const [expandedGroupContainers, setExpandedGroupContainers] = useState<Record<string, boolean>>({});
+
+  const toggleGroupContainer = (viewType: string, groupId: string | number) => {
+    const key = `${viewType}-${groupId}`;
+    setExpandedGroupContainers(prev => {
+      const isExpanded = prev[key] !== false; // default is true
+      return { ...prev, [key]: !isExpanded };
+    });
+  };
+
+  const handleGroupContainersExpandCollapse = (expand: boolean) => {
+    setExpandedGroupContainers(prev => {
+      const updated = { ...prev };
+      if (viewMode === "status") {
+        const statuses = ["Não iniciada", "Em andamento", "Concluída"];
+        statuses.forEach(st => {
+          updated[`status-${st}`] = expand;
+        });
+      } else if (viewMode === "category") {
+        categories.forEach(cat => {
+          updated[`category-${cat.id}`] = expand;
+        });
+        updated[`category--1`] = expand;
+      } else if (viewMode === "area") {
+        areas.forEach(ar => {
+          updated[`area-${ar.id}`] = expand;
+        });
+        updated[`area--1`] = expand;
+      } else if (viewMode === "responsible") {
+        responsibles.forEach(resp => {
+          updated[`responsible-${resp.id}`] = expand;
+        });
+        updated[`responsible--1`] = expand;
+      }
+      return updated;
+    });
   };
 
   // Helper to check if a task has children
@@ -568,29 +1061,34 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
 
   // Calculate stats
   const stats = useMemo(() => {
-    const total = tasks.length;
-    const completed = tasks.filter(t => normalizeStatus(t.status) === "Concluída").length;
-    const inProgress = tasks.filter(t => normalizeStatus(t.status) === "Em andamento").length;
-    const pending = tasks.filter(t => normalizeStatus(t.status) === "Não iniciada").length;
+    const total = enhancedTasks.length;
+    const completed = enhancedTasks.filter(t => normalizeStatus(t.status) === "Concluída").length;
+    const inProgress = enhancedTasks.filter(t => normalizeStatus(t.status) === "Em andamento").length;
+    const pending = enhancedTasks.filter(t => normalizeStatus(t.status) === "Não iniciada").length;
     
     // Progress is weighted average of root tasks
     let progressSum = 0;
     const rootCount = rootTasks.length;
     if (rootCount > 0) {
       rootTasks.forEach(r => {
-        progressSum += r.progress;
+        progressSum += r.progress || 0;
       });
     }
     const avgRootProgress = rootCount > 0 ? Math.round(progressSum / rootCount) : 0;
 
     return { total, completed, inProgress, pending, avgRootProgress };
-  }, [tasks, rootTasks]);
+  }, [enhancedTasks, rootTasks]);
 
   // Filtered tasks and chart definitions for Dashboard
   const matchesFiltersDashboard = (t: Task): boolean => {
     // Check status
     if (statusFilter !== "all") {
       if (normalizeStatus(t.status) !== statusFilter) return false;
+    }
+
+    // Check situation
+    if (situationFilter !== "all") {
+      if (getDeadlineStatus(t.endDate, t.status) !== situationFilter) return false;
     }
 
     // Check priority
@@ -680,8 +1178,8 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
   };
 
   const filteredTasks = useMemo(() => {
-    return tasks.filter(t => matchesFiltersDashboard(t));
-  }, [tasks, statusFilter, priorityFilter, categoryFilter, planFilter, selectedAreaIds, selectedResponsibleIds, periodTypeFilter, periodValueFilter]);
+    return enhancedTasks.filter(t => matchesFiltersDashboard(t));
+  }, [enhancedTasks, statusFilter, situationFilter, priorityFilter, categoryFilter, planFilter, selectedAreaIds, selectedResponsibleIds, periodTypeFilter, periodValueFilter]);
 
   const dashboardStats = useMemo(() => {
     const total = filteredTasks.length;
@@ -705,7 +1203,12 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
   // Chart data 2: Average Progress and Task Count per Area
   const areaChartData = useMemo(() => {
     if (!areas || areas.length === 0) return [];
-    return areas.map(area => {
+    
+    const targetAreas = selectedAreaIds.length > 0 
+      ? areas.filter(a => selectedAreaIds.includes(a.id))
+      : areas;
+
+    return targetAreas.map(area => {
       const areaTasks = filteredTasks.filter(t => t.areaIds?.includes(area.id));
       const total = areaTasks.length;
       const completed = areaTasks.filter(t => normalizeStatus(t.status) === "Concluída").length;
@@ -722,7 +1225,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
         "Concluídas": completed
       };
     }).filter(d => d["Total de Tarefas"] > 0);
-  }, [filteredTasks, areas]);
+  }, [filteredTasks, areas, selectedAreaIds]);
 
   // Chart data 3: Priority breakdown
   const priorityChartData = useMemo(() => {
@@ -742,6 +1245,82 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
       };
     });
   }, [filteredTasks]);
+
+  const areaQuarterStatusData = useMemo(() => {
+    if (!areas || areas.length === 0) return [];
+    
+    const dataMap: Record<string, any> = {};
+
+    const targetAreas = selectedAreaIds.length > 0 
+      ? areas.filter(a => selectedAreaIds.includes(a.id))
+      : areas;
+
+    targetAreas.forEach(a => {
+      [0, 1, 2, 3].forEach(q => {
+        const key = `${a.id}-${q}`;
+        dataMap[key] = {
+          key,
+          areaName: a.name,
+          quarter: `${q + 1}º Tri`,
+          name: `${a.name} - ${q + 1}º Tri`,
+          "Não iniciada": 0,
+          "Em andamento": 0,
+          "Concluídas": 0
+        };
+      });
+    });
+
+    if (selectedAreaIds.length === 0) {
+      [0, 1, 2, 3].forEach(q => {
+        const key = `sem_area-${q}`;
+        dataMap[key] = {
+          key,
+          areaName: "Sem Área",
+          quarter: `${q + 1}º Tri`,
+          name: `Sem Área - ${q + 1}º Tri`,
+          "Não iniciada": 0,
+          "Em andamento": 0,
+          "Concluídas": 0
+        };
+      });
+    }
+
+    filteredTasks.forEach(t => {
+      if (!t.endDate) return;
+      const d = new Date(t.endDate);
+      if (isNaN(d.getTime())) return;
+      
+      const month = d.getUTCMonth();
+      const q = Math.floor(month / 3);
+      
+      const status = normalizeStatus(t.status);
+      let statusKey = "Não iniciada";
+      if (status === "Concluída") statusKey = "Concluídas";
+      else if (status === "Em andamento") statusKey = "Em andamento";
+
+      if (t.areaIds && t.areaIds.length > 0) {
+        t.areaIds.forEach(aid => {
+          const key = `${aid}-${q}`;
+          if (dataMap[key]) {
+            dataMap[key][statusKey]++;
+          }
+        });
+      } else {
+        const key = `sem_area-${q}`;
+        if (dataMap[key]) {
+          dataMap[key][statusKey]++;
+        }
+      }
+    });
+
+    return Object.values(dataMap)
+      .filter(d => (d["Não iniciada"] > 0 || d["Em andamento"] > 0 || d["Concluídas"] > 0))
+      .sort((a, b) => {
+        const cmp = a.areaName.localeCompare(b.areaName, 'pt-BR');
+        if (cmp !== 0) return cmp;
+        return a.quarter.localeCompare(b.quarter);
+      });
+  }, [filteredTasks, areas, selectedAreaIds]);
 
   // Grouped dashboard data for the table grouped by Plan -> Area -> Category
   const groupedDashboardData = useMemo(() => {
@@ -949,14 +1528,14 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
     const list: any[] = [];
     const traverse = (node: any, depth: number) => {
       list.push({ ...node, depth });
-      const isExpanded = expandedGroups[node.id] !== undefined ? expandedGroups[node.id] : depth < 1; // defaults to true for first group
+      const isExpanded = expandedGroups[node.id] !== undefined ? expandedGroups[node.id] : (isAnyFilterActive ? true : depth < 1); // defaults to true for first group
       if (isExpanded && node.children && node.children.length > 0) {
         node.children.forEach((child: any) => traverse(child, depth + 1));
       }
     };
     groupedDashboardData.forEach(node => traverse(node, 0));
     return list;
-  }, [groupedDashboardData, expandedGroups]);
+  }, [groupedDashboardData, expandedGroups, isAnyFilterActive]);
 
   const groupedQuarterDashboardData = useMemo(() => {
     const planMap: Record<number, { plan: Plan; tasks: Task[] }> = {};
@@ -1125,14 +1704,14 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
     const list: any[] = [];
     const traverse = (node: any, depth: number) => {
       list.push({ ...node, depth });
-      const isExpanded = expandedQuarterGroups[node.id] !== undefined ? expandedQuarterGroups[node.id] : depth < 1;
+      const isExpanded = expandedQuarterGroups[node.id] !== undefined ? expandedQuarterGroups[node.id] : (isAnyFilterActive ? true : depth < 1);
       if (isExpanded && node.children && node.children.length > 0) {
         node.children.forEach((child: any) => traverse(child, depth + 1));
       }
     };
     groupedQuarterDashboardData.forEach(node => traverse(node, 0));
     return list;
-  }, [groupedQuarterDashboardData, expandedQuarterGroups]);
+  }, [groupedQuarterDashboardData, expandedQuarterGroups, isAnyFilterActive]);
 
   const groupedPlanQuarterAreaData = useMemo(() => {
     const planMap: Record<number, { plan: Plan; tasks: Task[] }> = {};
@@ -1303,14 +1882,14 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
     const list: any[] = [];
     const traverse = (node: any, depth: number) => {
       list.push({ ...node, depth });
-      const isExpanded = expandedPlanQuarterAreaGroups[node.id] !== undefined ? expandedPlanQuarterAreaGroups[node.id] : depth < 1;
+      const isExpanded = expandedPlanQuarterAreaGroups[node.id] !== undefined ? expandedPlanQuarterAreaGroups[node.id] : (isAnyFilterActive ? true : depth < 1);
       if (isExpanded && node.children && node.children.length > 0) {
         node.children.forEach((child: any) => traverse(child, depth + 1));
       }
     };
     groupedPlanQuarterAreaData.forEach(node => traverse(node, 0));
     return list;
-  }, [groupedPlanQuarterAreaData, expandedPlanQuarterAreaGroups]);
+  }, [groupedPlanQuarterAreaData, expandedPlanQuarterAreaGroups, isAnyFilterActive]);
 
   const planAreaTimelineData = useMemo(() => {
     const planMap: Record<number, { plan: Plan; tasks: Task[]; areaMap: Record<number, { area: Pick<Area, "id"|"name">; tasks: Task[] }> }> = {};
@@ -1328,7 +1907,15 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
       planMap[pId].tasks.push(t);
       
       const hasArea = t.areaIds && t.areaIds.length > 0;
-      const areaList = hasArea ? t.areaIds : [0];
+      let areaList = hasArea ? t.areaIds : [0];
+      
+      if (selectedAreaIds.length > 0) {
+        if (hasArea) {
+          areaList = t.areaIds.filter(id => selectedAreaIds.includes(id));
+        } else {
+          areaList = [];
+        }
+      }
       
       areaList.forEach(aId => {
         if (!planMap[pId].areaMap[aId]) {
@@ -1456,7 +2043,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
 
     tree.sort((a, b) => a.name.localeCompare(b.name));
     return tree;
-  }, [filteredTasks, plans, areas]);
+  }, [filteredTasks, plans, areas, selectedAreaIds]);
 
   const [expandedTimelineGroups, setExpandedTimelineGroups] = useState<Record<string, boolean>>({});
 
@@ -1464,14 +2051,14 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
     const list: any[] = [];
     const traverse = (node: any, depth: number) => {
       list.push({ ...node, depth });
-      const isExpanded = expandedTimelineGroups[node.id] !== undefined ? expandedTimelineGroups[node.id] : depth < 1;
+      const isExpanded = expandedTimelineGroups[node.id] !== undefined ? expandedTimelineGroups[node.id] : (isAnyFilterActive ? true : depth < 1);
       if (isExpanded && node.children && node.children.length > 0) {
         node.children.forEach((child: any) => traverse(child, depth + 1));
       }
     };
     planAreaTimelineData.forEach(node => traverse(node, 0));
     return list;
-  }, [planAreaTimelineData, expandedTimelineGroups]);
+  }, [planAreaTimelineData, expandedTimelineGroups, isAnyFilterActive]);
 
   // Format dates elegantly for Portuguese/Brazilian locale or ISO
   const formatDate = (dateStr: string | null) => {
@@ -1479,17 +2066,78 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
     try {
       const d = new Date(dateStr);
       if (isNaN(d.getTime())) return "N/D";
-      return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric", timeZone: "UTC" });
+      return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" });
     } catch {
       return "N/D";
+    }
+  };
+
+  const formatDateTime = (dateStr: string | null | undefined) => {
+    if (!dateStr) return null;
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) return null;
+      return d.toLocaleString("pt-BR", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+    } catch {
+      return null;
     }
   };
 
   // Submit task create or edit form
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 1. Título da tarefa: obrigatório.
     if (!editingTask.title?.trim()) {
-      showToast("Validação", "O título da tarefa é obrigatório.", "error");
+      showToast("Validação", "O título da tarefa é obrigatório.", "warning");
+      return;
+    }
+
+    // 2. Data Início e Data fim: obrigatório.
+    if (!editingTask.startDate) {
+      showToast("Validação", "A data de início é obrigatória.", "warning");
+      return;
+    }
+    if (!editingTask.endDate) {
+      showToast("Validação", "A data de fim é obrigatória.", "warning");
+      return;
+    }
+
+    // 3. Data Fim não pode ser menor que a Data Início.
+    const startD = new Date(editingTask.startDate);
+    const endD = new Date(editingTask.endDate);
+    if (endD < startD) {
+      showToast("Validação", "A data de fim não pode ser menor que a data de início.", "warning");
+      return;
+    }
+
+    // 4. Prioridade: Obrigatório.
+    if (!editingTask.priority) {
+      showToast("Validação", "A prioridade é obrigatória.", "warning");
+      return;
+    }
+
+    // 5. Plano de Atividades (Vincular a um): Obrigatório.
+    if (!editingTask.planId) {
+      showToast("Validação", "O vínculo com um Plano de Atividades é obrigatório.", "warning");
+      return;
+    }
+
+    // 6. Áreas de Vinculação: Obrigatório.
+    if (!editingTask.areaIds || editingTask.areaIds.length === 0) {
+      showToast("Validação", "A seleção de pelo menos uma Área de Vinculação é obrigatória.", "warning");
+      return;
+    }
+
+    // 7. Categorias: Obrigatório, pelo menos uma
+    if (!editingTask.categoryIds || editingTask.categoryIds.length === 0) {
+      showToast("Validação", "A seleção de pelo menos uma Categoria é obrigatória.", "warning");
+      return;
+    }
+
+    // 8. Responsáveis Designados: Obrigatório, pelo menos um.
+    if (!editingTask.responsibleIds || editingTask.responsibleIds.length === 0) {
+      showToast("Validação", "A designação de pelo menos um Responsável é obrigatória.", "warning");
       return;
     }
 
@@ -1500,11 +2148,13 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
 
       const finalProgress = editingTask.progress ?? 0;
       const finalStatus = finalProgress === 100 ? "Concluída" : finalProgress > 0 ? "Em andamento" : "Não iniciada";
+      const author = currentUser?.name || "Administrador";
 
       const payload = {
         ...editingTask,
         progress: finalProgress,
-        status: finalStatus
+        status: finalStatus,
+        updatedBy: author
       };
 
       const res = await fetch(url, {
@@ -1597,21 +2247,76 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
 
   // Handle task deletion
   const handleDeleteTask = async (id: number) => {
-    if (!window.confirm("Certeza que deseja excluir permanentemente esta tarefa e todas as suas subtarefas (se houver)?")) {
-      return;
+    const countSubtasks = (taskId: number): number => {
+      let subCount = 0;
+      const directChildren = tasks.filter(t => t.parentId === taskId);
+      subCount += directChildren.length;
+      for (const child of directChildren) {
+        subCount += countSubtasks(child.id);
+      }
+      return subCount;
+    };
+    
+    const subtaskCount = countSubtasks(id);
+    const subtaskMessage = subtaskCount > 0 
+      ? `Esta tarefa possui ${subtaskCount} tarefa(s) filha(s) que também será(ão) excluída(s).\n\nDeseja realmente excluir a tarefa e suas subtarefas?` 
+      : "Deseja realmente excluir a tarefa?";
+
+    setConfirmState({
+      type: "confirm",
+      title: "Excluir Tarefa",
+      message: `Atenção: A exclusão é permanente.\n\n${subtaskMessage}`,
+      onConfirm: async () => {
+        try {
+          const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
+          const resData = await res.json();
+          if (resData.success) {
+            showToast("Sucesso", "Tarefa excluída do banco.", "success");
+            await reloadTasks();
+          } else {
+            showToast("Erro", resData.error || "Ocorreu uma falha ao remover a tarefa.", "error");
+          }
+        } catch (err: any) {
+          showToast("Erro de Rede", "Erro ao conectar ao servidor para excluir tarefa.", "error");
+        }
+      }
+    });
+  };
+
+  const handleQuickStatusChange = async (task: Task, newStatus: string) => {
+    let finalProgress = Number(task.progress) || 0;
+    if (newStatus === "Não iniciada") {
+      finalProgress = 0;
+    } else if (newStatus === "Concluída") {
+      finalProgress = 100;
+    } else if (newStatus === "Em andamento") {
+      if (finalProgress === 0 || finalProgress === 100) {
+        finalProgress = 50; // set intermediate progress
+      }
     }
 
     try {
-      const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
+      const payload = {
+        ...task,
+        progress: finalProgress,
+        status: newStatus
+      };
+
+      const res = await fetch(`/api/tasks/${task.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
       const resData = await res.json();
+
       if (resData.success) {
-        showToast("Sucesso", "Tarefa excluída do banco.", "success");
+        showToast("Progresso Atualizado", `Tarefa "${task.title}" movida para "${newStatus}".`, "success");
         await reloadTasks();
       } else {
-        showToast("Erro", resData.error || "Ocorreu uma falha ao remover a tarefa.", "error");
+        showToast("Erro", resData.error || "Erro ao movimentar tarefa.", "error");
       }
-    } catch (err: any) {
-      showToast("Erro de Rede", "Erro ao conectar ao servidor para excluir tarefa.", "error");
+    } catch {
+      showToast("Falha de Rede", "Erro ao conectar-se ao servidor.", "error");
     }
   };
 
@@ -1627,15 +2332,35 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
 
   const timelineTasks = useMemo(() => {
     if (timelineTaskId === null) return [];
-    const result: { task: Task; depth: number }[] = [];
-    const collect = (id: number, currentDepth: number) => {
+    
+    // Find ancestors up to root
+    const ancestors: Task[] = [];
+    let currId: number | null | undefined = taskById[timelineTaskId]?.parentId;
+    while (currId && taskById[currId]) {
+      ancestors.unshift(taskById[currId]);
+      currId = taskById[currId].parentId;
+    }
+
+    const result: { task: Task; depth: number; isTarget: boolean; isAncestor: boolean }[] = [];
+    
+    // Add ancestors
+    ancestors.forEach((anc, idx) => {
+      result.push({ task: anc, depth: idx, isTarget: false, isAncestor: true });
+    });
+
+    const targetDepth = ancestors.length;
+
+    // Collect target and its descendants
+    const collect = (id: number, currentDepth: number, isTargetNode: boolean = false) => {
       const t = taskById[id];
-      if (t) result.push({ task: t, depth: currentDepth });
+      if (t) result.push({ task: t, depth: currentDepth, isTarget: isTargetNode, isAncestor: false });
       const children = childrenMap[id] || [];
       const sortedChildren = [...children].sort((a, b) => new Date(a.endDate || "2099-01-01").getTime() - new Date(b.endDate || "2099-01-01").getTime());
-      sortedChildren.forEach(c => collect(c.id, currentDepth + 1));
+      sortedChildren.forEach(c => collect(c.id, currentDepth + 1, false));
     };
-    collect(timelineTaskId, 0);
+    
+    collect(timelineTaskId, targetDepth, true);
+    
     return result;
   }, [timelineTaskId, taskById, childrenMap]);
 
@@ -1754,6 +2479,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest block font-medium">Descrição (Opcional)</label>
                     <textarea rows={4} value={regDesc} onChange={(e) => setRegDesc(e.target.value)} placeholder="Objetivos, metas..." className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-xs font-medium text-slate-700 focus:border-adasa-mid outline-none transition-all placeholder:text-slate-400"></textarea>
                   </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1"><User size={12}/> Autor da Modificação</label>
+                    <input type="text" value={regUpdatedBy} onChange={(e) => setRegUpdatedBy(e.target.value)} placeholder="Ex: Thiago Pires" className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-xs font-semibold text-slate-700 focus:border-adasa-mid outline-none transition-all placeholder:text-slate-400" />
+                  </div>
                   <button type="submit" className="w-full py-3.5 mt-2 font-black text-xs text-white bg-adasa-mid hover:bg-adasa-dark rounded-xl transition shadow-md">{editingRegId !== null ? "Salvar Alterações" : "Cadastrar Plano"}</button>
                 </form>
               )}
@@ -1767,6 +2496,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   <div className="space-y-1.5">
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Sigla (Duas Letras)</label>
                     <input type="text" required maxLength={2} value={regAbbreviation} onChange={(e) => setRegAbbreviation(e.target.value.toUpperCase())} placeholder="Ex: RE" className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-xs font-semibold text-slate-700 focus:border-adasa-mid outline-none transition-all placeholder:text-slate-400" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1"><User size={12}/> Autor da Modificação</label>
+                    <input type="text" value={regUpdatedBy} onChange={(e) => setRegUpdatedBy(e.target.value)} placeholder="Ex: Thiago Pires" className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-xs font-semibold text-slate-700 focus:border-adasa-mid outline-none transition-all placeholder:text-slate-400" />
                   </div>
                   <button type="submit" className="w-full py-3.5 mt-2 font-black text-xs text-white bg-adasa-mid hover:bg-adasa-dark rounded-xl transition shadow-md">{editingRegId !== null ? "Salvar Alterações" : "Cadastrar Área"}</button>
                 </form>
@@ -1797,6 +2530,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                       ))}
                       {areas.length === 0 && <span className="text-xs text-slate-500 italic block">Nenhuma área cadastrada.</span>}
                     </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1"><User size={12}/> Autor da Modificação</label>
+                    <input type="text" value={regUpdatedBy} onChange={(e) => setRegUpdatedBy(e.target.value)} placeholder="Ex: Thiago Pires" className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-xs font-semibold text-slate-700 focus:border-adasa-mid outline-none transition-all placeholder:text-slate-400" />
                   </div>
                   <button type="submit" className="w-full py-3.5 mt-2 flex-1 bg-adasa-mid text-white rounded-xl text-xs font-black uppercase tracking-wider hover:bg-adasa-dark transition-all shadow-md">{editingRegId !== null ? "Atualizar" : "Salvar Categoria"}</button>
                 </form>
@@ -1836,6 +2573,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                       {areas.length === 0 && <span className="text-xs text-slate-500 italic block">Nenhuma área cadastrada.</span>}
                     </div>
                   </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-1"><User size={12}/> Autor da Modificação</label>
+                    <input type="text" value={regUpdatedBy} onChange={(e) => setRegUpdatedBy(e.target.value)} placeholder="Ex: Thiago Pires" className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-xs font-semibold text-slate-700 focus:border-adasa-mid outline-none transition-all placeholder:text-slate-400" />
+                  </div>
                   <button type="submit" className="w-full py-3.5 mt-2 font-black text-xs text-white bg-adasa-mid hover:bg-adasa-dark rounded-xl transition shadow-md">{editingRegId !== null ? "Salvar Alterações" : "Cadastrar Responsável"}</button>
                 </form>
               )}
@@ -1857,6 +2598,11 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                       {p.description && <span className="block text-xs text-slate-500 mt-1.5 line-clamp-2 font-medium">{p.description}</span>}
                     </div>
                   </div>
+                  {p.updatedAt && (
+                    <div className="text-[10px] text-slate-400 mt-1 font-semibold flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-2 py-1 rounded w-fit">
+                      <Clock size={10} /> Atualizado: {formatDateTime(p.updatedAt)} por {p.updatedBy || 'Sistema'}
+                    </div>
+                  )}
                   <div className="mt-auto flex items-center justify-between pt-4 border-t border-slate-100">
                     <div className="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-[10px] font-black text-slate-600 uppercase">
                       <ListTodo size={12} /> {tasks.filter(t => t.planId === p.id).length} Tarefas
@@ -1891,6 +2637,11 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                           </span>
                         )}
                       </div>
+                      {a.updatedAt && (
+                        <div className="text-[9px] text-slate-400 mt-1.5 font-semibold flex items-center gap-1">
+                          <Clock size={10} /> Atualizado: {formatDateTime(a.updatedAt)} por {a.updatedBy || 'Sistema'}
+                        </div>
+                      )}
                     </div>
                   </div>
                   <div className="mt-auto flex items-center justify-between pt-4 border-t border-slate-100">
@@ -1929,6 +2680,11 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                       </div>
                     </div>
                   </div>
+                  {c.updatedAt && (
+                    <div className="text-[10px] text-slate-400 mb-2 font-semibold flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-2 py-1 rounded w-fit">
+                      <Clock size={10} /> Atualizado: {formatDateTime(c.updatedAt)} por {c.updatedBy || 'Sistema'}
+                    </div>
+                  )}
                   <div className="mt-auto flex items-center justify-end pt-3 border-t border-slate-100">
                     <div className="flex gap-1.5">
                        <button onClick={() => { setEditingRegId(c.id); setRegName(c.name); setRegAreaIds(c.areaIds || []); setIsRegModalOpen(true); }} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit2 size={14} /></button>
@@ -1958,6 +2714,11 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                       </div>
                     </div>
                   </div>
+                  {r.updatedAt && (
+                    <div className="text-[10px] text-slate-400 mb-2 font-semibold flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-2 py-1 rounded w-fit">
+                      <Clock size={10} /> Atualizado: {formatDateTime(r.updatedAt)} por {r.updatedBy || 'Sistema'}
+                    </div>
+                  )}
                   <div className="mt-auto flex items-center justify-between pt-4 border-t border-slate-100">
                     <div className="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-[10px] font-black text-slate-600 uppercase">
                       <FileText size={12} /> {tasks.filter(t => t.responsibleIds?.includes(r.id)).length} Tarefas Atribuídas
@@ -2160,8 +2921,8 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
               </div>
             </div>
 
-            {/* Row 3: Status, Priority and Category */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Row 3: Status, Situation, Priority and Category */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="flex flex-col gap-1.5">
                 <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">🚦 Status</span>
                 <select
@@ -2173,6 +2934,20 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   <option value="Não iniciada">NÃO INICIADA</option>
                   <option value="Em andamento">EM ANDAMENTO</option>
                   <option value="Concluída">CONCLUÍDA</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">📅 Situação</span>
+                <select
+                  value={situationFilter}
+                  onChange={(e) => setSituationFilter(e.target.value)}
+                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-600 bg-white text-slate-700 font-bold"
+                >
+                  <option value="all">Todas as Situações</option>
+                  <option value="No Prazo">NO PRAZO</option>
+                  <option value="Crítica">CRÍTICA</option>
+                  <option value="Atrasada">ATRASADA</option>
                 </select>
               </div>
 
@@ -2285,7 +3060,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
             </div>
 
             {/* Clear Filters Button if any is changed */}
-            {(planFilter !== "all" || selectedAreaIds.length > 0 || selectedResponsibleIds.length > 0 || statusFilter !== "all" || priorityFilter !== "all" || categoryFilter !== "all" || periodTypeFilter !== "all") && (
+            {(planFilter !== "all" || selectedAreaIds.length > 0 || selectedResponsibleIds.length > 0 || statusFilter !== "all" || situationFilter !== "all" || priorityFilter !== "all" || categoryFilter !== "all" || periodTypeFilter !== "all") && (
               <div className="pt-2 flex justify-end">
                 <button
                   onClick={() => {
@@ -2293,6 +3068,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                     setSelectedAreaIds([]);
                     setSelectedResponsibleIds([]);
                     setStatusFilter("all");
+                    setSituationFilter("all");
                     setPriorityFilter("all");
                     setCategoryFilter("all");
                     setPeriodTypeFilter("all");
@@ -2535,8 +3311,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                         <th className="px-3.5 py-2 font-black uppercase text-[9px] tracking-wider">Qtde Não Iniciada</th>
                         <th className="px-3.5 py-2 font-black uppercase text-[9px] tracking-wider">Qtde Em Andamento</th>
                         <th className="px-3.5 py-2 font-black uppercase text-[9px] tracking-wider">Qtde Concluídas</th>
-                        <th className="px-3.5 py-2 font-black uppercase text-[9px] tracking-wider">Progresso Médio</th>
-                        <th className="px-3.5 py-2 font-black uppercase text-[9px] tracking-wider">Status Indicativo</th>
+                        <th className="px-3.5 py-2 font-black uppercase text-[9px] tracking-wider min-w-[140px]">Progresso</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-50">
@@ -2547,27 +3322,38 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                           <td className="px-3.5 py-2 font-bold text-slate-500">{row["Não iniciada"]}</td>
                           <td className="px-3.5 py-2 font-bold text-blue-500">{row["Em andamento"]}</td>
                           <td className="px-3.5 py-2 font-bold text-emerald-600">{row["Concluídas"]}</td>
-                          <td className="px-3.5 py-2 font-black text-indigo-600">{row["Progresso Médio (%)"]}%</td>
                           <td className="px-3.5 py-2">
-                            <div className="w-full bg-slate-100 rounded-full h-2.5 overflow-hidden border border-slate-200/50 flex items-center">
-                              <div
-                                className={cn(
-                                  "h-full rounded-full transition-all duration-500",
-                                  row["Progresso Médio (%)"] === 100 
-                                    ? "bg-emerald-500" 
-                                    : row["Progresso Médio (%)"] >= 50 
-                                      ? "bg-blue-500"
-                                      : row["Progresso Médio (%)"] > 0 ? "bg-slate-400" : "bg-slate-300"
-                                )}
-                                style={{ width: `${row["Progresso Médio (%)"]}%` }}
-                              ></div>
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 bg-slate-100 h-2 rounded-full overflow-hidden w-full max-w-[120px]">
+                                <div 
+                                  className={cn(
+                                    "h-full rounded-full transition-all duration-300",
+                                    row["Progresso Médio (%)"] === 100 
+                                      ? "bg-emerald-500"
+                                      : row["Progresso Médio (%)"] >= 50
+                                        ? "bg-blue-500"
+                                        : row["Progresso Médio (%)"] > 0 ? "bg-slate-400" : "bg-slate-300"
+                                  )}
+                                  style={{ width: `${row["Progresso Médio (%)"]}%` }}
+                                />
+                              </div>
+                              <span className={cn(
+                                "text-xs font-black w-10 text-right leading-none",
+                                row["Progresso Médio (%)"] === 100 
+                                  ? "text-emerald-700 animate-pulse"
+                                  : row["Progresso Médio (%)"] >= 50
+                                    ? "text-blue-700"
+                                    : row["Progresso Médio (%)"] > 0 ? "text-slate-600" : "text-slate-400"
+                              )}>
+                                {row["Progresso Médio (%)"]}%
+                              </span>
                             </div>
                           </td>
                         </tr>
                       ))}
                       {areaChartData.length === 0 && (
                         <tr>
-                          <td colSpan={7} className="p-8 text-center text-slate-400 italic">Nenhum dado por área.</td>
+                          <td colSpan={6} className="p-8 text-center text-slate-400 italic">Nenhum dado por área.</td>
                         </tr>
                       )}
                     </tbody>
@@ -2575,6 +3361,147 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                 </div>
               </div>
 
+            </div>
+
+            {/* Status Chart by Area and Quarter */}
+            <div className="lg:col-span-12 bg-white border border-slate-200/90 rounded-[2rem] p-6 shadow-sm text-left mt-6 space-y-4">
+              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-slate-100 pb-4">
+                <div>
+                  <dt className="text-xs font-black tracking-widest text-slate-400 uppercase">Acompanhamento de Status</dt>
+                  <h4 className="text-lg font-black text-slate-800 mt-1 font-sans">Status das Tarefas por Área e Trimestre</h4>
+                  <p className="text-xs font-medium text-slate-500 mt-0.5 leading-snug">
+                    Quantidade de tarefas Não Iniciadas, Em Andamento e Concluídas agrupadas por Área e separadas por trimestre.
+                  </p>
+                </div>
+                <div className="flex bg-slate-100 p-1 rounded-xl">
+                  <button
+                    onClick={() => setQuarterChartType("small-multiples")}
+                    className={cn(
+                      "px-3 py-1.5 text-xs font-bold rounded-lg transition-all",
+                      quarterChartType === "small-multiples" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                    )}
+                  >
+                    Por Área (Small Multiples)
+                  </button>
+                  <button
+                    onClick={() => setQuarterChartType("heatmap")}
+                    className={cn(
+                      "px-3 py-1.5 text-xs font-bold rounded-lg transition-all",
+                      quarterChartType === "heatmap" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                    )}
+                  >
+                    Mapa de Calor (Esforço)
+                  </button>
+                </div>
+              </div>
+
+              <div className="w-full mt-4 max-h-[500px] overflow-y-auto overflow-x-hidden custom-scrollbar">
+                {areaQuarterStatusData.length > 0 ? (
+                  quarterChartType === "small-multiples" ? (
+                    (() => {
+                      const groupedByArea = areaQuarterStatusData.reduce((acc, item) => {
+                        if (!acc[item.areaName]) acc[item.areaName] = [];
+                        acc[item.areaName].push(item);
+                        return acc;
+                      }, {} as Record<string, typeof areaQuarterStatusData>);
+                      
+                      const areasList = Object.keys(groupedByArea);
+                      
+                      return (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 pb-2">
+                          {areasList.map(areaName => (
+                            <div key={areaName} className="bg-slate-50 border border-slate-100 rounded-xl p-4 flex flex-col h-[280px]">
+                              <h5 className="text-sm font-bold text-slate-700 mb-2 truncate" title={areaName}>{areaName}</h5>
+                              <div className="flex-1 min-h-0">
+                                <ResponsiveContainer width="100%" height="100%">
+                                  <BarChart data={groupedByArea[areaName]} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                    <XAxis dataKey="quarter" tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} axisLine={false} dy={5} />
+                                    <YAxis tick={{ fontSize: 10, fill: '#64748b' }} tickLine={false} axisLine={false} allowDecimals={false} width={25} />
+                                    <Tooltip content={<CustomAreaStatusTooltip />} cursor={{fill: 'rgba(0,0,0,0.05)'}} />
+                                    <Bar dataKey="Não iniciada" name="Não Iniciada" stackId="a" fill="#94a3b8" />
+                                    <Bar dataKey="Em andamento" name="Em Andamento" stackId="a" fill="#3b82f6" />
+                                    <Bar dataKey="Concluídas" name="Concluídas" stackId="a" fill="#10b981" />
+                                  </BarChart>
+                                </ResponsiveContainer>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      );
+                    })()
+                  ) : (
+                    (() => {
+                      // HeatMap implementation
+                      const areasList = Array.from(new Set(areaQuarterStatusData.map(d => d.areaName)));
+                      const quarters = ["1º Tri", "2º Tri", "3º Tri", "4º Tri"];
+                      
+                      const computedData = areaQuarterStatusData.map(d => {
+                        return {
+                          ...d,
+                          Total: d["Não iniciada"] + d["Em andamento"] + d["Concluídas"]
+                        }
+                      });
+
+                      const maxTotal = Math.max(...computedData.map(d => d.Total), 1); // Avoid div by 0
+
+                      const getColor = (val: number, max: number) => {
+                        if (val === 0) return "bg-slate-50";
+                        const intensity = val / max;
+                        if (intensity < 0.2) return "bg-indigo-100";
+                        if (intensity < 0.4) return "bg-indigo-300";
+                        if (intensity < 0.6) return "bg-indigo-500";
+                        if (intensity < 0.8) return "bg-indigo-700";
+                        return "bg-indigo-900";
+                      };
+
+                      return (
+                        <div className="flex flex-col w-full overflow-auto">
+                          <table className="w-full text-left min-w-[600px] border-collapse">
+                            <thead>
+                              <tr>
+                                <th className="p-3 text-xs font-black tracking-widest text-slate-400 uppercase border-b border-slate-200">Área</th>
+                                {quarters.map(q => (
+                                  <th key={q} className="p-3 text-xs font-black tracking-widest text-slate-400 uppercase text-center border-b border-slate-200">{q}</th>
+                                ))}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {areasList.map(areaName => (
+                                <tr key={areaName} className="border-b border-slate-100/50 hover:bg-slate-50 transition-colors">
+                                  <td className="p-3 text-sm font-bold text-slate-700 w-1/3">{areaName}</td>
+                                  {quarters.map(q => {
+                                    const cellData = computedData.find(d => d.areaName === areaName && d.quarter === q);
+                                    const value = cellData ? cellData.Total : 0;
+                                    return (
+                                      <td key={q} className="p-2 align-middle w-32">
+                                        <div 
+                                          className={cn(
+                                            "w-full h-12 rounded-xl flex items-center justify-center font-black text-sm transition-all duration-300",
+                                            getColor(value, maxTotal),
+                                            value > 0 && value / maxTotal >= 0.6 ? "text-white shadow-md shadow-indigo-900/20" : "text-indigo-900"
+                                          )}
+                                          title={`${value} tarefas no ${q} da área ${areaName}`}
+                                        >
+                                          {value > 0 ? value : <span className="text-slate-300 font-medium">-</span>}
+                                        </div>
+                                      </td>
+                                    );
+                                  })}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )
+                    })()
+                  )
+                ) : (
+                  <div className="flex items-center justify-center h-full text-slate-400 font-bold italic">
+                    Nenhum dado disponível.
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Timeline by Area & Quarter */}
@@ -2651,7 +3578,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                       <div className="py-8 text-center text-slate-400 text-sm font-medium italic border border-slate-100 border-dashed rounded-xl">Nenhuma tarefa atribuída aos trimestres.</div>
                     ) : (
                       visibleTimelineRows.map((row) => {
-                        const isExpanded = expandedTimelineGroups[row.id] !== undefined ? expandedTimelineGroups[row.id] : row.depth < 1;
+                        const isExpanded = expandedTimelineGroups[row.id] !== undefined ? expandedTimelineGroups[row.id] : (isAnyFilterActive ? true : row.depth < 1);
                         const isPlan = row.type === "plan";
                         
                         return (
@@ -2773,7 +3700,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                         expanded[node.id] = true;
                         if (node.children) node.children.forEach(traverse);
                       };
-                      groupedPlanQuarterAreaDashboardData.forEach(traverse);
+                      groupedPlanQuarterAreaData.forEach(traverse);
                       setExpandedPlanQuarterAreaGroups(expanded);
                     }}
                     className="px-3 py-1.5 text-xs bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold rounded-xl hover:bg-indigo-100/80 transition-colors uppercase tracking-wider cursor-pointer"
@@ -2814,7 +3741,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {visiblePlanQuarterAreaGroupedRows.map((row) => {
-                      const isExpanded = expandedPlanQuarterAreaGroups[row.id] !== undefined ? expandedPlanQuarterAreaGroups[row.id] : row.depth < 1; // defaults to true for depth < 1
+                      const isExpanded = expandedPlanQuarterAreaGroups[row.id] !== undefined ? expandedPlanQuarterAreaGroups[row.id] : (isAnyFilterActive ? true : row.depth < 1); // defaults to true for depth < 1
                       
                       const renderDate = (dStr: string | null) => {
                         if (!dStr) return <span className="text-slate-300">-</span>;
@@ -2994,7 +3921,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {visibleQuarterGroupedRows.map((row) => {
-                      const isExpanded = expandedQuarterGroups[row.id] !== undefined ? expandedQuarterGroups[row.id] : row.depth < 1; // defaults to true for depth < 1
+                      const isExpanded = expandedQuarterGroups[row.id] !== undefined ? expandedQuarterGroups[row.id] : (isAnyFilterActive ? true : row.depth < 1); // defaults to true for depth < 1
                       
                       const renderDate = (dStr: string | null) => {
                         if (!dStr) return <span className="text-slate-300">-</span>;
@@ -3175,7 +4102,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {visibleGroupedRows.map((row) => {
-                      const isExpanded = expandedGroups[row.id] !== undefined ? expandedGroups[row.id] : row.depth < 1; // defaults to true for depth < 1
+                      const isExpanded = expandedGroups[row.id] !== undefined ? expandedGroups[row.id] : (isAnyFilterActive ? true : row.depth < 1); // defaults to true for depth < 1
                       const hasChildren = row.children && row.children.length > 0;
                       
                       // Formatting helper for start/end date
@@ -3321,6 +4248,529 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
               </div>
             </div>
 
+            {/* Tabela de Tarefas Agrupada por Área no Final do Painel */}
+            <div className="lg:col-span-12 bg-white border border-slate-200/90 rounded-[2rem] p-6 shadow-sm text-left mt-6 space-y-4">
+              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-slate-100 pb-4">
+                <div>
+                  <dt className="text-xs font-black tracking-widest text-slate-400 uppercase">Detalhamento Operacional</dt>
+                  <h4 className="text-lg font-black text-slate-800 mt-1 font-sans">Tarefas Agrupadas por Área Temática</h4>
+                  <p className="text-xs font-medium text-slate-500 mt-0.5 leading-snug">
+                    Relação de atividades com referência na data fim, consolidando trimestre, mês e progresso atual, agrupadas por área/setor.
+                  </p>
+                </div>
+              </div>
+
+              <div className="overflow-x-auto border border-slate-200/60 rounded-2xl shadow-xs">
+                <table className="w-full text-left text-xs text-slate-600 border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 text-slate-500 border-b border-slate-200 font-black uppercase text-[10px] tracking-wider select-none">
+                      <th 
+                        onClick={() => handleAreaTableSort("title")}
+                        className="px-4 py-3.5 min-w-[280px] cursor-pointer hover:bg-slate-100/80 transition-colors"
+                      >
+                        Título da Tarefa <AreaTableSortIcon field="title" />
+                      </th>
+                      <th 
+                        onClick={() => handleAreaTableSort("start")}
+                        className="px-4 py-3.5 text-center min-w-[110px] cursor-pointer hover:bg-slate-100/80 transition-colors"
+                      >
+                        Início <AreaTableSortIcon field="start" />
+                      </th>
+                      <th 
+                        onClick={() => handleAreaTableSort("end")}
+                        className="px-4 py-3.5 text-center min-w-[110px] cursor-pointer hover:bg-slate-100/80 transition-colors"
+                      >
+                        Prazo <AreaTableSortIcon field="end" />
+                      </th>
+                      <th 
+                        onClick={() => handleAreaTableSort("quarter")}
+                        className="px-4 py-3.5 text-center cursor-pointer hover:bg-slate-100/80 transition-colors"
+                      >
+                        Trimestre <AreaTableSortIcon field="quarter" />
+                      </th>
+                      <th 
+                        onClick={() => handleAreaTableSort("month")}
+                        className="px-4 py-3.5 text-center cursor-pointer hover:bg-slate-100/80 transition-colors"
+                      >
+                        Mês <AreaTableSortIcon field="month" />
+                      </th>
+                      <th 
+                        onClick={() => handleAreaTableSort("status")}
+                        className="px-4 py-3.5 text-center cursor-pointer hover:bg-slate-100/80 transition-colors"
+                      >
+                        Status <AreaTableSortIcon field="status" />
+                      </th>
+                      <th 
+                        onClick={() => handleAreaTableSort("situation")}
+                        className="px-4 py-3.5 text-center cursor-pointer hover:bg-slate-100/80 transition-colors"
+                      >
+                        Situação <AreaTableSortIcon field="situation" />
+                      </th>
+                      <th 
+                        onClick={() => handleAreaTableSort("progress")}
+                        className="px-4 py-3.5 min-w-[140px] cursor-pointer hover:bg-slate-100/80 transition-colors"
+                      >
+                        Progresso <AreaTableSortIcon field="progress" />
+                      </th>
+                      <th className="px-4 py-3.5 text-center min-w-[85px]">
+                        Timeline
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {(() => {
+                      const sortTaskList = sortAreaTaskList;
+
+                      const targetAreas = selectedAreaIds.length > 0 
+                        ? areas.filter(a => selectedAreaIds.includes(a.id))
+                        : areas;
+
+                      const allAreas = [
+                        ...targetAreas,
+                        ...(selectedAreaIds.length === 0 ? [{ id: 0, name: "Sem Área de Atuação" }] : [])
+                      ];
+
+                      const sortedAreas = [...allAreas].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+                      const sortedCategories = [...categories].sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+                      
+                      const allCategoriesForGroup = [
+                        ...sortedCategories,
+                        { id: -1, name: "Sem Categoria" }
+                      ];
+
+                      const rows: React.ReactNode[] = [];
+
+                      const renderRowHierarchical = (t: Task, depth: number, areaName: string, categoryName: string) => {
+                        const subTasksCount = childrenMap[t.id]?.length || 0;
+                        const isExpanded = expandedTasks[t.id] !== undefined ? expandedTasks[t.id] : (isAnyFilterActive ? true : false);
+                        
+                        let q = '-';
+                        let mLabel = '-';
+                        let formattedEndDate = '-';
+                        let formattedStartDate = '-';
+                        
+                        if (t.startDate) {
+                          try {
+                            const dStart = new Date(t.startDate);
+                            if (!isNaN(dStart.getTime())) {
+                              formattedStartDate = dStart.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" });
+                            }
+                          } catch(e) {}
+                        }
+                        
+                        if (t.endDate) {
+                          try {
+                            const d = new Date(t.endDate);
+                            if (!isNaN(d.getTime())) {
+                              formattedEndDate = d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" });
+                              const monthIdx = d.getUTCMonth();
+                              
+                              if (monthIdx < 3) q = '1º Trim.';
+                              else if (monthIdx < 6) q = '2º Trim.';
+                              else if (monthIdx < 9) q = '3º Trim.';
+                              else q = '4º Trim.';
+                              
+                              const monthName = d.toLocaleDateString("pt-BR", { month: "short", timeZone: "UTC" });
+                              mLabel = monthName.charAt(0).toUpperCase() + monthName.slice(1);
+                            }
+                          } catch(e) {}
+                        }
+
+                        const normStatus = normalizeStatus(t.status);
+                        const dlStatus = getDeadlineStatus(t.endDate, t.status);
+
+                        rows.push(
+                          <tr key={`task-${areaName}-${categoryName}-${t.id}`} className="hover:bg-slate-50 transition-colors bg-white">
+                            <td className="px-4 py-3 font-semibold text-slate-700">
+                              <div className="flex items-center" style={{ paddingLeft: `${depth * 20}px` }}>
+                                {subTasksCount > 0 ? (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleExpand(t.id);
+                                    }}
+                                    className="p-1 mr-1 hover:bg-slate-100 rounded text-slate-400 hover:text-slate-600 transition"
+                                    title={isExpanded ? "Recolher subtarefas" : "Expandir subtarefas"}
+                                  >
+                                    {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                                  </button>
+                                ) : (
+                                  <span className="w-6 shrink-0" />
+                                )}
+                                <span className={cn(depth > 0 ? "text-slate-500 font-medium font-sans text-xs" : "text-slate-700 font-semibold")}>{t.title}</span>
+                                {subTasksCount > 0 && (
+                                  <span className="text-slate-400 font-normal ml-1">({subTasksCount})</span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-center text-slate-650 font-mono">
+                              {formattedStartDate !== '-' ? formattedStartDate : <span className="text-slate-300">-</span>}
+                            </td>
+                            <td className="px-4 py-3 text-center text-slate-650 font-mono">
+                              {formattedEndDate}
+                            </td>
+                            <td className="px-4 py-3 text-center text-slate-800 font-bold text-[11px]">
+                              {q !== '-' ? <span className="bg-white border border-slate-200 px-2.5 py-1 rounded-md shadow-sm">{q}</span> : <span className="text-slate-300">-</span>}
+                            </td>
+                            <td className="px-4 py-3 text-center text-slate-700 font-bold uppercase text-[10px]">
+                              {mLabel !== '-' ? mLabel : <span className="text-slate-300">-</span>}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              {normStatus === "Concluída" ? (
+                                <div className="inline-flex items-center justify-center text-emerald-500" title="Status: Concluída">
+                                  <CheckCircle2 size={16} />
+                                </div>
+                              ) : normStatus === "Em andamento" ? (
+                                <div className="inline-flex items-center justify-center text-blue-500 animate-pulse" title="Status: Em andamento">
+                                  <Clock size={16} />
+                                </div>
+                              ) : (
+                                <div className="inline-flex items-center justify-center text-slate-300" title="Status: Não iniciada">
+                                  <Circle size={16} />
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              {normStatus === "Concluída" ? (
+                                <div className="inline-flex items-center justify-center text-emerald-500" title="Situação: No Prazo (Concluída)">
+                                  <CheckCircle2 size={16} />
+                                </div>
+                              ) : dlStatus === "Atrasada" ? (
+                                <div className="inline-flex items-center justify-center text-rose-500" title="Situação: Atrasada">
+                                  <AlertCircle size={16} />
+                                </div>
+                              ) : dlStatus === "Crítica" ? (
+                                <div className="inline-flex items-center justify-center text-amber-500" title="Situação: Crítica">
+                                  <AlertTriangle size={16} />
+                                </div>
+                              ) : (
+                                <div className="inline-flex items-center justify-center text-emerald-500" title="Situação: No Prazo">
+                                  <CheckCircle2 size={16} />
+                                </div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 bg-slate-100 h-1.5 rounded-full overflow-hidden w-full max-w-[120px]">
+                                  <div 
+                                    className={cn(
+                                      "h-full rounded-full transition-all duration-300",
+                                      t.progress === 100 ? "bg-emerald-500" : t.progress >= 50 ? "bg-blue-500" : t.progress > 0 ? "bg-amber-400" : "bg-slate-300"
+                                    )}
+                                    style={{ width: `${t.progress || 0}%` }}
+                                  />
+                                </div>
+                                <span className={cn(
+                                  "text-[10px] font-black w-8 text-right leading-none",
+                                  t.progress === 100 ? "text-emerald-600 animate-pulse" : t.progress >= 50 ? "text-blue-600" : t.progress > 0 ? "text-amber-600" : "text-slate-400"
+                                )}>
+                                  {t.progress || 0}%
+                                </span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-center w-[85px]">
+                              <button
+                                onClick={() => setTimelineTaskId(t.id)}
+                                className="p-1 px-2 bg-white border border-slate-200 text-slate-600 hover:text-adasa-mid hover:border-adasa-200 rounded-lg transition shadow-sm text-xs font-bold inline-flex items-center justify-center"
+                                title="Ver Linha do Tempo"
+                              >
+                                <Activity size={12} className="text-indigo-600" />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+
+                        if (isExpanded && subTasksCount > 0) {
+                          const children = (childrenMap[t.id] || []).filter(c => filteredTasks.some(x => x.id === c.id));
+                          const sortedChildren = sortTaskList(children);
+                          sortedChildren.forEach(child => {
+                            renderRowHierarchical(child, depth + 1, areaName, categoryName);
+                          });
+                        }
+                      };
+
+                      sortedAreas.forEach(area => {
+                        const areaTasks = filteredTasks.filter(t => {
+                          const hasArea = t.areaIds && t.areaIds.length > 0;
+                          if (area.id === 0) {
+                            return !hasArea;
+                          } else {
+                            return t.areaIds && t.areaIds.includes(area.id);
+                          }
+                        });
+
+                        if (areaTasks.length > 0) {
+                          const isAreaCollapsed = collapsedAreas[area.name] || false;
+
+                          rows.push(
+                            <tr 
+                              key={`area-${area.name}`} 
+                              className="bg-slate-100/75 border-t-2 border-t-slate-200 cursor-pointer hover:bg-slate-200 transition-colors"
+                              onClick={() => setCollapsedAreas(prev => ({ ...prev, [area.name]: !prev[area.name] }))}
+                            >
+                              <td colSpan={9} className="px-4 py-3 font-black text-slate-800 uppercase tracking-wide border-l-4 border-l-indigo-500">
+                                <div className="flex items-center gap-2">
+                                  {isAreaCollapsed ? <ChevronRight size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
+                                  <span>{area.name}</span>
+                                  <span className="text-[10px] text-slate-500 font-bold ml-2 bg-slate-200 px-2 py-0.5 rounded-full">{areaTasks.length} TAREFA(S)</span>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+
+                          if (!isAreaCollapsed) {
+                            allCategoriesForGroup.forEach(category => {
+                              const groupTasks = areaTasks.filter(t => {
+                                const hasCat = t.categoryIds && t.categoryIds.length > 0;
+                                if (category.id === -1) {
+                                  return !hasCat;
+                                } else {
+                                  return t.categoryIds && t.categoryIds.includes(category.id);
+                                }
+                              });
+
+                              if (groupTasks.length > 0) {
+                                const collKey = `${area.name}-${category.name}`;
+                                const isCategoryCollapsed = collapsedTableCategories[collKey] || false;
+
+                                rows.push(
+                                  <tr 
+                                    key={`cat-header-${area.name}-${category.name}`}
+                                    className="bg-slate-50/75 border-t border-t-slate-100 cursor-pointer hover:bg-slate-100/75 transition-colors select-none"
+                                    onClick={() => setCollapsedTableCategories(prev => ({
+                                      ...prev,
+                                      [collKey]: !isCategoryCollapsed
+                                    }))}
+                                  >
+                                    <td colSpan={9} className="px-4 py-2 font-bold text-slate-600 border-l-[3px] border-l-amber-500/80">
+                                      <div className="flex items-center gap-2 pl-4">
+                                        {isCategoryCollapsed ? <ChevronRight size={12} className="text-slate-400" /> : <ChevronDown size={12} className="text-slate-400" />}
+                                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Categoria:</span>
+                                        <span className="text-xs font-black text-slate-700">{category.name}</span>
+                                        <span className="text-[9px] text-slate-500 font-bold ml-1.5 bg-slate-200/60 border border-slate-200/60 px-1.5 py-0.5 rounded-full">{groupTasks.length} TAREFA(S)</span>
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+
+                                if (!isCategoryCollapsed) {
+                                  const groupRoots = groupTasks.filter(t => !t.parentId || !groupTasks.some(x => x.id === t.parentId));
+                                  const sortedRoots = sortTaskList(groupRoots);
+
+                                  sortedRoots.forEach(t => {
+                                    renderRowHierarchical(t, 0, area.name, category.name);
+                                  });
+                                }
+                              }
+                            });
+                          }
+                        }
+                      });
+
+                      if (rows.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan={9} className="p-12 text-center text-slate-400 italic font-bold">
+                              Nenhuma tarefa encontrada com os filtros atuais.
+                            </td>
+                          </tr>
+                        );
+                      }
+
+                      return rows;
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+          </div>
+        )}
+
+        {/* Dashboard Timeline Modal Overlay */}
+        {timelineTaskId !== null && (
+          <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex flex-col p-4 sm:p-8 md:p-12 items-center justify-center overflow-hidden">
+            <div className="bg-white rounded-[2rem] w-full max-w-5xl h-full max-h-[90vh] shadow-2xl relative flex flex-col">
+              <div className="flex z-20 justify-between items-center p-6 border-b border-slate-100 shrink-0">
+                 <h3 className="text-xl font-black text-slate-800 tracking-tight">Evolução do Item</h3>
+                 <button onClick={() => setTimelineTaskId(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} className="text-slate-500 hover:text-slate-800" /></button>
+              </div>
+              <div className="p-6 sm:p-10 overflow-y-auto custom-scrollbar flex-1 relative">
+                <div className="mb-8 border-b border-slate-100 pb-4">
+                  <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+                    <Activity size={16} className="text-adasa-mid" /> 
+                    Linha do Tempo: {getTaskDisplayName(taskById[timelineTaskId]) || ""}
+                  </h4>
+                  <p className="text-[11px] font-semibold text-slate-500 mt-1 mb-4">
+                    Exibindo a hierarquia da tarefa (predecessores e subtarefas dependentes). As estatísticas referem-se à tarefa selecionada e suas filhas.
+                  </p>
+                  {(() => {
+                    const targetIdx = timelineTasks.findIndex(t => t.isTarget);
+                    // Include target and descendants for stats, or just descendants? Let's include target too since the UI says "tarefa selecionada e suas filhas"
+                    const childrenTasks = timelineTasks.slice(targetIdx);
+                    const total = childrenTasks.length;
+                    if (total === 0) return null;
+                    
+                    const completed = childrenTasks.filter(t => normalizeStatus(t.task.status) === "Concluída").length;
+                    const inProgress = childrenTasks.filter(t => normalizeStatus(t.task.status) === "Em andamento").length;
+                    const pending = total - completed - inProgress;
+                    
+                    return (
+                      <div className="flex flex-wrap items-center justify-center gap-4 py-2">
+                        <div className="flex items-center gap-2 bg-slate-100 text-slate-700 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider shadow-sm">
+                          <span>TOTAIS <span className="border-l border-slate-300 ml-2 pl-2 text-sm font-extrabold">{total}</span></span>
+                        </div>
+                        <div className="flex items-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider shadow-sm">
+                          <CheckCircle2 size={16} /> CONCLUÍDAS <span className="border-l border-emerald-200 ml-1 pl-2 text-sm font-extrabold">{completed}</span>
+                        </div>
+                        <div className="flex items-center gap-2 bg-blue-50 text-blue-700 border border-blue-200 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider shadow-sm">
+                          <Activity size={16} /> EM ANDAMENTO <span className="border-l border-blue-200 ml-1 pl-2 text-sm font-extrabold">{inProgress}</span>
+                        </div>
+                        <div className="flex items-center gap-2 bg-slate-50 text-slate-600 border border-slate-200 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider shadow-sm">
+                          <Clock size={16} /> NÃO INICIADAS <span className="border-l border-slate-200 ml-1 pl-2 text-sm font-extrabold">{pending}</span>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+                <div className="relative border-l-2 border-slate-200/80 ml-4 lg:ml-6 pl-6 lg:pl-10 space-y-12">
+                  {timelineTasks.map(({ task, depth, isTarget, isAncestor }, idx) => (
+                    <div key={task.id} className="relative group z-10">
+                      {depth > 0 && (
+                        <div 
+                          className="absolute top-4 border-t-2 border-slate-200/80 border-dashed -z-10"
+                          style={{ left: '-20px', width: `calc(20px + ${Math.min(depth * 1.5, 6)}rem)` }}
+                        />
+                      )}
+                      
+                      <div className={`absolute -left-[37px] lg:-left-[55px] top-1.5 z-10 w-6 h-6 lg:w-7 lg:h-7 rounded-full border-[3px] border-white flex items-center justify-center shadow-sm transition-transform duration-300 group-hover:scale-110 ${normalizeStatus(task.status) === "Concluída" ? "bg-emerald-500" : normalizeStatus(task.status) === "Em andamento" ? "bg-blue-500" : "bg-slate-400"}`}>
+                        {normalizeStatus(task.status) === "Concluída" ? <CheckCircle2 size={12} className="text-white" /> : normalizeStatus(task.status) === "Em andamento" ? <Activity size={12} className="text-white" /> : <Clock size={12} className="text-white" />}
+                      </div>
+                      
+                      <div 
+                        className={cn("border p-5 rounded-2xl hover:shadow-md transition-all cursor-pointer group-hover:-translate-y-0.5", isTarget ? "bg-indigo-50/50 border-indigo-300 shadow-md ring-2 ring-indigo-500/20" : isAncestor ? "bg-slate-50/50 border-slate-200 opacity-80 hover:opacity-100" : "bg-white border-slate-200/70 hover:border-adasa-mid/60")} 
+                        onClick={() => { setTimelineTaskId(null); handleEditTask(task); }}
+                        style={{ marginLeft: `${depth > 0 ? Math.min(depth * 1.5, 6) : 0}rem` }}
+                      >
+                        <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4 mb-4">
+                          <div className="space-y-1.5">
+                            <div className="flex flex-wrap items-center gap-2">
+                              {isTarget && <span className="text-[10px] font-black tracking-widest uppercase text-white bg-indigo-500 px-2.5 py-0.5 rounded-md flex items-center gap-1 shadow-sm"><Activity size={10} className="text-indigo-100" /> Selecionada</span>}
+                              <span className="text-[10px] font-black tracking-widest uppercase text-slate-400 bg-slate-200/50 px-2 py-0.5 rounded-md">ID: {task.id}</span>
+                              <span className={`text-[9px] font-bold uppercase py-0.5 px-2 rounded-md border ${getPriorityBadgeClass(task.priority)}`}>{task.priority}</span>
+
+                              {(() => {
+                                const normStatus = normalizeStatus(task.status);
+                                let statusClasses = "bg-slate-100 text-slate-600 border-slate-200";
+                                if (normStatus === "Concluída") statusClasses = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                                else if (normStatus === "Em andamento") statusClasses = "bg-blue-50 text-blue-700 border-blue-200";
+
+                                return (
+                                  <span className={`text-[9px] font-black uppercase py-0.5 px-2 rounded-md border ${statusClasses}`}>
+                                    {normStatus}
+                                  </span>
+                                );
+                              })()}
+
+                              {(() => {
+                                if (normalizeStatus(task.status) === "Concluída") return null;
+                                const dlStatus = getDeadlineStatus(task.endDate, task.status);
+                                let dlClasses = "bg-slate-550 text-slate-500 border-slate-200";
+                                if (dlStatus === "Atrasada") dlClasses = "bg-rose-500 text-white border-rose-500 font-extrabold shadow-xs";
+                                else if (dlStatus === "Crítica") dlClasses = "bg-amber-500 text-white border-amber-500 font-extrabold shadow-xs";
+                                else dlClasses = "bg-emerald-50 text-emerald-800 border-emerald-200 font-semibold";
+
+                                return (
+                                  <span className={`text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-md border ${dlClasses}`}>
+                                    {dlStatus}
+                                  </span>
+                                );
+                              })()}
+                              {task.parentId && (
+                                <span className="text-[10px] font-black tracking-widest uppercase text-indigo-500 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md flex items-center gap-1"><GitCommit size={10} /> Subatividade</span>
+                              )}
+                              {task.categoryIds?.map(cid => {
+                                const cat = categories.find(c => c.id === cid);
+                                return cat ? (
+                                  <span key={cid} className="text-[9px] font-bold uppercase text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-md flex items-center gap-1">
+                                    <Tag size={10} /> {cat.name}
+                                  </span>
+                                ) : null;
+                              })}
+                            </div>
+                            <h4 className="text-base font-black text-slate-800 leading-tight group-hover:text-adasa-mid transition-colors">{getTaskDisplayName(task)}</h4>
+                          </div>
+                          <div className="flex items-center gap-3 shrink-0 bg-white p-3 rounded-xl border border-slate-100 shadow-sm flex-wrap justify-end">
+                            <div className="flex flex-col items-start gap-1">
+                              <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                                <CalendarRange size={12} className="text-adasa-mid" /> Início
+                              </div>
+                              <div className="text-sm font-black text-slate-800">{formatDate(task.startDate) || "Não definido"}</div>
+                            </div>
+                            <div className="w-px h-8 bg-slate-100"></div>
+                            <div className="flex flex-col items-start gap-1">
+                              <div className="flex items-center gap-1.5 text-[10px] font-black text-slate-500 uppercase tracking-wider">
+                                <CalendarRange size={12} className="text-adasa-mid" /> Prazo final
+                              </div>
+                              <div className="text-sm font-black text-slate-800">{formatDate(task.endDate) || "Não definido"}</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {task.description && (
+                          <p className="text-xs font-semibold text-slate-600 mb-4 leading-relaxed line-clamp-2">{task.description}</p>
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-slate-200/70">
+                          <div className="space-y-4">
+                            {task.responsibleIds && task.responsibleIds.length > 0 && (
+                              <div className="space-y-2">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Responsáveis</span>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {task.responsibleIds.map(rid => {
+                                    const resp = responsibles.find(r => r.id === rid);
+                                    if (!resp) return null;
+                                    const initials = resp.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                                    return (
+                                      <div key={rid} className="flex items-center justify-center w-7 h-7 text-[10px] font-bold text-slate-700 bg-slate-100 rounded-full border border-slate-200 shadow-sm" title={resp.name}>
+                                        {initials}
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                            
+                            {task.dependsOnTaskId && taskById[task.dependsOnTaskId] && (
+                              <div className="space-y-2">
+                                <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Depende de</span>
+                                <div className="flex items-center gap-2 text-[11px] font-bold text-slate-700 bg-white px-2.5 py-1.5 rounded-lg border border-slate-200 shadow-sm w-max" title={getTaskDisplayName(taskById[task.dependsOnTaskId])}>
+                                  <Link2 size={14} className="text-slate-400" />
+                                  <span className="max-w-[200px] truncate">{getTaskDisplayName(taskById[task.dependsOnTaskId])}</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          <div className="space-y-2">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block flex justify-between">Progresso <span className="text-adasa-mid">{task.progress}%</span></span>
+                            <div className="h-2 bg-slate-200 rounded-full overflow-hidden border border-slate-200/50">
+                              <div className={`h-full ${normalizeStatus(task.status) === "Concluída" ? "bg-emerald-500" : "bg-adasa-mid"} transition-all duration-500`} style={{ width: `${task.progress || 0}%` }} />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  
+                  {timelineTasks.length === 0 && (
+                    <div className="text-center py-10 text-slate-400 font-semibold italic text-sm">
+                      Nenhuma tarefa encontrada na linha do tempo.
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -3336,14 +4786,22 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
         {/* Left side: Search filters and Task tree */}
         <div className="lg:col-span-12 bg-white border border-slate-200/80 rounded-[2rem] p-6 shadow-sm space-y-6">
           <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-            <div>
-              <h3 className="text-base font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
-                <ListTodo size={18} className="text-adasa-mid" /> Filtro de Atividades
-              </h3>
-              <p className="text-xs font-semibold text-slate-500">
-                Navegação multinível, subtarefas e consolidação automática temporo-produtiva.
-              </p>
-            </div>
+            <button
+              onClick={() => setIsTasksFiltersExpanded(!isTasksFiltersExpanded)}
+              className="flex-1 text-left flex justify-between items-center group focus:outline-none cursor-pointer"
+            >
+              <div>
+                <h3 className="text-base font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
+                  <ListTodo size={18} className="text-adasa-mid" /> Filtro de Atividades
+                </h3>
+                <p className="text-xs font-semibold text-slate-500 mt-1">
+                  Navegação multinível, subtarefas e consolidação automática temporo-produtiva.
+                </p>
+              </div>
+              <div className="bg-slate-50 group-hover:bg-slate-100 border border-slate-200 group-hover:border-slate-350 text-slate-400 group-hover:text-slate-600 p-2 rounded-xl transition-colors mr-2">
+                {isTasksFiltersExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+              </div>
+            </button>
 
             <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
               <button
@@ -3358,7 +4816,8 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
           </div>
 
           {/* Filter Bar */}
-          <div className="bg-slate-50/60 rounded-3xl border border-slate-200/60 p-5 space-y-5">
+          {isTasksFiltersExpanded && (
+            <div className="bg-slate-50/60 rounded-3xl border border-slate-200/60 p-5 space-y-5 animate-in slide-in-from-top-4 fade-in duration-300">
             {/* Row 1: Plan Select (sorted to show most recent first) */}
             <div className="flex flex-col gap-1.5 max-w-xs">
               <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">📁 Plano</span>
@@ -3502,8 +4961,8 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
               </div>
             </div>
 
-            {/* Row 3: Status, Priority and Category Select filters */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Row 3: Status, Situation, Priority and Category Select filters */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="flex flex-col gap-1.5">
                 <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">🚦 Status</span>
                 <select
@@ -3515,6 +4974,20 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   <option value="Não iniciada">NÃO INICIADA</option>
                   <option value="Em andamento">EM ANDAMENTO</option>
                   <option value="Concluída">CONCLUÍDA</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">📅 Situação</span>
+                <select
+                  value={situationFilter}
+                  onChange={(e) => setSituationFilter(e.target.value)}
+                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-adasa-mid bg-white text-slate-700 font-bold"
+                >
+                  <option value="all">Todas as Situações</option>
+                  <option value="No Prazo">NO PRAZO</option>
+                  <option value="Crítica">CRÍTICA</option>
+                  <option value="Atrasada">ATRASADA</option>
                 </select>
               </div>
 
@@ -3562,6 +5035,12 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
               </div>
             </div>
           </div>
+        )}
+          <div className="mt-6 mb-2 border-l-4 border-adasa-mid pl-2.5 py-0.5">
+            <h3 className="text-xs sm:text-sm font-black text-slate-800 uppercase tracking-widest">
+              Visualização
+            </h3>
+          </div>
 
           {/* View Toggle & Adicionar Tarefa Actions */}
           <div className="flex flex-col xl:flex-row justify-center items-center bg-slate-50 border border-slate-200 rounded-2xl p-3 w-full gap-4">
@@ -3571,6 +5050,12 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                 className={`flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl transition-all whitespace-nowrap shadow-sm ${viewMode === "category" && timelineTaskId === null ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"}`}
               >
                 <Tag size={16} /> Categorias
+              </button>
+              <button
+                onClick={() => { setViewMode("board"); setTimelineTaskId(null); }}
+                className={`flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl transition-all whitespace-nowrap shadow-sm ${viewMode === "board" && timelineTaskId === null ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"}`}
+              >
+                <LayoutGrid size={16} /> Quadro
               </button>
               <button
                 onClick={() => { setViewMode("status"); setTimelineTaskId(null); }}
@@ -3590,11 +5075,17 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
               >
                 <Users size={16} /> Responsáveis
               </button>
-               <button
+              <button
                 onClick={() => { setViewMode("tree"); setTimelineTaskId(null); }}
                 className={`flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl transition-all whitespace-nowrap shadow-sm ${viewMode === "tree" && timelineTaskId === null ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"}`}
               >
-                <FolderKanban size={16} /> Hierarquia
+                <FolderKanban size={16} /> Lista
+              </button>
+              <button
+                onClick={() => { setViewMode("table"); setTimelineTaskId(null); }}
+                className={`flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl transition-all whitespace-nowrap shadow-sm ${viewMode === "table" && timelineTaskId === null ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"}`}
+              >
+                <Table size={16} /> Tabela
               </button>
               {timelineTaskId !== null && (
                 <button
@@ -3615,8 +5106,29 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
           </div>
 
           {/* Main Container */}
-          {timelineTaskId === null ? (
-            <div className="space-y-4">
+          <div className="space-y-4">
+              {["status", "category", "area", "responsible"].includes(viewMode) && (
+                <div className="flex flex-col sm:flex-row items-center gap-3 justify-between bg-slate-50 border border-slate-200/80 rounded-2xl p-3 px-4 shadow-xs mt-2 select-none">
+                  <div className="flex items-center gap-2">
+                    <Layers size={15} className="text-indigo-500" />
+                    <span className="text-xs font-extrabold text-slate-700 uppercase tracking-wider">Painel de Agrupamento ({viewMode === "status" ? "Status" : viewMode === "category" ? "Categorias" : viewMode === "area" ? "Áreas" : "Responsáveis"})</span>
+                  </div>
+                  <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <button
+                      onClick={() => handleGroupContainersExpandCollapse(true)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] sm:text-xs font-black text-indigo-600 bg-indigo-50 hover:bg-indigo-100/80 rounded-xl transition border border-indigo-200/50 cursor-pointer uppercase tracking-wider shadow-xs"
+                    >
+                      <ChevronsDown size={14} className="stroke-[2.5]" /> Expandir Todos
+                    </button>
+                    <button
+                      onClick={() => handleGroupContainersExpandCollapse(false)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] sm:text-xs font-black text-slate-600 bg-white hover:bg-slate-100 border border-slate-200 rounded-xl transition cursor-pointer uppercase tracking-wider shadow-xs"
+                    >
+                      <ChevronsUp size={14} className="stroke-[2.5]" /> Recolher Todos
+                    </button>
+                  </div>
+                </div>
+              )}
               {viewMode === "tree" && (
                 <div className="overflow-hidden rounded-xl border border-slate-200/60 mt-2">
                   {rootTasks.length === 0 ? (
@@ -3630,6 +5142,246 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   )}
                 </div>
               )}
+              {viewMode === "table" && (() => {
+                  let flatTasks = [...enhancedTasks].filter(t => matchesFilters(t));
+                  
+                  if (tableSort) {
+                    flatTasks.sort((a, b) => {
+                       let valA: any = "";
+                       let valB: any = "";
+                       
+                       if (tableSort.field === "title") {
+                          valA = getTaskDisplayName(a);
+                          valB = getTaskDisplayName(b);
+                       } else if (tableSort.field === "area") {
+                          valA = (a.areaIds || []).map(id => areas.find(x => x.id === id)?.name || "").join(", ");
+                          valB = (b.areaIds || []).map(id => areas.find(x => x.id === id)?.name || "").join(", ");
+                       } else if (tableSort.field === "category") {
+                          valA = (a.categoryIds || []).map(id => categories.find(x => x.id === id)?.name || "").join(", ");
+                          valB = (b.categoryIds || []).map(id => categories.find(x => x.id === id)?.name || "").join(", ");
+                       } else if (tableSort.field === "responsibles") {
+                          valA = (a.responsibleIds || []).map(id => responsibles.find(x => x.id === id)?.name || "").join(", ");
+                          valB = (b.responsibleIds || []).map(id => responsibles.find(x => x.id === id)?.name || "").join(", ");
+                       } else if (tableSort.field === "progress") {
+                          valA = a.progress || 0;
+                          valB = b.progress || 0;
+                       } else if (tableSort.field === "status") {
+                          valA = normalizeStatus(a.status);
+                          valB = normalizeStatus(b.status);
+                       } else if (tableSort.field === "situation") {
+                          valA = getDeadlineStatus(a.endDate, a.status);
+                          valB = getDeadlineStatus(b.endDate, b.status);
+                       } else if (tableSort.field === "priority") {
+                          const getPrioValue = (tk: Task) => {
+                            if (tk.priority === "Alta") return 1;
+                            if (tk.priority === "Média") return 2;
+                            if (tk.priority === "Baixa") return 3;
+                            return 4;
+                          };
+                          valA = getPrioValue(a);
+                          valB = getPrioValue(b);
+                       } else if (tableSort.field === "start") {
+                          valA = a.startDate || "9999-99-99";
+                          valB = b.startDate || "9999-99-99";
+                       } else if (tableSort.field === "end") {
+                          valA = a.endDate || "9999-99-99";
+                          valB = b.endDate || "9999-99-99";
+                       }
+                       
+                       if (valA < valB) return tableSort.dir === "asc" ? -1 : 1;
+                       if (valA > valB) return tableSort.dir === "asc" ? 1 : -1;
+                       return 0;
+                    });
+                  }
+
+                  const handleSort = (field: string) => {
+                     setTableSort(prev => {
+                        if (prev?.field === field) {
+                           return prev.dir === "asc" ? { field, dir: "desc" } : null;
+                        }
+                        return { field, dir: "asc" };
+                     });
+                  };
+
+                  const SortIcon = ({ field }: { field: string }) => {
+                     if (tableSort?.field !== field) return <ChevronDown size={14} className="opacity-30" />;
+                     return tableSort.dir === "asc" ? <ChevronUp size={14} className="text-indigo-600" /> : <ChevronDown size={14} className="text-indigo-600" />;
+                  };
+
+                  return (
+                    <div className="space-y-3">
+                      {/* Top horizontal scrollbar bar, only displayed if we have a scrollable table */}
+                      {tableScrollWidth > 0 && (
+                        <div 
+                          ref={topScrollTableRef}
+                          onScroll={handleTopTableScroll}
+                          className="hidden lg:block overflow-x-auto w-full scrollbar-thin bg-slate-50 border border-slate-200/60 p-1.5 rounded-xl mb-1"
+                        >
+                          <div style={{ width: `${tableScrollWidth}px` }} className="h-1 bg-transparent" />
+                        </div>
+                      )}
+                      <div ref={contentScrollTableRef} onScroll={handleContentTableScroll} className="overflow-x-auto rounded-xl border border-slate-200 mt-2 bg-white shadow-sm scrollbar-thin scrollbar-thumb-slate-300">
+                       <table className="w-full text-left text-xs border-collapse min-w-[1050px]">
+                         <thead>
+                            <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider text-[10px] font-black">
+                              <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none" onClick={() => handleSort("title")}>
+                                <div className="flex items-center gap-1.5">Tarefa <SortIcon field="title" /></div>
+                              </th>
+                              <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none" onClick={() => handleSort("area")}>
+                                <div className="flex items-center gap-1.5">Área <SortIcon field="area" /></div>
+                              </th>
+                              <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none" onClick={() => handleSort("category")}>
+                                <div className="flex items-center gap-1.5">Categoria <SortIcon field="category" /></div>
+                              </th>
+                              <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none" onClick={() => handleSort("responsibles")}>
+                                <div className="flex items-center gap-1.5">Responsáveis <SortIcon field="responsibles" /></div>
+                              </th>
+                              <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none" onClick={() => handleSort("start")}>
+                                <div className="flex items-center gap-1.5">Início <SortIcon field="start" /></div>
+                              </th>
+                              <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none" onClick={() => handleSort("end")}>
+                                <div className="flex items-center gap-1.5">Prazo <SortIcon field="end" /></div>
+                              </th>
+                              <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none text-center" onClick={() => handleSort("priority")}>
+                                <div className="flex items-center justify-center gap-1.5">Prioridade <SortIcon field="priority" /></div>
+                              </th>
+                              <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none text-center" onClick={() => handleSort("status")}>
+                                <div className="flex items-center justify-center gap-1.5">Status <SortIcon field="status" /></div>
+                              </th>
+                              <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none text-center" onClick={() => handleSort("situation")}>
+                                <div className="flex items-center justify-center gap-1.5">Situação <SortIcon field="situation" /></div>
+                              </th>
+                              <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none min-w-[140px]" onClick={() => handleSort("progress")}>
+                                <div className="flex items-center gap-1.5">Progresso <SortIcon field="progress" /></div>
+                              </th>
+                              <th className="px-4 py-3 text-center">Timeline</th>
+                            </tr>
+                          </thead>
+                         <tbody className="divide-y divide-slate-100">
+                           {flatTasks.length === 0 ? (
+                             <tr>
+                               <td colSpan={11} className="text-center py-12 text-slate-400 font-medium">Nenhuma tarefa encontrada.</td>
+                             </tr>
+                           ) : flatTasks.map(task => {
+                               const taskChildrenCount = childrenMap[task.id]?.length || 0;
+                               const normStatus = normalizeStatus(task.status);
+                               let statusClasses = "bg-slate-100 text-slate-600 border-slate-200";
+                               if (normStatus === "Concluída") statusClasses = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                               else if (normStatus === "Em andamento") statusClasses = "bg-blue-50 text-blue-700 border-blue-200";
+
+                               const dlStatus = getDeadlineStatus(task.endDate, task.status);
+                               let dlClasses = "bg-slate-50 text-slate-500 border-slate-200";
+                               if (normStatus !== "Concluída") {
+                                  if (dlStatus === "Atrasada") dlClasses = "bg-rose-500 text-white border-rose-500 shadow-xs";
+                                  else if (dlStatus === "Crítica") dlClasses = "bg-amber-500 text-white border-amber-500 shadow-xs";
+                                  else dlClasses = "bg-emerald-50 text-emerald-800 border-emerald-200";
+                               }
+
+                               return (
+                                 <tr key={task.id} className="hover:bg-slate-50/50 transition-colors group">
+                                   <td className="px-4 py-3 border-r border-slate-50">
+                                     <span className="font-bold text-slate-800 hover:text-indigo-600 block cursor-pointer transition-colors" onClick={() => handleEditTask(task)}>
+                                       {getTaskDisplayName(task)} {taskChildrenCount > 0 && <span className="text-slate-400 font-normal">({taskChildrenCount})</span>}
+                                     </span>
+                                     {task.parentId && taskById[task.parentId] && (
+                                       <span className="text-[9px] text-indigo-500 font-bold uppercase mt-0.5 block truncate max-w-xs" title={`Subtarefa de: ${taskById[task.parentId].title}`}>
+                                          Subtarefa de: {taskById[task.parentId].title}
+                                       </span>
+                                     )}
+                                   </td>
+                                   <td className="px-4 py-3 border-r border-slate-50">
+                                     <div className="flex flex-wrap gap-1">
+                                        {task.areaIds?.map(aid => {
+                                           const ar = areas.find(a => a.id === aid);
+                                           if (!ar) return null;
+                                           return <span key={aid} className="text-[9px] font-bold uppercase bg-sky-50 text-sky-700 border border-sky-100 px-1.5 py-0.5 rounded-sm line-clamp-1">{ar.name}</span>;
+                                        })}
+                                     </div>
+                                   </td>
+                                   <td className="px-4 py-3 border-r border-slate-50">
+                                     <div className="flex flex-wrap gap-1">
+                                        {task.categoryIds?.map(cid => {
+                                           const cat = categories.find(c => c.id === cid);
+                                           if (!cat) return null;
+                                           return <span key={cid} className="text-[9px] font-bold uppercase bg-indigo-50 text-indigo-600 border border-indigo-100 px-1.5 py-0.5 rounded-sm line-clamp-1">{cat.name}</span>;
+                                        })}
+                                     </div>
+                                   </td>
+                                   <td className="px-4 py-3 border-r border-slate-50">
+                                     <div className="flex flex-wrap gap-1">
+                                        {task.responsibleIds?.map(rid => {
+                                           const r = responsibles.find(x => x.id === rid);
+                                           if (!r) return null;
+                                           return <span key={rid} className="text-[9px] font-bold uppercase bg-slate-100 text-slate-600 border border-slate-200 px-1.5 py-0.5 rounded-sm line-clamp-1">{r.name}</span>;
+                                        })}
+                                     </div>
+                                   </td>
+                                    <td className="px-4 py-3 border-r border-slate-50 font-semibold text-slate-600 whitespace-nowrap">
+                                      {formatDate(task.startDate)}
+                                    </td>
+                                    <td className="px-4 py-3 border-r border-slate-50 font-semibold text-slate-600 whitespace-nowrap">
+                                      {formatDate(task.endDate)}
+                                    </td>
+                                    <td className="px-4 py-3 border-r border-slate-50 text-center">
+                                      {normStatus === "Concluída" ? (
+                                        <div className="inline-flex items-center justify-center text-emerald-500" title="Status: Concluída">
+                                          <CheckCircle2 size={16} />
+                                        </div>
+                                      ) : normStatus === "Em andamento" ? (
+                                        <div className="inline-flex items-center justify-center text-blue-500 animate-pulse" title="Status: Em andamento">
+                                          <Clock size={16} />
+                                        </div>
+                                      ) : (
+                                        <div className="inline-flex items-center justify-center text-slate-300" title="Status: Não iniciada">
+                                          <Circle size={16} />
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-3 border-r border-slate-50 text-center">
+                                      {normStatus === "Concluída" ? (
+                                        <div className="inline-flex items-center justify-center text-emerald-500" title="Situação: No Prazo (Concluída)">
+                                          <CheckCircle2 size={16} />
+                                        </div>
+                                      ) : dlStatus === "Atrasada" ? (
+                                        <div className="inline-flex items-center justify-center text-rose-500" title="Situação: Atrasada">
+                                          <AlertCircle size={16} />
+                                        </div>
+                                      ) : dlStatus === "Crítica" ? (
+                                        <div className="inline-flex items-center justify-center text-amber-500" title="Situação: Crítica">
+                                          <AlertTriangle size={16} />
+                                        </div>
+                                      ) : (
+                                        <div className="inline-flex items-center justify-center text-emerald-500" title="Situação: No Prazo">
+                                          <CheckCircle2 size={16} />
+                                        </div>
+                                      )}
+                                    </td>
+                                   <td className="px-4 py-3">
+                                     <div className="space-y-1">
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block flex justify-between">Progresso <span className="text-adasa-mid">{task.progress || 0}%</span></span>
+                                        <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                          <div className={`h-full ${normalizeStatus(task.status) === "Concluída" ? "bg-emerald-500" : "bg-adasa-mid"} transition-all duration-500`} style={{ width: `${task.progress || 0}%` }} />
+                                        </div>
+                                     </div>
+                                   </td>
+                                   <td className="px-4 py-3 text-center">
+                                     <button
+                                       onClick={() => setTimelineTaskId(task.id)}
+                                       className="p-1 px-2 bg-white border border-slate-200 text-slate-600 hover:text-adasa-mid hover:border-adasa-200 rounded-lg transition shadow-sm text-xs font-bold inline-flex items-center justify-center"
+                                       title="Ver Linha do Tempo"
+                                     >
+                                       <Activity size={12} className="text-indigo-600" />
+                                     </button>
+                                   </td>
+                                 </tr>
+                               );
+                           })}
+                         </tbody>
+                       </table>
+                    </div>
+                    </div>
+                  );
+              })()}
               {viewMode === "status" && (() => {
                  const groups = {
                    "Não iniciada": rootTasks.filter(t => normalizeStatus(t.status) === "Não iniciada"),
@@ -3642,17 +5394,23 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                        if (groupRootTasks.length === 0) return null;
                        
                        return (
-                         <div key={status} className="overflow-hidden rounded-xl border border-slate-200/60 flex flex-col bg-white">
-                            <div className="bg-slate-50 border-b border-slate-200/60 px-4 py-3 flex items-center justify-between">
+                         <div key={status} className="overflow-hidden rounded-xl border border-slate-200/60 flex flex-col bg-white transition-all duration-200 shadow-sm">
+                            <div 
+                              onClick={() => toggleGroupContainer("status", status)}
+                              className="bg-slate-50 hover:bg-slate-100/70 border-b border-slate-200/60 px-4 py-3 flex items-center justify-between cursor-pointer select-none transition-colors"
+                            >
                               <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                                 {expandedGroupContainers[`status-${status}`] !== false ? <ChevronDown size={14} className="text-slate-400 stroke-[2.5]" /> : <ChevronRight size={14} className="text-slate-400 stroke-[2.5]" />}
                                  {status === "Concluída" ? <CheckCircle2 size={14} className="text-emerald-500" /> : status === "Em andamento" ? <Activity size={14} className="text-blue-500" /> : <Clock size={14} className="text-slate-400" />}
                                  {status}
                               </h3>
                               <span className="bg-white border border-slate-200 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full">{groupRootTasks.length} grupos estruturais</span>
                             </div>
-                            <div>
-                              {groupRootTasks.filter(t => childMatchesOrIsPath(t.id)).map(t => renderTaskNode(t, 0, false))}
-                            </div>
+                            {expandedGroupContainers[`status-${status}`] !== false && (
+                              <div>
+                                {groupRootTasks.filter(t => childMatchesOrIsPath(t.id)).map(t => renderTaskNode(t, 0, false))}
+                              </div>
+                            )}
                          </div>
                        )
                      })}
@@ -3668,17 +5426,23 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                        if (groupRootTasks.length === 0) return null;
                        
                        return (
-                         <div key={cat.id} className="overflow-hidden rounded-xl border border-slate-200/60 flex flex-col bg-white">
-                            <div className="bg-slate-50 border-b border-slate-200/60 px-4 py-3 flex items-center justify-between">
+                         <div key={cat.id} className="overflow-hidden rounded-xl border border-slate-200/60 flex flex-col bg-white transition-all duration-200 shadow-sm">
+                            <div 
+                              onClick={() => toggleGroupContainer("category", cat.id)}
+                              className="bg-slate-50 hover:bg-slate-100/70 border-b border-slate-200/60 px-4 py-3 flex items-center justify-between cursor-pointer select-none transition-colors"
+                            >
                               <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                                 {expandedGroupContainers[`category-${cat.id}`] !== false ? <ChevronDown size={14} className="text-slate-400 stroke-[2.5]" /> : <ChevronRight size={14} className="text-slate-400 stroke-[2.5]" />}
                                  <Tag size={14} className="text-slate-400" />
                                  {cat.name}
                               </h3>
                               <span className="bg-white border border-slate-200 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full">{groupRootTasks.length} grupos estruturais</span>
                             </div>
-                            <div>
-                              {groupRootTasks.filter(t => childMatchesOrIsPath(t.id)).map(t => renderTaskNode(t, 0, false))}
-                            </div>
+                            {expandedGroupContainers[`category-${cat.id}`] !== false && (
+                              <div>
+                                {groupRootTasks.filter(t => childMatchesOrIsPath(t.id)).map(t => renderTaskNode(t, 0, false))}
+                              </div>
+                            )}
                          </div>
                        )
                      })}
@@ -3694,22 +5458,397 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                        if (groupRootTasks.length === 0) return null;
                        
                        return (
-                         <div key={ar.id} className="overflow-hidden rounded-xl border border-slate-200/60 flex flex-col bg-white">
-                            <div className="bg-slate-50 border-b border-slate-200/60 px-4 py-3 flex items-center justify-between">
+                         <div key={ar.id} className="overflow-hidden rounded-xl border border-slate-200/60 flex flex-col bg-white transition-all duration-200 shadow-sm">
+                            <div 
+                              onClick={() => toggleGroupContainer("area", ar.id)}
+                              className="bg-slate-50 hover:bg-slate-100/70 border-b border-slate-200/60 px-4 py-3 flex items-center justify-between cursor-pointer select-none transition-colors"
+                            >
                               <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                                 {expandedGroupContainers[`area-${ar.id}`] !== false ? <ChevronDown size={14} className="text-slate-400 stroke-[2.5]" /> : <ChevronRight size={14} className="text-slate-400 stroke-[2.5]" />}
                                  <Briefcase size={14} className="text-slate-400" />
                                  {ar.name}
                               </h3>
                               <span className="bg-white border border-slate-200 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full">{groupRootTasks.length} grupos estruturais</span>
                             </div>
-                            <div>
-                              {groupRootTasks.filter(t => childMatchesOrIsPath(t.id)).map(t => renderTaskNode(t, 0, false))}
-                            </div>
+                            {expandedGroupContainers[`area-${ar.id}`] !== false && (
+                              <div>
+                                {groupRootTasks.filter(t => childMatchesOrIsPath(t.id)).map(t => renderTaskNode(t, 0, false))}
+                              </div>
+                            )}
                          </div>
                        )
                      })}
                    </div>
                  );
+              })()}
+              {viewMode === "board" && (() => {
+                  const visibleTasks = enhancedTasks.filter(t => matchesFilters(t));
+                  const groups: Record<string, Task[]> = {};
+
+                  if (boardGroupBy === "status") {
+                    groups["Não iniciada"] = visibleTasks.filter(t => normalizeStatus(t.status) === "Não iniciada");
+                    groups["Em andamento"] = visibleTasks.filter(t => normalizeStatus(t.status) === "Em andamento");
+                    groups["Concluída"] = visibleTasks.filter(t => normalizeStatus(t.status) === "Concluída");
+                  } else {
+                    categories.forEach(cat => {
+                      groups[cat.name] = [];
+                    });
+                    groups["Sem Categoria"] = [];
+
+                    visibleTasks.forEach(task => {
+                      if (task.categoryIds && task.categoryIds.length > 0) {
+                        let assigned = false;
+                        task.categoryIds.forEach(catId => {
+                          const cat = categories.find(c => c.id === catId);
+                          if (cat) {
+                            groups[cat.name].push(task);
+                            assigned = true;
+                          }
+                        });
+                        if (!assigned) {
+                          groups["Sem Categoria"].push(task);
+                        }
+                      } else {
+                        groups["Sem Categoria"].push(task);
+                      }
+                    });
+                  }
+
+                  const isStatusGroup = boardGroupBy === "status";
+                  const wrapperClass = isStatusGroup
+                    ? "grid grid-cols-1 lg:grid-cols-3 gap-6 items-start mt-2 font-sans text-slate-800 w-full"
+                    : "flex flex-col lg:flex-row gap-6 overflow-x-auto pb-4 items-start mt-2 font-sans text-slate-800 w-full pr-2 scrollbar-thin";
+
+                  const colClass = isStatusGroup
+                    ? "bg-slate-50/50 border border-slate-200/60 rounded-2xl p-4 flex flex-col h-[850px] min-w-0"
+                    : "bg-slate-50/50 border border-slate-200/60 rounded-2xl p-4 flex flex-col h-[850px] w-full lg:w-[360px] lg:shrink-0 min-w-0 lg:min-w-[340px]";
+
+                  return (
+                    <div className="flex flex-col w-full font-sans">
+                      {/* Subheader and Group controls for Board */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5">
+                        <div className="flex items-center gap-2">
+                          <LayoutGrid size={18} className="text-adasa-mid" />
+                          <span className="font-extrabold text-xs uppercase tracking-widest text-slate-700">Modo Quadro Kanban</span>
+                        </div>
+                        <div className="flex items-center gap-2 sm:gap-3">
+                          <span className="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Agrupar por:</span>
+                          <div className="flex bg-slate-200/60 p-1 rounded-xl border border-slate-300/40">
+                            <button
+                              onClick={() => setBoardGroupBy("category")}
+                              className={cn(
+                                "px-3.5 py-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
+                                !isStatusGroup
+                                  ? "bg-white text-slate-800 shadow-sm font-extrabold"
+                                  : "text-slate-600 hover:text-slate-800"
+                              )}
+                            >
+                              Categorias
+                            </button>
+                            <button
+                              onClick={() => setBoardGroupBy("status")}
+                              className={cn(
+                                "px-3.5 py-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
+                                isStatusGroup
+                                  ? "bg-white text-slate-800 shadow-sm font-extrabold"
+                                  : "text-slate-600 hover:text-slate-800"
+                              )}
+                            >
+                              Status
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Top horizontal scrollbar bar, only displayed if we have a scrollable board view */}
+                      {!isStatusGroup && boardScrollWidth > 0 && (
+                        <div 
+                          ref={topScrollRef}
+                          onScroll={handleTopScroll}
+                          className="hidden lg:block overflow-x-auto w-full scrollbar-thin bg-slate-50 border border-slate-200/60 p-1.5 rounded-xl mb-3"
+                        >
+                          <div style={{ width: `${boardScrollWidth}px` }} className="h-1 bg-transparent" />
+                        </div>
+                      )}
+
+                      <div ref={contentScrollRef} onScroll={handleContentScroll} className={wrapperClass}>
+                        {Object.entries(groups).map(([colKey, colTasks]) => {
+                          let headerBg = "bg-slate-100 border-slate-200 text-slate-700";
+                          let statusIcon = <Clock size={16} className="text-slate-400" />;
+
+                          if (isStatusGroup) {
+                            if (colKey === "Em andamento") {
+                              headerBg = "bg-blue-50 border-blue-200 text-blue-700";
+                              statusIcon = <Activity size={16} className="text-blue-500" />;
+                            } else if (colKey === "Concluída") {
+                              headerBg = "bg-emerald-50 border-emerald-250 text-emerald-700";
+                              statusIcon = <CheckCircle2 size={16} className="text-emerald-550" />;
+                            }
+                          } else {
+                            if (colKey === "Sem Categoria") {
+                              headerBg = "bg-slate-100 border-slate-200 text-slate-600";
+                              statusIcon = <Tag size={16} className="text-slate-400" />;
+                            } else {
+                              const index = categories.findIndex(c => c.name === colKey);
+                              const colors = [
+                                { bg: "bg-indigo-50 border-indigo-200 text-indigo-700", textToken: "text-indigo-500" },
+                                { bg: "bg-amber-50 border-amber-200 text-amber-700", textToken: "text-amber-500" },
+                                { bg: "bg-rose-50 border-rose-200 text-rose-700", textToken: "text-rose-500" },
+                                { bg: "bg-violet-50 border-violet-200 text-violet-700", textToken: "text-violet-500" },
+                                { bg: "bg-cyan-50 border-cyan-200 text-cyan-700", textToken: "text-cyan-500" },
+                                { bg: "bg-teal-50 border-teal-200 text-teal-700", textToken: "text-teal-500" },
+                                { bg: "bg-fuchsia-50 border-fuchsia-200 text-fuchsia-700", textToken: "text-fuchsia-500" },
+                              ];
+                              const colorPair = colors[index % colors.length] || colors[0];
+                              headerBg = colorPair.bg;
+                              statusIcon = <Tag size={16} className={colorPair.textToken} />;
+                            }
+                          }
+
+                          return (
+                            <div key={colKey} className={colClass}>
+                              {/* Column Header */}
+                              <div className={cn("flex items-center justify-between mb-4 p-3 rounded-xl border font-bold text-xs uppercase tracking-wider shadow-sm", headerBg)}>
+                                <div className="flex items-center gap-2">
+                                  {statusIcon}
+                                  <span className="truncate max-w-[150px]" title={colKey}>{colKey}</span>
+                                </div>
+                                <span className="bg-white px-2 py-0.5 rounded-full text-[10px] font-black border text-slate-500 shadow-xs border-slate-200">
+                                  {colTasks.length}
+                                </span>
+                              </div>
+
+                              {/* Card List scrollable */}
+                              <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-thin">
+                                {colTasks.length === 0 ? (
+                                  <div className="text-center p-8 text-xs font-semibold text-slate-400 border border-dashed border-slate-200 rounded-xl bg-white/40">
+                                    Nenhuma atividade
+                                  </div>
+                                ) : (
+                                  colTasks.map(task => {
+                                    const parentTask = task.parentId ? taskById[task.parentId] : null;
+                                    return (
+                                      <motion.div
+                                        key={task.id}
+                                        whileHover={{ y: -2, scale: 1.01 }}
+                                        className="bg-white border border-slate-200 p-4 rounded-xl shadow-xs hover:shadow-sm transition-all flex flex-col gap-3 group relative cursor-default"
+                                      >
+                                        {/* Top Priority and Title */}
+                                        <div className="flex items-start justify-between gap-1.5">
+                                          <div className="space-y-0.5 min-w-0 w-full">
+                                            <h4 
+                                              onClick={() => handleEditTask(task)}
+                                              className="text-xs font-black text-slate-800 hover:text-indigo-600 transition-colors cursor-pointer tracking-tight leading-tight uppercase truncate"
+                                              title={`Editar: ${task.title}`}
+                                            >
+                                              {task.title}
+                                            </h4>
+                                            
+                                            {/* Status / Priority / Situation Badges */}
+                                            <div className="flex flex-wrap items-center gap-1.5 pt-1.5">
+                                              {task.priority && (
+                                                <span className={cn(
+                                                  "text-[8.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-sm border shadow-xs flex items-center gap-1",
+                                                  task.priority === "Alta" ? "bg-rose-50 text-rose-700 border-rose-250" :
+                                                  task.priority === "Média" ? "bg-amber-50 text-amber-700 border-amber-250" :
+                                                  "bg-slate-50 text-slate-600 border-slate-200"
+                                                )}>
+                                                  <Flag size={9} className={task.priority === "Alta" ? "fill-rose-100" : task.priority === "Média" ? "fill-amber-100" : ""} />
+                                                  {task.priority}
+                                                </span>
+                                              )}
+                                              {(() => {
+                                                const normStatus = normalizeStatus(task.status);
+                                                let statusClasses = "bg-slate-50 text-slate-600 border-slate-200";
+                                                let StatusIcon = Circle;
+                                                if (normStatus === "Concluída") {
+                                                  statusClasses = "bg-emerald-50 text-emerald-700 border-emerald-250";
+                                                  StatusIcon = CheckCircle2;
+                                                } else if (normStatus === "Em andamento") {
+                                                  statusClasses = "bg-blue-50 text-blue-700 border-blue-250";
+                                                  StatusIcon = Clock;
+                                                }
+                                                return (
+                                                  <span className={`text-[8.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-sm border shadow-xs flex items-center gap-1 ${statusClasses}`}>
+                                                    <StatusIcon size={9} />
+                                                    {normStatus}
+                                                  </span>
+                                                );
+                                              })()}
+                                              {(() => {
+                                                if (normalizeStatus(task.status) === "Concluída") return null;
+                                                const dlStatus = getDeadlineStatus(task.endDate, task.status);
+                                                let dlClasses = "bg-slate-50 text-slate-500 border-slate-200";
+                                                let DlIcon = CheckCircle2;
+                                                if (dlStatus === "Atrasada") {
+                                                  dlClasses = "bg-rose-500 text-white border-rose-500 shadow-xs";
+                                                  DlIcon = AlertCircle;
+                                                } else if (dlStatus === "Crítica") {
+                                                  dlClasses = "bg-amber-500 text-white border-amber-500 shadow-xs";
+                                                  DlIcon = AlertTriangle;
+                                                } else {
+                                                  dlClasses = "bg-emerald-50 text-emerald-800 border-emerald-200";
+                                                  DlIcon = CheckCircle2;
+                                                }
+                                                
+                                                return (
+                                                  <span className={`text-[8.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-sm border flex items-center gap-1 ${dlClasses}`}>
+                                                    <DlIcon size={9} />
+                                                    {dlStatus.toUpperCase()}
+                                                  </span>
+                                                );
+                                              })()}
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        {/* Description */}
+                                        {task.description ? (
+                                          <p className="text-[10px] text-slate-500 font-semibold leading-relaxed line-clamp-2">
+                                            {task.description}
+                                          </p>
+                                        ) : (
+                                          <p className="text-[10px] text-slate-350 italic font-semibold">
+                                            S/ descrição definida
+                                          </p>
+                                        )}
+
+                                        {/* Subtasks Progress */}
+                                        {(() => {
+                                          const subTasks = enhancedTasks.filter(t => t.parentId === task.id);
+                                          if (subTasks.length === 0) return null;
+                                          const concluded = subTasks.filter(t => normalizeStatus(t.status) === "Concluída").length;
+                                          return (
+                                            <div className="bg-slate-50 border border-slate-100 px-2 py-1 rounded-lg text-[9px] font-bold text-slate-500 flex items-center justify-between">
+                                              <span className="uppercase tracking-widest text-[8px]">Subtarefas</span>
+                                              <span>{concluded}/{subTasks.length} concluídas</span>
+                                            </div>
+                                          );
+                                        })()}
+
+                                        {/* Progress Bar */}
+                                        <div className="space-y-1">
+                                          <div className="flex items-center justify-between text-[9px] font-black uppercase text-slate-400">
+                                            <span>Progresso</span>
+                                            <span className="text-slate-650 font-extrabold">{task.progress || 0}%</span>
+                                          </div>
+                                          <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                                            <div 
+                                              className={cn(
+                                                "h-full rounded-full transition-all duration-300",
+                                                normalizeStatus(task.status) === "Concluída" ? "bg-emerald-500" : "bg-adasa-mid"
+                                              )} 
+                                              style={{ width: `${task.progress || 0}%` }}
+                                            />
+                                          </div>
+                                        </div>
+
+                                        {/* Dates */}
+                                        {(task.startDate || task.endDate) && (
+                                          <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400">
+                                            <CalendarRange size={12} className="text-slate-350 shrink-0" />
+                                            <span className="truncate">
+                                              {task.startDate ? new Date(task.startDate).toLocaleDateString("pt-BR") : "S/D"}
+                                              {" - "}
+                                              {task.endDate ? new Date(task.endDate).toLocaleDateString("pt-BR") : "S/D"}
+                                            </span>
+                                          </div>
+                                        )}
+
+                                        {/* Tags/Users/Categories and Quick Actions */}
+                                        <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 mt-0.5">
+                                          <div className="flex flex-wrap gap-1 max-w-[65%]">
+                                            {task.categoryIds?.slice(0, 2).map(catId => {
+                                              const cat = categories.find(c => c.id === catId);
+                                              if (!cat) return null;
+                                              return (
+                                                <span key={catId} className="text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200 truncate max-w-[75px]" title={cat.name}>
+                                                  {cat.name}
+                                                </span>
+                                              );
+                                            })}
+                                            {task.areaIds?.slice(0, 2).map(areaId => {
+                                              const area = areas.find(a => a.id === areaId);
+                                              if (!area) return null;
+                                              return (
+                                                <span key={areaId} className="text-[8px] font-extrabold uppercase px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200 truncate max-w-[75px]" title={area.name}>
+                                                  {area.name}
+                                                </span>
+                                              );
+                                            })}
+                                          </div>
+
+                                          <div className="flex items-center gap-1">
+                                            {/* Move Left */}
+                                            {isStatusGroup && normalizeStatus(task.status) !== "Não iniciada" && (
+                                              <button
+                                                onClick={() => {
+                                                  const nextStatus = normalizeStatus(task.status) === "Concluída" ? "Em andamento" : "Não iniciada";
+                                                  handleQuickStatusChange(task, nextStatus);
+                                                }}
+                                                className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                                                title="Mover para Esquerda"
+                                              >
+                                                <ChevronRight size={14} className="rotate-180" />
+                                              </button>
+                                            )}
+
+                                            {/* Edit */}
+                                            <button
+                                              onClick={() => handleEditTask(task)}
+                                              className="p-1 text-slate-400 hover:text-blue-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                                              title="Editar"
+                                            >
+                                              <Edit3 size={12} />
+                                            </button>
+
+                                            {/* Delete */}
+                                            <button
+                                              onClick={() => handleDeleteTask(task.id)}
+                                              className="p-1 text-slate-400 hover:text-rose-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                                              title="Deletar"
+                                            >
+                                              <Trash2 size={12} />
+                                            </button>
+
+                                            {/* Move Right */}
+                                            {isStatusGroup && normalizeStatus(task.status) !== "Concluída" && (
+                                              <button
+                                                onClick={() => {
+                                                  const nextStatus = normalizeStatus(task.status) === "Não iniciada" ? "Em andamento" : "Concluída";
+                                                  handleQuickStatusChange(task, nextStatus);
+                                                }}
+                                                className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                                                title="Mover para Direita"
+                                              >
+                                                <ChevronRight size={14} />
+                                              </button>
+                                            )}
+                                          </div>
+                                        </div>
+
+                                        {/* Parent Task Subtask Indicator */}
+                                        {parentTask && (
+                                          <div className="pt-2 mt-1 border-t border-slate-100 border-dashed">
+                                            <span 
+                                              className="text-[9px] font-black text-indigo-500 uppercase tracking-widest block truncate"
+                                              title={`Subtarefa de: ${parentTask.title}`}
+                                            >
+                                              Subtarefa de: {parentTask.title}
+                                            </span>
+                                          </div>
+                                        )}
+                                      </motion.div>
+                                    );
+                                  })
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
               })()}
               {viewMode === "responsible" && (() => {
                  const resps = [...responsibles, { id: -1, name: "Sem responsável definido", areaIds: [] }];
@@ -3720,17 +5859,23 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                        if (groupRootTasks.length === 0) return null;
                        
                        return (
-                         <div key={resp.id} className="overflow-hidden rounded-xl border border-slate-200/60 flex flex-col bg-white">
-                            <div className="bg-slate-50 border-b border-slate-200/60 px-4 py-3 flex items-center justify-between">
+                         <div key={resp.id} className="overflow-hidden rounded-xl border border-slate-200/60 flex flex-col bg-white transition-all duration-200 shadow-sm">
+                            <div 
+                              onClick={() => toggleGroupContainer("responsible", resp.id)}
+                              className="bg-slate-50 hover:bg-slate-100/70 border-b border-slate-200/60 px-4 py-3 flex items-center justify-between cursor-pointer select-none transition-colors"
+                            >
                               <h3 className="text-xs font-black text-slate-700 uppercase tracking-wider flex items-center gap-2">
+                                 {expandedGroupContainers[`responsible-${resp.id}`] !== false ? <ChevronDown size={14} className="text-slate-400 stroke-[2.5]" /> : <ChevronRight size={14} className="text-slate-400 stroke-[2.5]" />}
                                  <Users size={14} className="text-slate-400" />
                                  {resp.name}
                               </h3>
                               <span className="bg-white border border-slate-200 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full">{groupRootTasks.length} grupos estruturais</span>
                             </div>
-                            <div>
-                              {groupRootTasks.filter(t => childMatchesOrIsPath(t.id)).map(t => renderTaskNode(t, 0, false))}
-                            </div>
+                            {expandedGroupContainers[`responsible-${resp.id}`] !== false && (
+                              <div>
+                                {groupRootTasks.filter(t => childMatchesOrIsPath(t.id)).map(t => renderTaskNode(t, 0, false))}
+                              </div>
+                            )}
                          </div>
                        )
                      })}
@@ -3738,18 +5883,29 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                  );
               })()}
             </div>
-          ) : (
-            <div className="bg-white border border-slate-200/80 rounded-3xl p-6 sm:p-10 pt-10">
-              <div className="mb-8 border-b border-slate-100 pb-4">
-                <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
+
+            {/* Timeline Modal Overlay */}
+            {timelineTaskId !== null && (
+              <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[110] flex flex-col p-4 sm:p-8 md:p-12 items-center justify-center overflow-hidden">
+                <div className="bg-white rounded-[2rem] w-full max-w-5xl h-full max-h-[90vh] shadow-2xl relative flex flex-col text-left">
+                  <div className="flex z-20 justify-between items-center p-6 border-b border-slate-100 shrink-0">
+                    <h3 className="text-xl font-black text-slate-800 tracking-tight">Evolução do Item</h3>
+                    <button onClick={() => setTimelineTaskId(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                      <X size={24} className="text-slate-500 hover:text-slate-800" />
+                    </button>
+                  </div>
+                  <div className="p-6 sm:p-10 overflow-y-auto custom-scrollbar flex-1 relative text-left">
+                    <div className="mb-8 border-b border-slate-100 pb-4">
+                      <h4 className="text-sm font-black text-slate-800 uppercase tracking-widest flex items-center gap-2">
                   <Activity size={16} className="text-adasa-mid" /> 
                   Linha do Tempo: {getTaskDisplayName(taskById[timelineTaskId]) || ""}
                 </h4>
                 <p className="text-[11px] font-semibold text-slate-500 mt-1 mb-4">
-                  Exibindo o ciclo de vida da tarefa selecionada e todas as suas subtarefas dependentes.
+                  Exibindo a hierarquia da tarefa (predecessores e subtarefas dependentes). As estatísticas referem-se à tarefa selecionada e suas filhas.
                 </p>
                 {(() => {
-                  const childrenTasks = timelineTasks.filter(t => t.depth > 0);
+                  const targetIdx = timelineTasks.findIndex(t => t.isTarget);
+                  const childrenTasks = timelineTasks.slice(targetIdx);
                   const total = childrenTasks.length;
                   if (total === 0) return null;
                   
@@ -3776,7 +5932,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                 })()}
               </div>
               <div className="relative border-l-2 border-slate-200/80 ml-4 lg:ml-6 pl-6 lg:pl-10 space-y-12">
-                {timelineTasks.map(({ task, depth }, idx) => (
+                {timelineTasks.map(({ task, depth, isTarget, isAncestor }, idx) => (
                   <div key={task.id} className="relative group z-10">
                     {depth > 0 && (
                       <div 
@@ -3790,15 +5946,44 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                     </div>
                     
                     <div 
-                      className="bg-slate-50 border border-slate-200/70 p-5 rounded-2xl hover:border-adasa-mid/60 hover:shadow-md transition-all cursor-pointer group-hover:-translate-y-0.5" 
+                      className={cn("border p-5 rounded-2xl hover:shadow-md transition-all cursor-pointer group-hover:-translate-y-0.5", isTarget ? "bg-indigo-50/50 border-indigo-300 shadow-md ring-2 ring-indigo-500/20" : isAncestor ? "bg-slate-50/50 border-slate-200 opacity-80 hover:opacity-100" : "bg-white border-slate-200/70 hover:border-adasa-mid/60")} 
                       onClick={() => handleEditTask(task)}
                       style={{ marginLeft: `${depth > 0 ? Math.min(depth * 1.5, 6) : 0}rem` }}
                     >
                       <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-4 mb-4">
                         <div className="space-y-1.5">
                           <div className="flex flex-wrap items-center gap-2">
+                            {isTarget && <span className="text-[10px] font-black tracking-widest uppercase text-white bg-indigo-500 px-2.5 py-0.5 rounded-md flex items-center gap-1 shadow-sm"><Activity size={10} className="text-indigo-100" /> Selecionada</span>}
                             <span className="text-[10px] font-black tracking-widest uppercase text-slate-400 bg-slate-200/50 px-2 py-0.5 rounded-md">ID: {task.id}</span>
                             <span className={`text-[9px] font-bold uppercase py-0.5 px-2 rounded-md border ${getPriorityBadgeClass(task.priority)}`}>{task.priority}</span>
+
+                            {(() => {
+                              const normStatus = normalizeStatus(task.status);
+                              let statusClasses = "bg-slate-100 text-slate-600 border-slate-200";
+                              if (normStatus === "Concluída") statusClasses = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                              else if (normStatus === "Em andamento") statusClasses = "bg-blue-50 text-blue-700 border-blue-200";
+
+                              return (
+                                <span className={`text-[9px] font-black uppercase py-0.5 px-2 rounded-md border ${statusClasses}`}>
+                                  {normStatus}
+                                </span>
+                              );
+                            })()}
+
+                            {(() => {
+                              if (normalizeStatus(task.status) === "Concluída") return null;
+                              const dlStatus = getDeadlineStatus(task.endDate, task.status);
+                              let dlClasses = "bg-slate-550 text-slate-500 border-slate-200";
+                              if (dlStatus === "Atrasada") dlClasses = "bg-rose-500 text-white border-rose-500 font-extrabold shadow-xs";
+                              else if (dlStatus === "Crítica") dlClasses = "bg-amber-500 text-white border-amber-500 font-extrabold shadow-xs";
+                              else dlClasses = "bg-emerald-50 text-emerald-800 border-emerald-200 font-semibold";
+
+                              return (
+                                <span className={`text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-md border ${dlClasses}`}>
+                                  {dlStatus}
+                                </span>
+                              );
+                            })()}
                             {task.parentId && (
                               <span className="text-[10px] font-black tracking-widest uppercase text-indigo-500 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md flex items-center gap-1"><GitCommit size={10} /> Subatividade</span>
                             )}
@@ -3883,7 +6068,9 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                 )}
               </div>
             </div>
-          )}
+          </div>
+        </div>
+      )}
         </div>
       </div>
 
@@ -3921,6 +6108,19 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                     placeholder="Ex: Ampliação de Captação SAA Descoberto"
                     className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-700 focus:border-adasa-mid outline-none transition-all placeholder:text-slate-400 bg-slate-50/10 focus:bg-white"
                   />
+                </div>
+
+                {/* Form Author */}
+                <div className="space-y-1">
+                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                     <User size={12} className="text-slate-400" /> Autor da Modificação
+                   </label>
+                   <input
+                     type="text"
+                     disabled
+                     value={editingTask.updatedBy || currentUser?.name || "Administrador"}
+                     className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-500 bg-slate-100 cursor-not-allowed outline-none"
+                   />
                 </div>
 
                 {/* Tarefa Pai */}
@@ -4291,7 +6491,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
 
   // Recursive Tree Node Renderer
   function renderTaskNode(task: Task, depth: number, forceFlat: boolean = false) {
-    const isExpanded = !!expandedTasks[task.id];
+    const isExpanded = isAnyFilterActive ? (expandedTasks[task.id] !== false) : !!expandedTasks[task.id];
     const taskChildren = forceFlat ? [] : (childrenMap[task.id] || []);
     const hasSubs = taskChildren.length > 0;
     const visibleChildren = taskChildren.filter(c => childMatchesOrIsPath(c.id));
@@ -4308,7 +6508,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
         {/* Node Layout block */}
         <div 
           className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 transition-all gap-3 hover:bg-slate-50/50"
-          style={{ paddingLeft: `${forceFlat ? 16 : Math.max(16, depth * 24)}px` }}
+          style={{ paddingLeft: `${forceFlat ? 16 : 16 + depth * 48}px` }}
         >
           {/* Column Left: Collapse Indicator + Icon + Title */}
           <div className="flex items-start gap-2.5 flex-1 min-w-0">
@@ -4345,21 +6545,69 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                     {getTaskDisplayName(task)}
                   </span>
 
-                  {task.priority && (
-                    <span className={`text-[9px] font-bold uppercase py-0.5 px-2 rounded-md border ${getPriorityBadgeClass(task.priority)}`}>
-                      {task.priority}
-                    </span>
-                  )}
-                  
                   {hasSubs && (
                     <span 
-                      className="text-xs font-bold px-2 py-0.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded flex items-center gap-1 hover:bg-indigo-100 transition-colors cursor-pointer"
+                      className="text-[10px] font-bold px-1.5 py-0.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded flex items-center gap-1 hover:bg-indigo-100 transition-colors cursor-pointer"
                       title="Totais de Subtarefas"
-                      onClick={() => handleEditTask(task)}
+                      onClick={(e) => {
+                         e.stopPropagation();
+                         toggleExpand(task.id);
+                      }}
                     >
                       Subtarefas ({taskChildren.length})
                     </span>
                   )}
+
+                  {task.priority && (
+                    <span className={`text-[9px] font-bold uppercase py-0.5 px-2 rounded-md border flex items-center gap-1 ${getPriorityBadgeClass(task.priority)}`}>
+                      <Flag size={10} className={task.priority === "Alta" ? "fill-rose-100" : task.priority === "Média" ? "fill-amber-100" : ""} />
+                      {task.priority}
+                    </span>
+                  )}
+
+                  {(() => {
+                    const normStatus = normalizeStatus(task.status);
+                    let statusClasses = "bg-slate-100 text-slate-600 border-slate-200";
+                    let StatusIcon = Circle;
+                    if (normStatus === "Concluída") {
+                      statusClasses = "bg-emerald-50 text-emerald-700 border-emerald-200";
+                      StatusIcon = CheckCircle2;
+                    } else if (normStatus === "Em andamento") {
+                      statusClasses = "bg-blue-50 text-blue-700 border-blue-200";
+                      StatusIcon = Clock;
+                    }
+
+                    return (
+                      <span className={`text-[9px] font-black uppercase py-0.5 px-2 rounded-md border flex items-center gap-1 ${statusClasses}`}>
+                        <StatusIcon size={10} />
+                        {normStatus}
+                      </span>
+                    );
+                  })()}
+
+                  {(() => {
+                    if (normalizeStatus(task.status) === "Concluída") return null;
+                    const dlStatus = getDeadlineStatus(task.endDate, task.status);
+                    let dlClasses = "bg-slate-550 text-slate-500 border-slate-200";
+                    let DlIcon = CheckCircle2;
+                    if (dlStatus === "Atrasada") {
+                      dlClasses = "bg-rose-500 text-white border-rose-500 font-extrabold shadow-xs";
+                      DlIcon = AlertCircle;
+                    } else if (dlStatus === "Crítica") {
+                      dlClasses = "bg-amber-500 text-white border-amber-500 font-extrabold shadow-xs";
+                      DlIcon = AlertTriangle;
+                    } else {
+                      dlClasses = "bg-emerald-50 text-emerald-800 border-emerald-200 font-semibold";
+                      DlIcon = CheckCircle2;
+                    }
+
+                    return (
+                      <span className={`text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-md border flex items-center gap-1 ${dlClasses}`}>
+                        <DlIcon size={10} />
+                        {dlStatus}
+                      </span>
+                    );
+                  })()}
                 </div>
 
                 {/* Subtitle / Notes */}
@@ -4395,6 +6643,12 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                     <span className="flex items-center gap-1 text-[9px] font-bold uppercase text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-md" title={`Depende de: ${getTaskDisplayName(taskById[task.dependsOnTaskId])}`}>
                       <Link2 size={10} />
                       <span className="truncate max-w-[150px]">Depende de: {getTaskDisplayName(taskById[task.dependsOnTaskId])}</span>
+                    </span>
+                  )}
+                  {task.updatedAt && (
+                    <span className="flex items-center gap-1 text-[9px] font-bold uppercase text-slate-400 bg-white border border-slate-200 px-2 py-0.5 rounded-md" title={`Última atualização: ${formatDateTime(task.updatedAt)} por ${task.updatedBy || 'Sistema'}`}>
+                      <Clock size={10} className="text-slate-400" />
+                      <span className="truncate max-w-[150px]">{formatDateTime(task.updatedAt)} • {task.updatedBy || 'Sistema'}</span>
                     </span>
                   )}
                 </div>

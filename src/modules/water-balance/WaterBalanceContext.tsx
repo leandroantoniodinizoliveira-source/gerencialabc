@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
-import { WaterBalance, System, Region, Demand, SupplySource, OperationalAdjustment } from "../../../types";
+import { WaterBalance, System, Region, Demand, SupplySource, OperationalAdjustment } from "../../types";
 
 interface WaterBalanceState {
   waterBalances: WaterBalance[];

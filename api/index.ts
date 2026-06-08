@@ -892,6 +892,22 @@ app.get("/api/load-data", async (req, res) => {
         ALTER TABLE tasks ADD CONSTRAINT tasks_parent_id_fkey FOREIGN KEY (parent_id) REFERENCES tasks(id) ON DELETE CASCADE;
       `);
 
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS task_areas (
+          task_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
+          area_id INTEGER REFERENCES areas(id) ON DELETE CASCADE,
+          PRIMARY KEY (task_id, area_id)
+        );
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS task_responsibles (
+          task_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
+          responsible_id INTEGER REFERENCES responsibles(id) ON DELETE CASCADE,
+          PRIMARY KEY (task_id, responsible_id)
+        );
+      `);
+
       // Garantir ON DELETE CASCADE para 'task_areas(task_id)'
       await client.query(`
         DO $$
@@ -938,22 +954,6 @@ app.get("/api/load-data", async (req, res) => {
       `);
       await client.query(`
         ALTER TABLE task_responsibles ADD CONSTRAINT task_responsibles_task_id_fkey FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE;
-      `);
-
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS task_areas (
-          task_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
-          area_id INTEGER REFERENCES areas(id) ON DELETE CASCADE,
-          PRIMARY KEY (task_id, area_id)
-        );
-      `);
-
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS task_responsibles (
-          task_id INTEGER REFERENCES tasks(id) ON DELETE CASCADE,
-          responsible_id INTEGER REFERENCES responsibles(id) ON DELETE CASCADE,
-          PRIMARY KEY (task_id, responsible_id)
-        );
       `);
 
       await client.query("CREATE INDEX IF NOT EXISTS idx_tasks_parent_id ON tasks(parent_id);");
@@ -2506,10 +2506,10 @@ app.delete("/api/responsibles/:id", async (req, res) => {
   }
 });
 
-// Auto-exclusão imediata das tarefas se ainda não foi executado
-(async () => {
-  const markerPath = path.join(process.cwd(), "tasks_cleared_marker.txt");
-  if (!fs.existsSync(markerPath)) {
+  // Auto-exclusão imediata das tarefas se ainda não foi executado
+  (async () => {
+    const markerPath = process.env.VERCEL ? "/tmp/tasks_cleared_marker.txt" : path.join(process.cwd(), "tasks_cleared_marker.txt");
+    if (!fs.existsSync(markerPath)) {
     console.log("[LOG] Executando exclusão imediata de todas as tarefas de tasks...");
     try {
       const pool = getDbPool();

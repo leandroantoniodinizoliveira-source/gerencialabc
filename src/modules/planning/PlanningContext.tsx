@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, ReactNode } from "react";
-import { Task, Plan, Area, Category, Responsible } from "../../../types";
+import { Task, Plan, Area, Category, Responsible } from "../../types";
 
 // 1. Definição do Estado do Módulo
 interface PlanningState {
