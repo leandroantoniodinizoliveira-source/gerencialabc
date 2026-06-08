@@ -1,24 +1,44 @@
-import "dotenv/config";
-import express from "express";
-import path from "path";
-import fs from "fs";
-import { createServer as createViteServer } from "vite";
-import { Pool } from "pg";
+var __create = Object.create;
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __getProtoOf = Object.getPrototypeOf;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toESM = (mod, isNodeMode, target) => (target = mod != null ? __create(__getProtoOf(mod)) : {}, __copyProps(
+  // If the importer is in node compatibility mode or this is not an ESM
+  // file that has been converted to a CommonJS file using a Babel-
+  // compatible transform (i.e. "__esModule" has not been set), then set
+  // "default" to the CommonJS "module.exports" for node compatibility.
+  isNodeMode || !mod || !mod.__esModule ? __defProp(target, "default", { value: mod, enumerable: true }) : target,
+  mod
+));
 
-let dbPool: Pool | null = null;
-
-function parseSafeInt(val: any): number | null {
-  if (val === undefined || val === null || val === "") return null;
+// server.ts
+var import_config = require("dotenv/config");
+var import_express = __toESM(require("express"), 1);
+var import_path = __toESM(require("path"), 1);
+var import_fs = __toESM(require("fs"), 1);
+var import_vite = require("vite");
+var import_pg = require("pg");
+var dbPool = null;
+function parseSafeInt(val) {
+  if (val === void 0 || val === null || val === "") return null;
   if (typeof val === "number") {
     return isNaN(val) ? null : Math.floor(val);
   }
   const str = String(val).trim();
-  // Try parsing directly if it is already numeric
   const directParsed = parseInt(str, 10);
   if (!isNaN(directParsed) && /^-?\d+$/.test(str)) {
     return directParsed;
   }
-  // Try extracting the first contiguous match of digits from the string (e.g., "wb-2026" -> 2026)
   const match = str.match(/-?\d+/);
   if (match) {
     const parsed = parseInt(match[0], 10);
@@ -26,9 +46,8 @@ function parseSafeInt(val: any): number | null {
   }
   return null;
 }
-
-function parseSafeFloat(val: any): number {
-  if (val === undefined || val === null || val === "") return 0;
+function parseSafeFloat(val) {
+  if (val === void 0 || val === null || val === "") return 0;
   if (typeof val === "number") {
     return isNaN(val) ? 0 : val;
   }
@@ -36,9 +55,8 @@ function parseSafeFloat(val: any): number {
   const parsed = parseFloat(str);
   return isNaN(parsed) ? 0 : parsed;
 }
-
-function parseSafeFloatOrNull(val: any): number | null {
-  if (val === undefined || val === null || val === "") return null;
+function parseSafeFloatOrNull(val) {
+  if (val === void 0 || val === null || val === "") return null;
   if (typeof val === "number") {
     return isNaN(val) ? null : val;
   }
@@ -46,56 +64,43 @@ function parseSafeFloatOrNull(val: any): number | null {
   const parsed = parseFloat(str);
   return isNaN(parsed) ? null : parsed;
 }
-
-function getDbPool(): Pool {
+function getDbPool() {
   if (!dbPool) {
     const connectionString = process.env.DATABASE_URL;
     if (!connectionString) {
-      throw new Error("A variável DATABASE_URL (Neon PostgreSQL) está ausente no ambiente.");
+      throw new Error("A vari\xE1vel DATABASE_URL (Neon PostgreSQL) est\xE1 ausente no ambiente.");
     }
-    // Remove o parâmetro "channel_binding=require" se existir, pois o Node.js pg
-    // node-postgres pode ter problemas de compatibilidade com ele em algumas versões,
-    // embora no Vercel (PgBouncer) e Neon às vezes seja necessário, no Node 
-    // com ssl: { rejectUnauthorized: false } já é suficiente.
-    const cleanConnectionString = connectionString.replace(/&?channel_binding=require/g, "");
-    
-    dbPool = new Pool({
-      connectionString: cleanConnectionString,
+    dbPool = new import_pg.Pool({
+      connectionString,
       // O banco de dados Neon exige conexões seguras por SSL
       ssl: { rejectUnauthorized: false }
     });
   }
   return dbPool;
 }
-
-async function rollUpTask(client: any, parentId: number | null) {
+async function rollUpTask(client, parentId) {
   if (!parentId) return;
-
   const res = await client.query(
     "SELECT start_date, end_date, progress FROM pl_tasks WHERE parent_id = $1",
     [parentId]
   );
-  
   if (res.rows.length === 0) {
     await client.query(
       `UPDATE pl_tasks 
-       SET progress = 0, status = 'Não iniciada', start_date = NULL, end_date = NULL
+       SET progress = 0, status = 'N\xE3o iniciada', start_date = NULL, end_date = NULL
        WHERE id = $1`,
       [parentId]
     );
-
-    const parentRes = await client.query("SELECT parent_id FROM pl_tasks WHERE id = $1", [parentId]);
-    if (parentRes.rows.length > 0 && parentRes.rows[0].parent_id) {
-      await rollUpTask(client, parentRes.rows[0].parent_id);
+    const parentRes2 = await client.query("SELECT parent_id FROM pl_tasks WHERE id = $1", [parentId]);
+    if (parentRes2.rows.length > 0 && parentRes2.rows[0].parent_id) {
+      await rollUpTask(client, parentRes2.rows[0].parent_id);
     }
     return;
   }
-
-  let minStart: Date | null = null;
-  let maxEnd: Date | null = null;
+  let minStart = null;
+  let maxEnd = null;
   let totalProgress = 0;
   let validChildrenCount = 0;
-
   for (const row of res.rows) {
     if (row.start_date) {
       const d = new Date(row.start_date);
@@ -108,65 +113,52 @@ async function rollUpTask(client: any, parentId: number | null) {
     totalProgress += Number(row.progress) || 0;
     validChildrenCount++;
   }
-
   const avgProgress = validChildrenCount > 0 ? Math.round(totalProgress / validChildrenCount) : 0;
-  
-  let status = "Não iniciada";
+  let status = "N\xE3o iniciada";
   if (avgProgress === 100) {
-    status = "Concluída";
+    status = "Conclu\xEDda";
   } else if (avgProgress > 0) {
     status = "Em andamento";
   }
-
   await client.query(
     `UPDATE pl_tasks 
      SET start_date = $1, end_date = $2, progress = $3, status = $4
      WHERE id = $5`,
     [minStart, maxEnd, avgProgress, status, parentId]
   );
-
   const parentRes = await client.query("SELECT parent_id FROM pl_tasks WHERE id = $1", [parentId]);
   if (parentRes.rows.length > 0 && parentRes.rows[0].parent_id) {
     await rollUpTask(client, parentRes.rows[0].parent_id);
   }
 }
-
-async function cascadeAreasAndCategories(client: any, parentTaskId: number, areaIds: number[], categoryIds: number[]) {
+async function cascadeAreasAndCategories(client, parentTaskId, areaIds, categoryIds) {
   const childrenRes = await client.query("SELECT id FROM pl_tasks WHERE parent_id = $1", [parentTaskId]);
   for (const row of childrenRes.rows) {
     const childId = row.id;
-    
-    // update child areaIds
     await client.query("DELETE FROM pl_task_areas WHERE task_id = $1", [childId]);
     if (areaIds && areaIds.length > 0) {
       for (const aid of areaIds) {
         await client.query("INSERT INTO pl_task_areas (task_id, area_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [childId, aid]);
       }
     }
-    
-    // update child categoryIds
     await client.query("DELETE FROM pl_task_categories WHERE task_id = $1", [childId]);
     if (categoryIds && categoryIds.length > 0) {
       for (const cid of categoryIds) {
         await client.query("INSERT INTO pl_task_categories (task_id, category_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [childId, cid]);
       }
     }
-
-    // recursive call
     await cascadeAreasAndCategories(client, childId, areaIds, categoryIds);
   }
 }
-
-function splitCsvLine(line: string): string[] {
-  const result: string[] = [];
+function splitCsvLine(line) {
+  const result = [];
   let inQuotes = false;
   let currentWord = "";
-  
   for (let i = 0; i < line.length; i++) {
     const char = line[i];
     if (char === '"') {
       inQuotes = !inQuotes;
-    } else if (char === ';' && !inQuotes) {
+    } else if (char === ";" && !inQuotes) {
       result.push(currentWord.trim());
       currentWord = "";
     } else {
@@ -176,8 +168,7 @@ function splitCsvLine(line: string): string[] {
   result.push(currentWord.trim());
   return result;
 }
-
-async function seedTasks(client: any) {
+async function seedTasks(client) {
   const checkTable = await client.query(`
     SELECT EXISTS (
       SELECT FROM information_schema.tables 
@@ -187,46 +178,39 @@ async function seedTasks(client: any) {
   if (!checkTable.rows[0].exists) {
     return;
   }
-
-  const markerPath = process.env.VERCEL ? "/tmp/tasks_cleared_marker.txt" : path.join("/tmp", "tasks_cleared_marker.txt");
-  if (fs.existsSync(markerPath)) {
+  const markerPath = process.env.VERCEL ? "/tmp/tasks_cleared_marker.txt" : import_path.default.join("/tmp", "tasks_cleared_marker.txt");
+  if (import_fs.default.existsSync(markerPath)) {
     console.log("[LOG] seedTasks: pulando semeadura porque o arquivo tasks_cleared_marker.txt existe.");
     return;
   }
-
   const result = await client.query("SELECT COUNT(*) FROM pl_tasks");
   if (parseInt(result.rows[0].count, 10) > 0) {
     return;
   }
-
-  const rawPath = path.join(process.cwd(), "src", "tasks_raw.txt");
-  if (!fs.existsSync(rawPath)) {
+  const rawPath = import_path.default.join(process.cwd(), "src", "tasks_raw.txt");
+  if (!import_fs.default.existsSync(rawPath)) {
     console.log("No seed file tasks_raw.txt found");
     return;
   }
-
-  // Load plans
   let plan2025Id = null;
   let plan2026Id = null;
   try {
     const plansInfo = await client.query("SELECT id, name FROM pl_plans");
-    plansInfo.rows.forEach((p: any) => {
+    plansInfo.rows.forEach((p) => {
       if (p.name.includes("2025")) plan2025Id = p.id;
       if (p.name.includes("2026")) plan2026Id = p.id;
     });
   } catch (err) {
     console.error("Error fetching plans for seeding:", err);
   }
-
-  // Load categories and their associated areas
-  const categoryMap = new Map();
+  const categoryMap = /* @__PURE__ */ new Map();
   try {
     const catsAndAreas = await client.query(`
       SELECT c.id AS cat_id, c.name AS cat_name, ca.area_id
       FROM pl_categories c
       LEFT JOIN pl_category_areas ca ON c.id = ca.category_id
     `);
-    catsAndAreas.rows.forEach((row: any) => {
+    catsAndAreas.rows.forEach((row) => {
       const nameKey = row.cat_name.trim().toLowerCase();
       if (!categoryMap.has(nameKey)) {
         categoryMap.set(nameKey, { id: row.cat_id, name: row.cat_name, areaIds: [] });
@@ -238,26 +222,22 @@ async function seedTasks(client: any) {
   } catch (err) {
     console.error("Error fetching categories for seeding:", err);
   }
-
-  // Load responsibles
-  let regId = null; // Equipe Técnica de Regulação
-  let fiscId = null; // Superintendência de Fiscalização
-  let qualId = null; // Núcleo de Qualidade do Atendimento
-  let saneId = null; // Superintendência de Saneamento
-
+  let regId = null;
+  let fiscId = null;
+  let qualId = null;
+  let saneId = null;
   try {
     const resps = await client.query("SELECT id, name FROM pl_responsibles");
-    resps.rows.forEach((r: any) => {
-      if (r.name.includes("Regulação")) regId = r.id;
-      else if (r.name.includes("Fiscalização")) fiscId = r.id;
+    resps.rows.forEach((r) => {
+      if (r.name.includes("Regula\xE7\xE3o")) regId = r.id;
+      else if (r.name.includes("Fiscaliza\xE7\xE3o")) fiscId = r.id;
       else if (r.name.includes("Qualidade")) qualId = r.id;
       else if (r.name.includes("Saneamento")) saneId = r.id;
     });
   } catch (err) {
     console.error("Error loading responsibles for seeding:", err);
   }
-
-  const associateTaskRelations = async (taskId: number, matchedCat: any, matchedRespId: any) => {
+  const associateTaskRelations = async (taskId, matchedCat, matchedRespId) => {
     if (matchedCat) {
       await client.query("INSERT INTO pl_task_categories (task_id, category_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [taskId, matchedCat.id]);
       if (matchedCat.areaIds && matchedCat.areaIds.length > 0) {
@@ -270,61 +250,49 @@ async function seedTasks(client: any) {
       await client.query("INSERT INTO pl_task_responsibles (task_id, responsible_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [taskId, matchedRespId]);
     }
   };
-
-  const content = fs.readFileSync(rawPath, "utf8");
+  const content = import_fs.default.readFileSync(rawPath, "utf8");
   const lines = content.split("\n");
   let headerSeen = false;
-  
   for (const line of lines) {
     const trimmed = line.trim();
     if (!trimmed) continue;
-    
-    if (trimmed.startsWith("﻿ID do Usuário") || trimmed.startsWith("ID do Usuário")) {
+    if (trimmed.startsWith("\uFEFFID do Usu\xE1rio") || trimmed.startsWith("ID do Usu\xE1rio")) {
       continue;
     }
     if (trimmed.startsWith("0724fb5c") || trimmed.startsWith("fda950ef") || trimmed.startsWith("2ae3f3ed") || trimmed.startsWith("cf342551") || trimmed.startsWith("f481186f") || trimmed.startsWith("ec42f598") || trimmed.startsWith("cbb3f9ba") || trimmed.startsWith("b4475902") || trimmed.startsWith("ff74bee7")) {
       continue;
     }
-
-    if (trimmed.startsWith("﻿Identificação da tarefa") || trimmed.startsWith("Identificação da tarefa")) {
+    if (trimmed.startsWith("\uFEFFIdentifica\xE7\xE3o da tarefa") || trimmed.startsWith("Identifica\xE7\xE3o da tarefa")) {
       headerSeen = true;
       continue;
     }
-
     if (!headerSeen) continue;
-
     const parts = splitCsvLine(trimmed);
     if (parts.length < 5) continue;
-
     const title = parts[1] || "";
     const categoryName = parts[3] || "";
-    let statusText = parts[4] || "Não iniciado";
-    const priority = parts[5] || "Média";
+    let statusText = parts[4] || "N\xE3o iniciado";
+    const priority = parts[5] || "M\xE9dia";
     let assigned_to = parts[6] || "";
     const created_by = parts[7] || "";
     const end_date_str = parts[9] || null;
     const start_date_str = parts[10] || null;
     const checklist_itens_str = parts[16] || "";
     const notes = parts[18] || "";
-
     let status = "pending";
-    if (statusText === "Concluída" || statusText === "Concluído") {
+    if (statusText === "Conclu\xEDda" || statusText === "Conclu\xEDdo") {
       status = "completed";
     } else if (statusText === "Em andamento") {
       status = "in_progress";
     }
-
     let start_date = start_date_str ? new Date(start_date_str) : null;
     let end_date = end_date_str ? new Date(end_date_str) : null;
     if (start_date && isNaN(start_date.getTime())) start_date = null;
     if (end_date && isNaN(end_date.getTime())) end_date = null;
-
     if (assigned_to.startsWith('"') && assigned_to.endsWith('"')) {
       assigned_to = assigned_to.substring(1, assigned_to.length - 1);
     }
     assigned_to = assigned_to.replace(/;/g, ", ").trim();
-
-    // Determine plan_id based on year
     let plan_id = null;
     let year = null;
     if (start_date) {
@@ -332,7 +300,6 @@ async function seedTasks(client: any) {
     } else if (end_date) {
       year = end_date.getUTCFullYear();
     }
-    
     if (year === 2025 && plan2025Id) {
       plan_id = plan2025Id;
     } else if (year === 2026 && plan2026Id) {
@@ -340,8 +307,6 @@ async function seedTasks(client: any) {
     } else {
       plan_id = plan2026Id || plan2025Id || null;
     }
-
-    // Match category
     const catClean = categoryName.trim().toLowerCase();
     let matchedCat = null;
     if (categoryMap.has(catClean)) {
@@ -354,8 +319,6 @@ async function seedTasks(client: any) {
         }
       }
     }
-
-    // Determine responsible_id
     let matchedRespId = saneId;
     if (matchedCat && matchedCat.areaIds && matchedCat.areaIds.length > 0) {
       const firstAreaId = matchedCat.areaIds[0];
@@ -363,7 +326,6 @@ async function seedTasks(client: any) {
       else if (firstAreaId === 2 && fiscId) matchedRespId = fiscId;
       else if (firstAreaId === 3 && qualId) matchedRespId = qualId;
     }
-
     const insertRes = await client.query(
       `INSERT INTO pl_tasks (title, description, start_date, end_date, status, progress, priority, category, assigned_to, created_by, notes, plan_id)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
@@ -383,10 +345,8 @@ async function seedTasks(client: any) {
         plan_id
       ]
     );
-
     const parentId = insertRes.rows[0].id;
     await associateTaskRelations(parentId, matchedCat, matchedRespId);
-
     if (checklist_itens_str) {
       let checklist_clean = checklist_itens_str;
       if (checklist_clean.startsWith('"') && checklist_clean.endsWith('"')) {
@@ -396,7 +356,6 @@ async function seedTasks(client: any) {
       for (const item of checklist_items) {
         const title_sub = item.trim();
         if (!title_sub) continue;
-
         const subRes = await client.query(
           `INSERT INTO pl_tasks (title, description, start_date, end_date, status, progress, parent_id, priority, category, assigned_to, plan_id)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
@@ -422,7 +381,6 @@ async function seedTasks(client: any) {
     }
   }
 }
-
 async function runStartupMigration() {
   console.log("Migrating database schema: Creating tables safely if they do not exist...");
   try {
@@ -430,7 +388,6 @@ async function runStartupMigration() {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-
       await client.query(`
         CREATE TABLE IF NOT EXISTS wb_water_balances (
           id SERIAL PRIMARY KEY,
@@ -442,7 +399,6 @@ async function runStartupMigration() {
           status VARCHAR(50) NOT NULL
         );
       `);
-
       await client.query(`
         CREATE TABLE IF NOT EXISTS wb_systems (
           id SERIAL PRIMARY KEY,
@@ -451,7 +407,6 @@ async function runStartupMigration() {
           water_balance_id INTEGER REFERENCES wb_water_balances(id) ON DELETE CASCADE
         );
       `);
-
       await client.query(`
         CREATE TABLE IF NOT EXISTS wb_regions (
           id SERIAL PRIMARY KEY,
@@ -462,7 +417,6 @@ async function runStartupMigration() {
           water_balance_id INTEGER REFERENCES wb_water_balances(id) ON DELETE CASCADE
         );
       `);
-
       await client.query(`
         CREATE TABLE IF NOT EXISTS wb_demands (
           id SERIAL PRIMARY KEY,
@@ -475,7 +429,6 @@ async function runStartupMigration() {
           water_balance_id INTEGER REFERENCES wb_water_balances(id) ON DELETE CASCADE
         );
       `);
-
       await client.query(`
         CREATE TABLE IF NOT EXISTS wb_demand_entries (
           id SERIAL PRIMARY KEY,
@@ -488,7 +441,6 @@ async function runStartupMigration() {
           losses NUMERIC NOT NULL
         );
       `);
-
       await client.query(`
         CREATE TABLE IF NOT EXISTS wb_supply_sources (
           id SERIAL PRIMARY KEY,
@@ -503,7 +455,6 @@ async function runStartupMigration() {
           water_balance_id INTEGER REFERENCES wb_water_balances(id) ON DELETE CASCADE
         );
       `);
-
       await client.query(`
         CREATE TABLE IF NOT EXISTS wb_operational_adjustments (
           id SERIAL PRIMARY KEY,
@@ -517,7 +468,6 @@ async function runStartupMigration() {
           linked_adjustment_id INTEGER REFERENCES wb_operational_adjustments(id) ON DELETE SET NULL
         );
       `);
-
       await client.query(`
         CREATE TABLE IF NOT EXISTS wb_template_files (
           id SERIAL PRIMARY KEY,
@@ -526,7 +476,6 @@ async function runStartupMigration() {
           url TEXT
         );
       `);
-
       await client.query(`
         CREATE TABLE IF NOT EXISTS wb_water_balance_maps (
           id SERIAL PRIMARY KEY,
@@ -534,7 +483,6 @@ async function runStartupMigration() {
           geojson_data JSONB
         );
       `);
-
       await client.query(`
         CREATE TABLE IF NOT EXISTS wb_risk_references (
           id SERIAL PRIMARY KEY,
@@ -543,17 +491,15 @@ async function runStartupMigration() {
           justification TEXT NOT NULL
         );
       `);
-
       const riskCountRes = await client.query("SELECT COUNT(*) FROM wb_risk_references");
       if (parseInt(riskCountRes.rows[0].count, 10) === 0) {
         await client.query(`
           INSERT INTO wb_risk_references (iad, risk_classification, justification) VALUES
-          ('< 120%', 'Risco Alto (Crítico)', '**Inadequação Normativa e Insegurança de Pico.** O critério internacional de estresse severo (WEI+ da Agência Europeia do Ambiente) define insustentabilidade a longo prazo quando a demanda sufoca a oferta renovável. Urbanamente, o coeficiente de variação de consumo diário (K1) é fixado internacionalmente e na ABNT NBR 12218 como 1,2. Uma relação abaixo de 1,2 indica que o sistema não suportará o dia de maior consumo do ano, resultando em desabastecimento imediato de bairros e falha hidráulica.'),
-          ('120% a 130%', 'Risco Médio (Alerta)', '**Perda da Margem de Contingência Operacional.** Nesta faixa, a oferta atende estritamente à demanda no dia de pico urbano (K1 = 1,2), mas a "sobra" física do sistema cai para menos de 10%. Manuais de operação de saneamento e relatórios de risco hídrico apontam que trabalhar com menos de 10% de folga impede paradas para manutenções emergenciais (como queima de bombas) e desprotege a rede contra picos severos de perdas físicas por vazamentos na distribuição.'),
-          ('> 130%', 'Risco Baixo (Adequado)', '**Resiliência e Segurança Hídrica Plena.** Garante o pleno atendimento das flutuações sazonais urbanas recomendadas pela engenharia civil clássica. A margem mínima acima de 30% absorve os coeficientes de pico de consumo, compensa variações na qualidade da água bruta (como turbidez severa em chuvas que reduzem o ritmo das ETAs) e mantém o sistema operando em segurança contínua, em alinhamento com as zonas confortáveis prescritas pela ANA (Agência Nacional de Águas).')
+          ('< 120%', 'Risco Alto (Cr\xEDtico)', '**Inadequa\xE7\xE3o Normativa e Inseguran\xE7a de Pico.** O crit\xE9rio internacional de estresse severo (WEI+ da Ag\xEAncia Europeia do Ambiente) define insustentabilidade a longo prazo quando a demanda sufoca a oferta renov\xE1vel. Urbanamente, o coeficiente de varia\xE7\xE3o de consumo di\xE1rio (K1) \xE9 fixado internacionalmente e na ABNT NBR 12218 como 1,2. Uma rela\xE7\xE3o abaixo de 1,2 indica que o sistema n\xE3o suportar\xE1 o dia de maior consumo do ano, resultando em desabastecimento imediato de bairros e falha hidr\xE1ulica.'),
+          ('120% a 130%', 'Risco M\xE9dio (Alerta)', '**Perda da Margem de Conting\xEAncia Operacional.** Nesta faixa, a oferta atende estritamente \xE0 demanda no dia de pico urbano (K1 = 1,2), mas a "sobra" f\xEDsica do sistema cai para menos de 10%. Manuais de opera\xE7\xE3o de saneamento e relat\xF3rios de risco h\xEDdrico apontam que trabalhar com menos de 10% de folga impede paradas para manuten\xE7\xF5es emergenciais (como queima de bombas) e desprotege a rede contra picos severos de perdas f\xEDsicas por vazamentos na distribui\xE7\xE3o.'),
+          ('> 130%', 'Risco Baixo (Adequado)', '**Resili\xEAncia e Seguran\xE7a H\xEDdrica Plena.** Garante o pleno atendimento das flutua\xE7\xF5es sazonais urbanas recomendadas pela engenharia civil cl\xE1ssica. A margem m\xEDnima acima de 30% absorve os coeficientes de pico de consumo, compensa varia\xE7\xF5es na qualidade da \xE1gua bruta (como turbidez severa em chuvas que reduzem o ritmo das ETAs) e mant\xE9m o sistema operando em seguran\xE7a cont\xEDnua, em alinhamento com as zonas confort\xE1veis prescritas pela ANA (Ag\xEAncia Nacional de \xC1guas).')
         `);
       }
-
       await client.query(`
         CREATE TABLE IF NOT EXISTS pl_tasks (
           id SERIAL PRIMARY KEY,
@@ -571,9 +517,7 @@ async function runStartupMigration() {
           notes TEXT
         );
       `);
-
       await client.query("CREATE INDEX IF NOT EXISTS idx_tasks_parent_id ON pl_tasks(parent_id);");
-
       await client.query(`
         CREATE TABLE IF NOT EXISTS pl_areas (
           id SERIAL PRIMARY KEY,
@@ -581,14 +525,12 @@ async function runStartupMigration() {
           abbreviation VARCHAR(2)
         );
       `);
-
       await client.query(`
         CREATE TABLE IF NOT EXISTS pl_categories (
           id SERIAL PRIMARY KEY,
           name VARCHAR(255) NOT NULL
         );
       `);
-
       await client.query(`
         CREATE TABLE IF NOT EXISTS pl_category_areas (
           category_id INTEGER REFERENCES pl_categories(id) ON DELETE CASCADE,
@@ -596,7 +538,6 @@ async function runStartupMigration() {
           PRIMARY KEY (category_id, area_id)
         );
       `);
-
       await client.query(`
         CREATE TABLE IF NOT EXISTS pl_task_categories (
           task_id INTEGER REFERENCES pl_tasks(id) ON DELETE CASCADE,
@@ -604,7 +545,6 @@ async function runStartupMigration() {
           PRIMARY KEY (task_id, category_id)
         );
       `);
-      
       await client.query(`
         CREATE TABLE IF NOT EXISTS pl_plans (
           id SERIAL PRIMARY KEY,
@@ -613,9 +553,7 @@ async function runStartupMigration() {
           description TEXT
         );
       `);
-      
       await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS plan_id INTEGER REFERENCES pl_plans(id) ON DELETE SET NULL;`);
-      
       await client.query(`
         CREATE TABLE IF NOT EXISTS pl_responsibles (
           id SERIAL PRIMARY KEY,
@@ -624,7 +562,6 @@ async function runStartupMigration() {
           role VARCHAR(100)
         );
       `);
-      
       await client.query(`
         CREATE TABLE IF NOT EXISTS pl_responsible_areas (
           responsible_id INTEGER REFERENCES pl_responsibles(id) ON DELETE CASCADE,
@@ -632,7 +569,6 @@ async function runStartupMigration() {
           PRIMARY KEY (responsible_id, area_id)
         );
       `);
-      
       await client.query(`
         CREATE TABLE IF NOT EXISTS pl_task_areas (
           task_id INTEGER REFERENCES pl_tasks(id) ON DELETE CASCADE,
@@ -640,7 +576,6 @@ async function runStartupMigration() {
           PRIMARY KEY (task_id, area_id)
         );
       `);
-      
       await client.query(`
         CREATE TABLE IF NOT EXISTS pl_task_responsibles (
           task_id INTEGER REFERENCES pl_tasks(id) ON DELETE CASCADE,
@@ -648,20 +583,13 @@ async function runStartupMigration() {
           PRIMARY KEY (task_id, responsible_id)
         );
       `);
-
-      // Seed the tasks (checks if it exists internally)
       await seedTasks(client);
-
-      // Verify that depends_on_task_id exists
       await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS depends_on_task_id INTEGER REFERENCES pl_tasks(id) ON DELETE SET NULL;`);
-      
-      // Add updated_at and updated_by to tables
       await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
       await client.query(`ALTER TABLE pl_plans ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
       await client.query(`ALTER TABLE pl_areas ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
       await client.query(`ALTER TABLE pl_responsibles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
       await client.query(`ALTER TABLE pl_categories ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
-
       await client.query("COMMIT");
       console.log("Database tables verified successfully on server start!");
     } catch (err) {
@@ -674,33 +602,25 @@ async function runStartupMigration() {
     console.error("Failed to verify/migrate database schema on startup:", err);
   }
 }
-
 async function startServer() {
   await runStartupMigration();
-
-  const app = express();
-  const PORT = 3000;
-
-  // For parsing application/json. Increase limit for large GeoJSONs
-  app.use(express.json({ limit: "50mb" }));
-
-  const publicPath = path.join(process.cwd(), "public");
-  if (!fs.existsSync(publicPath)) {
+  const app = (0, import_express.default)();
+  const PORT = 3e3;
+  app.use(import_express.default.json({ limit: "50mb" }));
+  const publicPath = import_path.default.join(process.cwd(), "public");
+  if (!import_fs.default.existsSync(publicPath)) {
     try {
-      fs.mkdirSync(publicPath);
+      import_fs.default.mkdirSync(publicPath);
     } catch (e) {
       console.error(e);
     }
   }
-
-  // API to save GeoJSON
   app.post("/api/save-geojson", async (req, res) => {
     try {
-      const waterBalanceId = parseSafeInt(req.query.waterBalanceId as string);
+      const waterBalanceId = parseSafeInt(req.query.waterBalanceId);
       if (waterBalanceId === null) {
         return res.status(400).json({ error: "waterBalanceId is required and must be convertible to a number" });
       }
-      
       const pool = getDbPool();
       const client = await pool.connect();
       try {
@@ -717,37 +637,29 @@ async function startServer() {
       res.status(500).json({ error: "Failed to save geojson" });
     }
   });
-
-  // API to save template files
   app.post("/api/save-templates", async (req, res) => {
     try {
       const { templateFiles } = req.body;
       if (!Array.isArray(templateFiles)) {
-         return res.status(400).json({ success: false, error: "templateFiles must be an array" });
+        return res.status(400).json({ success: false, error: "templateFiles must be an array" });
       }
-      
       const pool = getDbPool();
       const client = await pool.connect();
-
       try {
         await client.query("BEGIN");
-        
         await client.query("TRUNCATE TABLE wb_template_files CASCADE");
-
-        // Sanitize the IDs dynamically so that anything that is not an integer is converted/reassimilated to not crash Postgres serial constraint (<= 2147483647)
         let currentMaxId = 0;
-        const sanitizedFiles = templateFiles.map((tf: any) => {
+        const sanitizedFiles = templateFiles.map((tf) => {
           let parsedId = parseInt(String(tf.id), 10);
           if (isNaN(parsedId) || parsedId > 2147483647 || parsedId <= 0) {
             const digitsOnly = String(tf.id).replace(/\D/g, "");
             parsedId = parseInt(digitsOnly, 10);
             if (isNaN(parsedId) || parsedId > 2147483647 || parsedId <= 0) {
-              parsedId = 0; // will be resolved sequentially
+              parsedId = 0;
             }
           }
           return { ...tf, id: parsedId };
         });
-
         for (const tf of sanitizedFiles) {
           if (tf.id > currentMaxId) {
             currentMaxId = tf.id;
@@ -759,19 +671,15 @@ async function startServer() {
             tf.id = currentMaxId;
           }
         }
-
         for (const tf of sanitizedFiles) {
           await client.query(
             "INSERT INTO wb_template_files (id, name, description, url) VALUES ($1, $2, $3, $4)",
             [tf.id, tf.name, tf.description, tf.url]
           );
         }
-
-        // Adjust the Postgres sequences for the template_files table to ensure any next INSERT works seamlessly
         await client.query(
           "SELECT setval(pg_get_serial_sequence('wb_template_files', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM wb_template_files"
         );
-
         await client.query("COMMIT");
         res.json({ success: true, message: "Modelos salvos com sucesso!" });
       } catch (error) {
@@ -780,20 +688,17 @@ async function startServer() {
       } finally {
         client.release();
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Erro ao salvar arquivos modelo:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
-  // API to load GeoJSON
   app.get("/api/load-geojson", async (req, res) => {
     try {
-      const waterBalanceId = parseSafeInt(req.query.waterBalanceId as string);
+      const waterBalanceId = parseSafeInt(req.query.waterBalanceId);
       if (waterBalanceId === null) {
         return res.status(400).json({ error: "waterBalanceId is required and must be convertible to a number" });
       }
-
       const pool = getDbPool();
       const client = await pool.connect();
       try {
@@ -814,8 +719,6 @@ async function startServer() {
       res.status(500).json({ error: "Failed to load geojson" });
     }
   });
-
-  // API to test Database connection
   app.get("/api/db-status", async (req, res) => {
     try {
       const pool = getDbPool();
@@ -826,20 +729,17 @@ async function startServer() {
       } finally {
         client.release();
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Erro ao conectar no banco:", error);
-      res.status(500).json({ success: false, error: error.message || "Falha na conexão com o banco de dados." });
+      res.status(500).json({ success: false, error: error.message || "Falha na conex\xE3o com o banco de dados." });
     }
   });
-
-  // API to initialize Database tables
   app.post("/api/init-db", async (req, res) => {
     try {
       const pool = getDbPool();
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
-        
         await client.query("DROP TABLE IF EXISTS wb_water_balance_maps CASCADE");
         await client.query("DROP TABLE IF EXISTS wb_risk_references CASCADE");
         await client.query("DROP TABLE IF EXISTS wb_template_files CASCADE");
@@ -860,7 +760,6 @@ async function startServer() {
         await client.query("DROP TABLE IF EXISTS pl_responsibles CASCADE");
         await client.query("DROP TABLE IF EXISTS pl_areas CASCADE");
         await client.query("DROP TABLE IF EXISTS pl_plans CASCADE");
-
         await client.query(`
           CREATE TABLE wb_water_balances (
             id SERIAL PRIMARY KEY,
@@ -872,7 +771,6 @@ async function startServer() {
             status VARCHAR(50) NOT NULL
           );
         `);
-
         await client.query(`
           CREATE TABLE wb_systems (
             id SERIAL PRIMARY KEY,
@@ -881,7 +779,6 @@ async function startServer() {
             water_balance_id INTEGER REFERENCES wb_water_balances(id) ON DELETE CASCADE
           );
         `);
-
         await client.query(`
           CREATE TABLE wb_regions (
             id SERIAL PRIMARY KEY,
@@ -892,7 +789,6 @@ async function startServer() {
             water_balance_id INTEGER REFERENCES wb_water_balances(id) ON DELETE CASCADE
           );
         `);
-
         await client.query(`
           CREATE TABLE wb_demands (
             id SERIAL PRIMARY KEY,
@@ -905,7 +801,6 @@ async function startServer() {
             water_balance_id INTEGER REFERENCES wb_water_balances(id) ON DELETE CASCADE
           );
         `);
-
         await client.query(`
           CREATE TABLE wb_demand_entries (
             id SERIAL PRIMARY KEY,
@@ -918,7 +813,6 @@ async function startServer() {
             losses NUMERIC NOT NULL
           );
         `);
-
         await client.query(`
           CREATE TABLE wb_supply_sources (
             id SERIAL PRIMARY KEY,
@@ -933,7 +827,6 @@ async function startServer() {
             water_balance_id INTEGER REFERENCES wb_water_balances(id) ON DELETE CASCADE
           );
         `);
-
         await client.query(`
           CREATE TABLE wb_operational_adjustments (
             id SERIAL PRIMARY KEY,
@@ -947,7 +840,6 @@ async function startServer() {
             linked_adjustment_id INTEGER REFERENCES wb_operational_adjustments(id) ON DELETE SET NULL
           );
         `);
-
         await client.query(`
           CREATE TABLE wb_template_files (
             id SERIAL PRIMARY KEY,
@@ -956,7 +848,6 @@ async function startServer() {
             url TEXT
           );
         `);
-
         await client.query(`
           CREATE TABLE wb_water_balance_maps (
             id SERIAL PRIMARY KEY,
@@ -964,7 +855,6 @@ async function startServer() {
             geojson_data JSONB
           );
         `);
-
         await client.query(`
           CREATE TABLE wb_risk_references (
             id SERIAL PRIMARY KEY,
@@ -973,15 +863,12 @@ async function startServer() {
             justification TEXT NOT NULL
           );
         `);
-
         await client.query(`
           INSERT INTO wb_risk_references (iad, risk_classification, justification) VALUES
-          ('< 120%', 'Risco Alto (Crítico)', '**Inadequação Normativa e Insegurança de Pico.** O critério internacional de estresse severo (WEI+ da Agência Europeia do Ambiente) define insustentabilidade a longo prazo quando a demanda sufoca a oferta renovável. Urbanamente, o coeficiente de variação de consumo diário (K1) é fixado internacionalmente e na ABNT NBR 12218 como 1,2. Uma relação abaixo de 1,2 indica que o sistema não suportará o dia de maior consumo do ano, resultando em desabastecimento imediato de bairros e falha hidráulica.'),
-          ('120% a 130%', 'Risco Médio (Alerta)', '**Perda da Margem de Contingência Operacional.** Nesta faixa, a oferta atende estritamente à demanda no dia de pico urbano (K1 = 1,2), mas a "sobra" física do sistema cai para menos de 10%. Manuais de operação de saneamento e relatórios de risco hídrico apontam que trabalhar com menos de 10% de folga impede paradas para manutenções emergenciais (como queima de bombas) e desprotege a rede contra picos severos de perdas físicas por vazamentos na distribuição.'),
-          ('> 130%', 'Risco Baixo (Adequado)', '**Resiliência e Segurança Hídrica Plena.** Garante o pleno atendimento das flutuações sazonais urbanas recomendadas pela engenharia civil clássica. A margem mínima acima de 30% absorve os coeficientes de pico de consumo, compensa variações na qualidade da água bruta (como turbidez severa em chuvas que reduzem o ritmo das ETAs) e mantém o sistema operando em segurança contínua, em alinhamento com as zonas confortáveis prescritas pela ANA (Agência Nacional de Águas).')
+          ('< 120%', 'Risco Alto (Cr\xEDtico)', '**Inadequa\xE7\xE3o Normativa e Inseguran\xE7a de Pico.** O crit\xE9rio internacional de estresse severo (WEI+ da Ag\xEAncia Europeia do Ambiente) define insustentabilidade a longo prazo quando a demanda sufoca a oferta renov\xE1vel. Urbanamente, o coeficiente de varia\xE7\xE3o de consumo di\xE1rio (K1) \xE9 fixado internacionalmente e na ABNT NBR 12218 como 1,2. Uma rela\xE7\xE3o abaixo de 1,2 indica que o sistema n\xE3o suportar\xE1 o dia de maior consumo do ano, resultando em desabastecimento imediato de bairros e falha hidr\xE1ulica.'),
+          ('120% a 130%', 'Risco M\xE9dio (Alerta)', '**Perda da Margem de Conting\xEAncia Operacional.** Nesta faixa, a oferta atende estritamente \xE0 demanda no dia de pico urbano (K1 = 1,2), mas a "sobra" f\xEDsica do sistema cai para menos de 10%. Manuais de opera\xE7\xE3o de saneamento e relat\xF3rios de risco h\xEDdrico apontam que trabalhar com menos de 10% de folga impede paradas para manuten\xE7\xF5es emergenciais (como queima de bombas) e desprotege a rede contra picos severos de perdas f\xEDsicas por vazamentos na distribui\xE7\xE3o.'),
+          ('> 130%', 'Risco Baixo (Adequado)', '**Resili\xEAncia e Seguran\xE7a H\xEDdrica Plena.** Garante o pleno atendimento das flutua\xE7\xF5es sazonais urbanas recomendadas pela engenharia civil cl\xE1ssica. A margem m\xEDnima acima de 30% absorve os coeficientes de pico de consumo, compensa varia\xE7\xF5es na qualidade da \xE1gua bruta (como turbidez severa em chuvas que reduzem o ritmo das ETAs) e mant\xE9m o sistema operando em seguran\xE7a cont\xEDnua, em alinhamento com as zonas confort\xE1veis prescritas pela ANA (Ag\xEAncia Nacional de \xC1guas).')
         `);
-
-        // Recreation of Plans, Areas, Responsibles and Tasks tables in init-db inside server.ts
         await client.query(`
           CREATE TABLE pl_plans (
             id SERIAL PRIMARY KEY,
@@ -990,7 +877,6 @@ async function startServer() {
             description TEXT
           );
         `);
-
         await client.query(`
           CREATE TABLE pl_areas (
             id SERIAL PRIMARY KEY,
@@ -998,7 +884,6 @@ async function startServer() {
             abbreviation VARCHAR(2)
           );
         `);
-
         await client.query(`
           CREATE TABLE pl_responsibles (
             id SERIAL PRIMARY KEY,
@@ -1007,7 +892,6 @@ async function startServer() {
             role VARCHAR(255)
           );
         `);
-
         await client.query(`
           CREATE TABLE pl_responsible_areas (
             responsible_id INTEGER REFERENCES pl_responsibles(id) ON DELETE CASCADE,
@@ -1015,7 +899,6 @@ async function startServer() {
             PRIMARY KEY (responsible_id, area_id)
           );
         `);
-
         await client.query(`
           CREATE TABLE pl_tasks (
             id SERIAL PRIMARY KEY,
@@ -1034,7 +917,6 @@ async function startServer() {
             plan_id INTEGER REFERENCES pl_plans(id) ON DELETE SET NULL
           );
         `);
-
         await client.query(`
           CREATE TABLE pl_task_areas (
             task_id INTEGER REFERENCES pl_tasks(id) ON DELETE CASCADE,
@@ -1042,7 +924,6 @@ async function startServer() {
             PRIMARY KEY (task_id, area_id)
           );
         `);
-
         await client.query(`
           CREATE TABLE pl_task_responsibles (
             task_id INTEGER REFERENCES pl_tasks(id) ON DELETE CASCADE,
@@ -1050,14 +931,12 @@ async function startServer() {
             PRIMARY KEY (task_id, responsible_id)
           );
         `);
-
         await client.query(`
           CREATE TABLE pl_categories (
             id SERIAL PRIMARY KEY,
             name VARCHAR(255) NOT NULL
           );
         `);
-
         await client.query(`
           CREATE TABLE pl_category_areas (
             category_id INTEGER REFERENCES pl_categories(id) ON DELETE CASCADE,
@@ -1065,7 +944,6 @@ async function startServer() {
             PRIMARY KEY (category_id, area_id)
           );
         `);
-
         await client.query(`
           CREATE TABLE pl_task_categories (
             task_id INTEGER REFERENCES pl_tasks(id) ON DELETE CASCADE,
@@ -1073,46 +951,36 @@ async function startServer() {
             PRIMARY KEY (task_id, category_id)
           );
         `);
-
         await client.query("CREATE INDEX IF NOT EXISTS idx_tasks_parent_id_init ON pl_tasks(parent_id);");
-
-        // Seed default plans, areas, and responsibles
-        const r2025 = await client.query("INSERT INTO pl_plans (name, title, description) VALUES ('Plano de Atividades 2025', 'Plano de Atividades 2025', 'Plano estratégico das ações para o ano de 2025.') RETURNING id");
-        const r2026 = await client.query("INSERT INTO pl_plans (name, title, description) VALUES ('Plano de Atividades 2026', 'Plano de Atividades 2026', 'Planejamento estratégico das ações para o ano de 2026.') RETURNING id");
-        
+        const r2025 = await client.query("INSERT INTO pl_plans (name, title, description) VALUES ('Plano de Atividades 2025', 'Plano de Atividades 2025', 'Plano estrat\xE9gico das a\xE7\xF5es para o ano de 2025.') RETURNING id");
+        const r2026 = await client.query("INSERT INTO pl_plans (name, title, description) VALUES ('Plano de Atividades 2026', 'Plano de Atividades 2026', 'Planejamento estrat\xE9gico das a\xE7\xF5es para o ano de 2026.') RETURNING id");
         const plan2025Id = r2025.rows[0].id;
         const plan2026Id = r2026.rows[0].id;
-
-        await client.query("INSERT INTO pl_areas (name) VALUES ('Regulação'), ('Fiscalização'), ('Qualidade do Atendimento'), ('Sustentabilidade'), ('Gestão de Clientes')");
-
-        // Seed default categories corresponding to their areas
+        await client.query("INSERT INTO pl_areas (name) VALUES ('Regula\xE7\xE3o'), ('Fiscaliza\xE7\xE3o'), ('Qualidade do Atendimento'), ('Sustentabilidade'), ('Gest\xE3o de Clientes')");
         const areasRes = await client.query("SELECT id, name FROM pl_areas ORDER BY id ASC");
         for (const areaRow of areasRes.rows) {
-          let catNames: string[] = [];
-          if (areaRow.name === 'Regulação') {
-            catNames = ['Auditoria de Tarifas', 'Análise de Contratos', 'NORMAS E ESTUDOS'];
-          } else if (areaRow.name === 'Fiscalização') {
-            catNames = ['Vistoria Técnica', 'Medição de Indicadores'];
-          } else if (areaRow.name === 'Qualidade do Atendimento') {
-            catNames = ['Pesquisa de Satisfação', 'Ouvidoria de Reclamações', 'PLANEJAMENTO'];
-          } else if (areaRow.name === 'Sustentabilidade') {
-            catNames = ['Eficiência Hidrelétrica', 'Reuso de Água', 'PROJETOS ESPECIAIS'];
-          } else if (areaRow.name === 'Gestão de Clientes') {
-            catNames = ['Cadastro de Usuários', 'Billing e Faturamento', 'PONTUAIS'];
+          let catNames = [];
+          if (areaRow.name === "Regula\xE7\xE3o") {
+            catNames = ["Auditoria de Tarifas", "An\xE1lise de Contratos", "NORMAS E ESTUDOS"];
+          } else if (areaRow.name === "Fiscaliza\xE7\xE3o") {
+            catNames = ["Vistoria T\xE9cnica", "Medi\xE7\xE3o de Indicadores"];
+          } else if (areaRow.name === "Qualidade do Atendimento") {
+            catNames = ["Pesquisa de Satisfa\xE7\xE3o", "Ouvidoria de Reclama\xE7\xF5es", "PLANEJAMENTO"];
+          } else if (areaRow.name === "Sustentabilidade") {
+            catNames = ["Efici\xEAncia Hidrel\xE9trica", "Reuso de \xC1gua", "PROJETOS ESPECIAIS"];
+          } else if (areaRow.name === "Gest\xE3o de Clientes") {
+            catNames = ["Cadastro de Usu\xE1rios", "Billing e Faturamento", "PONTUAIS"];
           }
           for (const cName of catNames) {
             const resC = await client.query("INSERT INTO pl_categories (name) VALUES ($1) RETURNING id", [cName]);
             await client.query("INSERT INTO pl_category_areas (category_id, area_id) VALUES ($1, $2)", [resC.rows[0].id, areaRow.id]);
           }
         }
-
-        await client.query("INSERT INTO pl_responsibles (name, email, role) VALUES ('Superintendência de Saneamento', 'saneamento@adasa.df.gov.br', 'Direção Técnica')");
-        await client.query("INSERT INTO pl_responsibles (name, email, role) VALUES ('Equipe Técnica de Regulação', 'regulacao@adasa.df.gov.br', 'Equipe Técnica')");
-        await client.query("INSERT INTO pl_responsibles (name, email, role) VALUES ('Superintendência de Fiscalização', 'fiscalizacao@adasa.df.gov.br', 'Fiscalizadores')");
-        await client.query("INSERT INTO pl_responsibles (name, email, role) VALUES ('Núcleo de Qualidade do Atendimento', 'qualidade@adasa.df.gov.br', 'Atendimento')");
-
+        await client.query("INSERT INTO pl_responsibles (name, email, role) VALUES ('Superintend\xEAncia de Saneamento', 'saneamento@adasa.df.gov.br', 'Dire\xE7\xE3o T\xE9cnica')");
+        await client.query("INSERT INTO pl_responsibles (name, email, role) VALUES ('Equipe T\xE9cnica de Regula\xE7\xE3o', 'regulacao@adasa.df.gov.br', 'Equipe T\xE9cnica')");
+        await client.query("INSERT INTO pl_responsibles (name, email, role) VALUES ('Superintend\xEAncia de Fiscaliza\xE7\xE3o', 'fiscalizacao@adasa.df.gov.br', 'Fiscalizadores')");
+        await client.query("INSERT INTO pl_responsibles (name, email, role) VALUES ('N\xFAcleo de Qualidade do Atendimento', 'qualidade@adasa.df.gov.br', 'Atendimento')");
         await seedTasks(client);
-
         await client.query("COMMIT");
         res.json({ success: true, message: "Tabelas recriadas e limpas com sucesso no Neon PostgreSQL!" });
       } catch (error) {
@@ -1121,12 +989,11 @@ async function startServer() {
       } finally {
         client.release();
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Erro ao inicializar tabelas:", error);
       res.status(500).json({ success: false, error: error.message || "Falha ao criar as tabelas no banco de dados." });
     }
   });
-
   app.get("/api/load-data", async (req, res) => {
     try {
       const pool = getDbPool();
@@ -1148,59 +1015,50 @@ async function startServer() {
         const dbResponsibleAreas = await client.query("SELECT * FROM pl_responsible_areas");
         const dbTaskAreas = await client.query("SELECT * FROM pl_task_areas");
         const dbTaskResponsibles = await client.query("SELECT * FROM pl_task_responsibles");
-
-        const responsibleAreasMap: Record<number, number[]> = {};
-        dbResponsibleAreas.rows.forEach(r => {
+        const responsibleAreasMap = {};
+        dbResponsibleAreas.rows.forEach((r) => {
           const rid = Number(r.responsible_id);
           const aid = Number(r.area_id);
           if (!responsibleAreasMap[rid]) responsibleAreasMap[rid] = [];
           responsibleAreasMap[rid].push(aid);
         });
-
-        const taskAreasMap: Record<number, number[]> = {};
-        dbTaskAreas.rows.forEach(r => {
+        const taskAreasMap = {};
+        dbTaskAreas.rows.forEach((r) => {
           const tid = Number(r.task_id);
           const aid = Number(r.area_id);
           if (!taskAreasMap[tid]) taskAreasMap[tid] = [];
           taskAreasMap[tid].push(aid);
         });
-
-        const taskResponsiblesMap: Record<number, number[]> = {};
-        dbTaskResponsibles.rows.forEach(r => {
+        const taskResponsiblesMap = {};
+        dbTaskResponsibles.rows.forEach((r) => {
           const tid = Number(r.task_id);
           const rid = Number(r.responsible_id);
           if (!taskResponsiblesMap[tid]) taskResponsiblesMap[tid] = [];
           taskResponsiblesMap[tid].push(rid);
         });
-
-        const mapEntriesToDemand = (demandId: number) => 
-          dbDemandEntries.rows
-            .filter(e => Number(e.demand_id) === demandId)
-            .map(e => ({
-              regionId: Number(e.region_id),
-              year: e.year,
-              population: Number(e.population),
-              coverage: Number(e.coverage),
-              perCapitaConsumption: Number(e.per_capita_consumption),
-              losses: Number(e.losses)
-            }));
-
-        const demands = dbDemands.rows.map(s => ({
+        const mapEntriesToDemand = (demandId) => dbDemandEntries.rows.filter((e) => Number(e.demand_id) === demandId).map((e) => ({
+          regionId: Number(e.region_id),
+          year: e.year,
+          population: Number(e.population),
+          coverage: Number(e.coverage),
+          perCapitaConsumption: Number(e.per_capita_consumption),
+          losses: Number(e.losses)
+        }));
+        const demands = dbDemands.rows.map((s) => ({
           id: Number(s.id),
           name: s.name,
           description: s.description,
           waterBalanceId: s.water_balance_id ? Number(s.water_balance_id) : null,
           modifiers: {
             population: Number(s.modifiers_population),
-            coverage: s.modifiers_coverage !== null && s.modifiers_coverage !== undefined ? Number(s.modifiers_coverage) : null,
+            coverage: s.modifiers_coverage !== null && s.modifiers_coverage !== void 0 ? Number(s.modifiers_coverage) : null,
             perCapitaConsumption: Number(s.modifiers_per_capita),
-            losses: s.modifiers_losses !== null && s.modifiers_losses !== undefined ? Number(s.modifiers_losses) : null
+            losses: s.modifiers_losses !== null && s.modifiers_losses !== void 0 ? Number(s.modifiers_losses) : null
           },
           entries: mapEntriesToDemand(Number(s.id))
         }));
-
         const payload = {
-          waterBalances: dbWaterBalances.rows.map(wb => ({
+          waterBalances: dbWaterBalances.rows.map((wb) => ({
             id: Number(wb.id),
             description: wb.description,
             responsible: wb.responsible,
@@ -1209,13 +1067,13 @@ async function startServer() {
             receiptDate: wb.receipt_date,
             status: wb.status
           })),
-          systems: dbSystems.rows.map(s => ({
+          systems: dbSystems.rows.map((s) => ({
             id: Number(s.id),
             code: s.code,
             name: s.name,
             waterBalanceId: s.water_balance_id ? Number(s.water_balance_id) : null
           })),
-          regions: dbRegions.rows.map(r => ({
+          regions: dbRegions.rows.map((r) => ({
             id: Number(r.id),
             code: r.code,
             name: r.name,
@@ -1223,8 +1081,8 @@ async function startServer() {
             description: r.description,
             waterBalanceId: r.water_balance_id ? Number(r.water_balance_id) : null
           })),
-          demands: demands,
-          supplySources: dbSupplySources.rows.map(s => ({
+          demands,
+          supplySources: dbSupplySources.rows.map((s) => ({
             id: Number(s.id),
             code: s.code,
             systemId: Number(s.system_id),
@@ -1236,7 +1094,7 @@ async function startServer() {
             unavailabilityReason: s.unavailability_reason,
             waterBalanceId: s.water_balance_id ? Number(s.water_balance_id) : null
           })),
-          operationalAdjustments: dbOperationalAdjustments.rows.map(o => ({
+          operationalAdjustments: dbOperationalAdjustments.rows.map((o) => ({
             id: Number(o.id),
             systemId: Number(o.system_id),
             type: o.type,
@@ -1247,38 +1105,38 @@ async function startServer() {
             waterBalanceId: o.water_balance_id ? Number(o.water_balance_id) : null,
             linkedAdjustmentId: o.linked_adjustment_id ? Number(o.linked_adjustment_id) : null
           })),
-          templateFiles: dbTemplateFiles.rows.map(t => ({
+          templateFiles: dbTemplateFiles.rows.map((t) => ({
             id: Number(t.id),
             name: t.name,
             description: t.description,
             url: t.url
           })),
-          riskReferences: dbRiskReferences.rows.map(r => ({
+          riskReferences: dbRiskReferences.rows.map((r) => ({
             id: Number(r.id),
             iad: r.iad,
             riskClassification: r.risk_classification,
             justification: r.justification
           })),
-          plans: dbPlans.rows.map(p => ({
+          plans: dbPlans.rows.map((p) => ({
             id: Number(p.id),
             name: p.name || p.title || "Plano Sem Nome",
             title: p.title || p.name || "Plano Sem Nome",
             description: p.description
           })),
-          areas: dbAreas.rows.map(a => ({
+          areas: dbAreas.rows.map((a) => ({
             id: Number(a.id),
             name: a.name,
             abbreviation: a.abbreviation,
             planId: null
           })),
-          responsibles: dbResponsibles.rows.map(r => ({
+          responsibles: dbResponsibles.rows.map((r) => ({
             id: Number(r.id),
             name: r.name,
             email: r.email,
             role: r.role,
             areaIds: responsibleAreasMap[Number(r.id)] || []
           })),
-          tasks: dbTasks.rows.map(t => ({
+          tasks: dbTasks.rows.map((t) => ({
             id: Number(t.id),
             title: t.title,
             description: t.description,
@@ -1297,20 +1155,18 @@ async function startServer() {
             responsibleIds: taskResponsiblesMap[Number(t.id)] || []
           }))
         };
-
         res.json({ success: true, data: payload });
       } finally {
         client.release();
       }
-    } catch (error: any) {
-      if (error && error.message === "A variável DATABASE_URL (Neon PostgreSQL) está ausente no ambiente.") {
+    } catch (error) {
+      if (error && error.message === "A vari\xE1vel DATABASE_URL (Neon PostgreSQL) est\xE1 ausente no ambiente.") {
         return res.status(200).json({ success: false, error: "DATABASE_URL_MISSING", data: null });
       }
       console.error("Erro ao carregar dados:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
   app.post("/api/save-data", async (req, res) => {
     try {
       const data = req.body;
@@ -1321,17 +1177,14 @@ async function startServer() {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
-        
         await client.query("TRUNCATE TABLE wb_demand_entries, wb_operational_adjustments, wb_supply_sources, wb_demands, wb_regions, wb_systems, wb_water_balances CASCADE");
-
         const { waterBalances, systems, regions, demands, supplySources, operationalAdjustments } = data;
-
         if (waterBalances && waterBalances.length > 0) {
-          const values: any[] = [];
+          const values = [];
           const queryParts = [];
           let paramIndex = 1;
           for (const wb of waterBalances) {
-            queryParts.push(`($${paramIndex}, $${paramIndex+1}, $${paramIndex+2}, $${paramIndex+3}, $${paramIndex+4}, $${paramIndex+5}, $${paramIndex+6})`);
+            queryParts.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6})`);
             values.push(
               parseSafeInt(wb.id),
               wb.description,
@@ -1356,13 +1209,12 @@ async function startServer() {
             values
           );
         }
-
         if (systems && systems.length > 0) {
-          const values: any[] = [];
+          const values = [];
           const queryParts = [];
           let paramIndex = 1;
           for (const sys of systems) {
-            queryParts.push(`($${paramIndex}, $${paramIndex+1}, $${paramIndex+2}, $${paramIndex+3})`);
+            queryParts.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3})`);
             values.push(
               parseSafeInt(sys.id),
               sys.code || null,
@@ -1381,13 +1233,12 @@ async function startServer() {
             values
           );
         }
-
         if (regions && regions.length > 0) {
-          const values: any[] = [];
+          const values = [];
           const queryParts = [];
           let paramIndex = 1;
           for (const reg of regions) {
-            queryParts.push(`($${paramIndex}, $${paramIndex+1}, $${paramIndex+2}, $${paramIndex+3}, $${paramIndex+4}, $${paramIndex+5})`);
+            queryParts.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5})`);
             values.push(
               parseSafeInt(reg.id),
               reg.code || null,
@@ -1410,13 +1261,12 @@ async function startServer() {
             values
           );
         }
-
         if (demands && demands.length > 0) {
-          const values: any[] = [];
+          const values = [];
           const queryParts = [];
           let paramIndex = 1;
           for (const sc of demands) {
-            queryParts.push(`($${paramIndex}, $${paramIndex+1}, $${paramIndex+2}, $${paramIndex+3}, $${paramIndex+4}, $${paramIndex+5}, $${paramIndex+6}, $${paramIndex+7})`);
+            queryParts.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6}, $${paramIndex + 7})`);
             values.push(
               parseSafeInt(sc.id),
               sc.name,
@@ -1443,8 +1293,7 @@ async function startServer() {
             values
           );
         }
-
-        const allEntries: any[] = [];
+        const allEntries = [];
         if (demands) {
           for (const sc of demands) {
             if (sc.entries) {
@@ -1463,14 +1312,14 @@ async function startServer() {
           }
         }
         if (allEntries.length > 0) {
-          const chunkSize = 2000;
+          const chunkSize = 2e3;
           for (let i = 0; i < allEntries.length; i += chunkSize) {
             const chunk = allEntries.slice(i, i + chunkSize);
-            const chunkValues: any[] = [];
-            const chunkParts: string[] = [];
+            const chunkValues = [];
+            const chunkParts = [];
             let deParamIndex = 1;
             for (const row of chunk) {
-              chunkParts.push(`($${deParamIndex}::integer, $${deParamIndex+1}::integer, $${deParamIndex+2}::integer, $${deParamIndex+3}::numeric, $${deParamIndex+4}::numeric, $${deParamIndex+5}::numeric, $${deParamIndex+6}::numeric)`);
+              chunkParts.push(`($${deParamIndex}::integer, $${deParamIndex + 1}::integer, $${deParamIndex + 2}::integer, $${deParamIndex + 3}::numeric, $${deParamIndex + 4}::numeric, $${deParamIndex + 5}::numeric, $${deParamIndex + 6}::numeric)`);
               chunkValues.push(row.scId, row.regionId, row.year, row.population, row.coverage, row.perCapitaConsumption, row.losses);
               deParamIndex += 7;
             }
@@ -1482,13 +1331,12 @@ async function startServer() {
             await client.query(query, chunkValues);
           }
         }
-
         if (supplySources && supplySources.length > 0) {
-          const values: any[] = [];
+          const values = [];
           const queryParts = [];
           let paramIndex = 1;
           for (const src of supplySources) {
-            queryParts.push(`($${paramIndex}, $${paramIndex+1}, $${paramIndex+2}, $${paramIndex+3}, $${paramIndex+4}, $${paramIndex+5}, $${paramIndex+6}, $${paramIndex+7}, $${paramIndex+8}, $${paramIndex+9})`);
+            queryParts.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6}, $${paramIndex + 7}, $${paramIndex + 8}, $${paramIndex + 9})`);
             values.push(
               parseSafeInt(src.id),
               src.code || null,
@@ -1519,13 +1367,12 @@ async function startServer() {
             values
           );
         }
-
         if (operationalAdjustments && Array.isArray(operationalAdjustments) && operationalAdjustments.length > 0) {
-          const values: any[] = [];
+          const values = [];
           const queryParts = [];
           let paramIndex = 1;
           for (const adj of operationalAdjustments) {
-            queryParts.push(`($${paramIndex}, $${paramIndex+1}, $${paramIndex+2}, $${paramIndex+3}, $${paramIndex+4}, $${paramIndex+5}, $${paramIndex+6}, $${paramIndex+7}, NULL)`);
+            queryParts.push(`($${paramIndex}, $${paramIndex + 1}, $${paramIndex + 2}, $${paramIndex + 3}, $${paramIndex + 4}, $${paramIndex + 5}, $${paramIndex + 6}, $${paramIndex + 7}, NULL)`);
             values.push(
               parseSafeInt(adj.id),
               parseSafeInt(adj.systemId),
@@ -1551,7 +1398,6 @@ async function startServer() {
                water_balance_id = EXCLUDED.water_balance_id`,
             values
           );
-
           for (const adj of operationalAdjustments) {
             if (adj.linkedAdjustmentId) {
               await client.query(
@@ -1561,15 +1407,12 @@ async function startServer() {
             }
           }
         }
-
-        // Synchronize sequences so Postgres automatic serialization works flawlessly
         await client.query("SELECT setval(pg_get_serial_sequence('wb_water_balances', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM wb_water_balances");
         await client.query("SELECT setval(pg_get_serial_sequence('wb_systems', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM wb_systems");
         await client.query("SELECT setval(pg_get_serial_sequence('wb_regions', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM wb_regions");
         await client.query("SELECT setval(pg_get_serial_sequence('wb_demands', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM wb_demands");
         await client.query("SELECT setval(pg_get_serial_sequence('wb_supply_sources', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM wb_supply_sources");
         await client.query("SELECT setval(pg_get_serial_sequence('wb_operational_adjustments', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM wb_operational_adjustments");
-
         await client.query("COMMIT");
         res.json({ success: true, message: "Dados salvos no PostgreSQL com sucesso!" });
       } catch (error) {
@@ -1578,35 +1421,32 @@ async function startServer() {
       } finally {
         client.release();
       }
-    } catch (error: any) {
-      if (error && error.message === "A variável DATABASE_URL (Neon PostgreSQL) está ausente no ambiente.") {
+    } catch (error) {
+      if (error && error.message === "A vari\xE1vel DATABASE_URL (Neon PostgreSQL) est\xE1 ausente no ambiente.") {
         return res.status(200).json({ success: false, error: "DATABASE_URL_MISSING" });
       }
       console.error("Erro ao salvar dados:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
   app.post("/api/save-module", async (req, res) => {
     try {
-      const { module, data } = req.body;
+      const { module: module2, data } = req.body;
       const pool = getDbPool();
       const client = await pool.connect();
-
       try {
         await client.query("BEGIN");
-
-        if (module === "water-balances") {
+        if (module2 === "water-balances") {
           const { waterBalances } = data;
           const keepIds = [];
-          const wbValues: any[] = [];
+          const wbValues = [];
           const wbParts = [];
           let wbParamIndex = 1;
           for (const wb of waterBalances) {
             const wbId = parseSafeInt(wb.id);
             if (wbId !== null) {
               keepIds.push(wbId);
-              wbParts.push(`($${wbParamIndex}, $${wbParamIndex+1}, $${wbParamIndex+2}, $${wbParamIndex+3}, $${wbParamIndex+4}, $${wbParamIndex+5}, $${wbParamIndex+6})`);
+              wbParts.push(`($${wbParamIndex}, $${wbParamIndex + 1}, $${wbParamIndex + 2}, $${wbParamIndex + 3}, $${wbParamIndex + 4}, $${wbParamIndex + 5}, $${wbParamIndex + 6})`);
               wbValues.push(
                 wbId,
                 wb.description,
@@ -1633,24 +1473,22 @@ async function startServer() {
             `, wbValues);
           }
           if (keepIds.length > 0) {
-            await client.query(`DELETE FROM wb_water_balances WHERE id NOT IN (${keepIds.map((_, idx) => '$' + (idx + 1) + '::integer').join(', ')})`, keepIds);
+            await client.query(`DELETE FROM wb_water_balances WHERE id NOT IN (${keepIds.map((_, idx) => "$" + (idx + 1) + "::integer").join(", ")})`, keepIds);
           } else {
             await client.query(`DELETE FROM wb_water_balances`);
           }
         }
-
-        if (module === "systems") {
+        if (module2 === "systems") {
           const { systems = [], regions = [] } = data;
-          
           const sysKeepIds = [];
-          const sysValues: any[] = [];
+          const sysValues = [];
           const sysParts = [];
           let sysParamIndex = 1;
           for (const sys of systems) {
             const sysId = parseSafeInt(sys.id);
             if (sysId !== null) {
               sysKeepIds.push(sysId);
-              sysParts.push(`($${sysParamIndex}, $${sysParamIndex+1}, $${sysParamIndex+2}, $${sysParamIndex+3})`);
+              sysParts.push(`($${sysParamIndex}, $${sysParamIndex + 1}, $${sysParamIndex + 2}, $${sysParamIndex + 3})`);
               sysValues.push(
                 sysId,
                 sys.code || null,
@@ -1670,16 +1508,15 @@ async function startServer() {
                 water_balance_id = EXCLUDED.water_balance_id
             `, sysValues);
           }
-
           const regKeepIds = [];
-          const regValues: any[] = [];
+          const regValues = [];
           const regParts = [];
           let regParamIndex = 1;
           for (const reg of regions) {
             const regId = parseSafeInt(reg.id);
             if (regId !== null) {
               regKeepIds.push(regId);
-              regParts.push(`($${regParamIndex}, $${regParamIndex+1}, $${regParamIndex+2}, $${regParamIndex+3}, $${regParamIndex+4}, $${regParamIndex+5})`);
+              regParts.push(`($${regParamIndex}, $${regParamIndex + 1}, $${regParamIndex + 2}, $${regParamIndex + 3}, $${regParamIndex + 4}, $${regParamIndex + 5})`);
               regValues.push(
                 regId,
                 reg.code || null,
@@ -1703,32 +1540,28 @@ async function startServer() {
                 water_balance_id = EXCLUDED.water_balance_id
             `, regValues);
           }
-
           if (regKeepIds.length > 0) {
-            await client.query(`DELETE FROM wb_regions WHERE id NOT IN (${regKeepIds.map((_, idx) => '$' + (idx + 1) + '::integer').join(', ')})`, regKeepIds);
+            await client.query(`DELETE FROM wb_regions WHERE id NOT IN (${regKeepIds.map((_, idx) => "$" + (idx + 1) + "::integer").join(", ")})`, regKeepIds);
           } else {
             await client.query(`DELETE FROM wb_regions`);
           }
-          
           if (sysKeepIds.length > 0) {
-            await client.query(`DELETE FROM wb_systems WHERE id NOT IN (${sysKeepIds.map((_, idx) => '$' + (idx + 1) + '::integer').join(', ')})`, sysKeepIds);
+            await client.query(`DELETE FROM wb_systems WHERE id NOT IN (${sysKeepIds.map((_, idx) => "$" + (idx + 1) + "::integer").join(", ")})`, sysKeepIds);
           } else {
             await client.query(`DELETE FROM wb_systems`);
           }
         }
-
-        if (module === "demands") {
+        if (module2 === "demands") {
           const { demands = [] } = data;
-          const scKeepIds: number[] = [];
-          const demandValues: any[] = [];
-          const demandParts: string[] = [];
+          const scKeepIds = [];
+          const demandValues = [];
+          const demandParts = [];
           let dParamIndex = 1;
-          
           for (const sc of demands) {
             const scId = parseSafeInt(sc.id);
             if (scId !== null) {
               scKeepIds.push(scId);
-              demandParts.push(`($${dParamIndex}::integer, $${dParamIndex+1}::varchar, $${dParamIndex+2}::text, $${dParamIndex+3}::numeric, $${dParamIndex+4}::numeric, $${dParamIndex+5}::numeric, $${dParamIndex+6}::numeric, $${dParamIndex+7}::integer)`);
+              demandParts.push(`($${dParamIndex}::integer, $${dParamIndex + 1}::varchar, $${dParamIndex + 2}::text, $${dParamIndex + 3}::numeric, $${dParamIndex + 4}::numeric, $${dParamIndex + 5}::numeric, $${dParamIndex + 6}::numeric, $${dParamIndex + 7}::integer)`);
               demandValues.push(
                 scId,
                 sc.name,
@@ -1742,7 +1575,6 @@ async function startServer() {
               dParamIndex += 8;
             }
           }
-          
           if (demandParts.length > 0) {
             await client.query(`
               INSERT INTO wb_demands (id, name, description, modifiers_population, modifiers_coverage, modifiers_per_capita, modifiers_losses, water_balance_id)
@@ -1757,12 +1589,10 @@ async function startServer() {
                 water_balance_id = EXCLUDED.water_balance_id
             `, demandValues);
           }
-
           if (scKeepIds.length > 0) {
             await client.query(`DELETE FROM wb_demand_entries WHERE demand_id IN (${scKeepIds.join(", ")})`);
           }
-
-          const allEntries: any[] = [];
+          const allEntries = [];
           for (const sc of demands) {
             const scId = parseSafeInt(sc.id);
             if (scId !== null && sc.entries) {
@@ -1779,16 +1609,15 @@ async function startServer() {
               }
             }
           }
-
           if (allEntries.length > 0) {
-            const chunkSize = 2000;
+            const chunkSize = 2e3;
             for (let i = 0; i < allEntries.length; i += chunkSize) {
               const chunk = allEntries.slice(i, i + chunkSize);
-              const chunkValues: any[] = [];
-              const chunkParts: string[] = [];
+              const chunkValues = [];
+              const chunkParts = [];
               let eParamIndex = 1;
               for (const row of chunk) {
-                chunkParts.push(`($${eParamIndex}::integer, $${eParamIndex+1}::integer, $${eParamIndex+2}::integer, $${eParamIndex+3}::numeric, $${eParamIndex+4}::numeric, $${eParamIndex+5}::numeric, $${eParamIndex+6}::numeric)`);
+                chunkParts.push(`($${eParamIndex}::integer, $${eParamIndex + 1}::integer, $${eParamIndex + 2}::integer, $${eParamIndex + 3}::numeric, $${eParamIndex + 4}::numeric, $${eParamIndex + 5}::numeric, $${eParamIndex + 6}::numeric)`);
                 chunkValues.push(row.scId, row.regionId, row.year, row.population, row.coverage, row.perCapitaConsumption, row.losses);
                 eParamIndex += 7;
               }
@@ -1799,26 +1628,23 @@ async function startServer() {
               `, chunkValues);
             }
           }
-
           if (scKeepIds.length > 0) {
             await client.query(`DELETE FROM wb_demands WHERE id NOT IN (${scKeepIds.join(", ")})`);
           } else {
             await client.query(`DELETE FROM wb_demands`);
           }
         }
-
-        if (module === "supply-sources") {
+        if (module2 === "supply-sources") {
           const { supplySources = [], operationalAdjustments = [] } = data;
-          
           const supKeepIds = [];
-          const supValues: any[] = [];
+          const supValues = [];
           const supParts = [];
           let supParamIndex = 1;
           for (const src of supplySources) {
             const srcId = parseSafeInt(src.id);
             if (srcId !== null) {
               supKeepIds.push(srcId);
-              supParts.push(`($${supParamIndex}, $${supParamIndex+1}, $${supParamIndex+2}, $${supParamIndex+3}, $${supParamIndex+4}, $${supParamIndex+5}, $${supParamIndex+6}, $${supParamIndex+7}, $${supParamIndex+8}, $${supParamIndex+9})`);
+              supParts.push(`($${supParamIndex}, $${supParamIndex + 1}, $${supParamIndex + 2}, $${supParamIndex + 3}, $${supParamIndex + 4}, $${supParamIndex + 5}, $${supParamIndex + 6}, $${supParamIndex + 7}, $${supParamIndex + 8}, $${supParamIndex + 9})`);
               supValues.push(
                 srcId,
                 src.code || null,
@@ -1851,20 +1677,19 @@ async function startServer() {
             `, supValues);
           }
           if (supKeepIds.length > 0) {
-            await client.query(`DELETE FROM wb_supply_sources WHERE id NOT IN (${supKeepIds.map((_, idx) => '$' + (idx + 1) + '::integer').join(', ')})`, supKeepIds);
+            await client.query(`DELETE FROM wb_supply_sources WHERE id NOT IN (${supKeepIds.map((_, idx) => "$" + (idx + 1) + "::integer").join(", ")})`, supKeepIds);
           } else {
             await client.query(`DELETE FROM wb_supply_sources`);
           }
-
           const adjKeepIds = [];
-          const adjValues: any[] = [];
+          const adjValues = [];
           const adjParts = [];
           let adjParamIndex = 1;
           for (const adj of operationalAdjustments) {
             const adjId = parseSafeInt(adj.id);
             if (adjId !== null) {
               adjKeepIds.push(adjId);
-              adjParts.push(`($${adjParamIndex}, $${adjParamIndex+1}, $${adjParamIndex+2}, $${adjParamIndex+3}, $${adjParamIndex+4}, $${adjParamIndex+5}, $${adjParamIndex+6}, $${adjParamIndex+7}, NULL)`);
+              adjParts.push(`($${adjParamIndex}, $${adjParamIndex + 1}, $${adjParamIndex + 2}, $${adjParamIndex + 3}, $${adjParamIndex + 4}, $${adjParamIndex + 5}, $${adjParamIndex + 6}, $${adjParamIndex + 7}, NULL)`);
               adjValues.push(
                 adjId,
                 parseSafeInt(adj.systemId),
@@ -1878,7 +1703,6 @@ async function startServer() {
               adjParamIndex += 8;
             }
           }
-
           if (adjParts.length > 0) {
             await client.query(`
               INSERT INTO wb_operational_adjustments (id, system_id, type, description, start_year, end_year, flow_value, water_balance_id, linked_adjustment_id)
@@ -1893,14 +1717,13 @@ async function startServer() {
                 water_balance_id = EXCLUDED.water_balance_id
             `, adjValues);
           }
-
-          const linkUpdates = operationalAdjustments.filter((adj: any) => parseSafeInt(adj.id) !== null && adj.linkedAdjustmentId);
+          const linkUpdates = operationalAdjustments.filter((adj) => parseSafeInt(adj.id) !== null && adj.linkedAdjustmentId);
           if (linkUpdates.length > 0) {
             const linkParts = [];
-            const linkValues: any[] = [];
+            const linkValues = [];
             let linkIndex = 1;
             for (const adj of linkUpdates) {
-              linkParts.push(`($${linkIndex}::integer, $${linkIndex+1}::integer)`);
+              linkParts.push(`($${linkIndex}::integer, $${linkIndex + 1}::integer)`);
               linkValues.push(parseSafeInt(adj.id), parseSafeInt(adj.linkedAdjustmentId));
               linkIndex += 2;
             }
@@ -1911,37 +1734,31 @@ async function startServer() {
               WHERE o.id = v.id
             `, linkValues);
           }
-
           if (adjKeepIds.length > 0) {
-            await client.query(`DELETE FROM wb_operational_adjustments WHERE id NOT IN (${adjKeepIds.map((_, idx) => '$' + (idx + 1) + '::integer').join(', ')})`, adjKeepIds);
+            await client.query(`DELETE FROM wb_operational_adjustments WHERE id NOT IN (${adjKeepIds.map((_, idx) => "$" + (idx + 1) + "::integer").join(", ")})`, adjKeepIds);
           } else {
             await client.query(`DELETE FROM wb_operational_adjustments`);
           }
         }
-
-        // Synchronize sequences so Postgres automatic serialization works flawlessly
         await client.query("SELECT setval(pg_get_serial_sequence('wb_water_balances', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM wb_water_balances");
         await client.query("SELECT setval(pg_get_serial_sequence('wb_systems', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM wb_systems");
         await client.query("SELECT setval(pg_get_serial_sequence('wb_regions', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM wb_regions");
         await client.query("SELECT setval(pg_get_serial_sequence('wb_demands', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM wb_demands");
         await client.query("SELECT setval(pg_get_serial_sequence('wb_supply_sources', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM wb_supply_sources");
         await client.query("SELECT setval(pg_get_serial_sequence('wb_operational_adjustments', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM wb_operational_adjustments");
-
         await client.query("COMMIT");
-        res.json({ success: true, message: `Módulo ${module} salvo com sucesso.` });
+        res.json({ success: true, message: `M\xF3dulo ${module2} salvo com sucesso.` });
       } catch (error) {
         await client.query("ROLLBACK");
         throw error;
       } finally {
         client.release();
       }
-    } catch (error: any) {
-      console.error("Erro ao salvar módulo:", error);
+    } catch (error) {
+      console.error("Erro ao salvar m\xF3dulo:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
-  // Diagnostic endpoint for plans
   app.get("/api/diagnostic/save-planos", async (req, res) => {
     try {
       console.log("[LOG] GET /api/diagnostic/save-planos diagnostics requested");
@@ -1975,7 +1792,6 @@ async function startServer() {
         const plansCount = await client.query("SELECT COUNT(*) FROM pl_plans");
         const areasCount = await client.query("SELECT COUNT(*) FROM pl_areas");
         const taskAreasCount = await client.query("SELECT COUNT(*) FROM pl_task_areas");
-
         res.json({
           success: true,
           message: "Diagnostic analysis performed successfully for Plans module",
@@ -1992,28 +1808,23 @@ async function startServer() {
       } finally {
         client.release();
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("[DIAGNOSTIC ERROR]:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
-  // Bulk / individual plan saving handler
   app.post("/api/save-planos", async (req, res) => {
     try {
       console.log("[LOG] POST /api/save-planos received request:", req.body);
       if (!req.body || typeof req.body !== "object") {
-        return res.status(400).json({ success: false, error: "O corpo da requisição é obrigatório." });
+        return res.status(400).json({ success: false, error: "O corpo da requisi\xE7\xE3o \xE9 obrigat\xF3rio." });
       }
-
       const { id, planId, name, title, description } = req.body;
       const targetId = id || planId;
-      const planName = (name && typeof name === "string") ? name.trim() : (title && typeof title === "string") ? title.trim() : "Plano Sem Nome";
-      const planTitle = (title && typeof title === "string") ? title.trim() : (name && typeof name === "string") ? name.trim() : "Plano Sem Nome";
-      const planDesc = (description && typeof description === "string") ? description.trim() : "";
-
+      const planName = name && typeof name === "string" ? name.trim() : title && typeof title === "string" ? title.trim() : "Plano Sem Nome";
+      const planTitle = title && typeof title === "string" ? title.trim() : name && typeof name === "string" ? name.trim() : "Plano Sem Nome";
+      const planDesc = description && typeof description === "string" ? description.trim() : "";
       const pool = getDbPool();
-
       if (targetId) {
         const parsedId = parseInt(targetId, 10);
         const result = await pool.query(
@@ -2059,13 +1870,11 @@ async function startServer() {
           }
         });
       }
-    } catch (error: any) {
-      console.error("[API ERROR] Erro crítico ao salvar plano via /api/save-planos:", error);
+    } catch (error) {
+      console.error("[API ERROR] Erro cr\xEDtico ao salvar plano via /api/save-planos:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
-  // REST endpoints for plans
   app.post("/api/plans", async (req, res) => {
     try {
       const { name, description, updatedBy } = req.body;
@@ -2075,12 +1884,11 @@ async function startServer() {
         [name || "Plano Sem Nome", description || "", updatedBy || "SGI Pro"]
       );
       res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name || result.rows[0].title || "Plano Sem Nome", description: result.rows[0].description, updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Erro ao criar plano:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
   app.put("/api/plans/:id", async (req, res) => {
     try {
       const planId = parseInt(req.params.id);
@@ -2091,43 +1899,39 @@ async function startServer() {
         [name || "Plano Sem Nome", description || "", updatedBy || "SGI Pro", planId]
       );
       if (result.rows.length === 0) {
-        return res.status(404).json({ success: false, error: "Plano não encontrado" });
+        return res.status(404).json({ success: false, error: "Plano n\xE3o encontrado" });
       }
       res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name || result.rows[0].title || "Plano Sem Nome", description: result.rows[0].description, updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Erro ao atualizar plano:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
   app.delete("/api/plans/:id", async (req, res) => {
     try {
       const planId = parseInt(req.params.id);
       const pool = getDbPool();
       await pool.query("DELETE FROM pl_plans WHERE id = $1", [planId]);
       res.json({ success: true, deletedId: planId });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Erro ao deletar plano:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
-  // REST endpoints for areas
   app.post("/api/areas", async (req, res) => {
     try {
       const { name, abbreviation, updatedBy } = req.body;
       const pool = getDbPool();
       const result = await pool.query(
         "INSERT INTO pl_areas (name, abbreviation, updated_at, updated_by) VALUES ($1, $2, NOW(), $3) RETURNING *",
-        [name || "Área Sem Nome", abbreviation || "", updatedBy || "SGI Pro"]
+        [name || "\xC1rea Sem Nome", abbreviation || "", updatedBy || "SGI Pro"]
       );
       res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name, abbreviation: result.rows[0].abbreviation, planId: null, updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
-    } catch (error: any) {
-      console.error("Erro ao criar área:", error);
+    } catch (error) {
+      console.error("Erro ao criar \xE1rea:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
   app.put("/api/areas/:id", async (req, res) => {
     try {
       const areaId = parseInt(req.params.id);
@@ -2138,28 +1942,25 @@ async function startServer() {
         [name, abbreviation || "", updatedBy || "SGI Pro", areaId]
       );
       if (result.rows.length === 0) {
-        return res.status(404).json({ success: false, error: "Área não encontrada" });
+        return res.status(404).json({ success: false, error: "\xC1rea n\xE3o encontrada" });
       }
       res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name, abbreviation: result.rows[0].abbreviation, planId: null, updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
-    } catch (error: any) {
-      console.error("Erro ao atualizar área:", error);
+    } catch (error) {
+      console.error("Erro ao atualizar \xE1rea:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
   app.delete("/api/areas/:id", async (req, res) => {
     try {
       const areaId = parseInt(req.params.id);
       const pool = getDbPool();
       await pool.query("DELETE FROM pl_areas WHERE id = $1", [areaId]);
       res.json({ success: true, deletedId: areaId });
-    } catch (error: any) {
-      console.error("Erro ao deletar área:", error);
+    } catch (error) {
+      console.error("Erro ao deletar \xE1rea:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
-  // REST endpoints for responsibles
   app.post("/api/responsibles", async (req, res) => {
     try {
       const { name, email, role, areaIds, updatedBy } = req.body;
@@ -2170,11 +1971,10 @@ async function startServer() {
         await pool.query("BEGIN");
         const result = await pool.query(
           "INSERT INTO pl_responsibles (name, email, role, updated_at, updated_by) VALUES ($1, $2, $3, NOW(), $4) RETURNING *",
-          [name || "Responsável Sem Nome", email || "", role || "", updatedBy || "SGI Pro"]
+          [name || "Respons\xE1vel Sem Nome", email || "", role || "", updatedBy || "SGI Pro"]
         );
         createdId = result.rows[0].id;
         finalResult = result;
-        
         if (Array.isArray(areaIds) && areaIds.length > 0) {
           for (const aId of areaIds) {
             await pool.query("INSERT INTO pl_responsible_areas (responsible_id, area_id) VALUES ($1, $2)", [createdId, aId]);
@@ -2186,12 +1986,11 @@ async function startServer() {
         throw err;
       }
       res.json({ success: true, data: { id: Number(createdId), name: finalResult.rows[0].name, email: finalResult.rows[0].email, role: finalResult.rows[0].role, areaIds: areaIds || [], updatedAt: finalResult.rows[0].updated_at, updatedBy: finalResult.rows[0].updated_by } });
-    } catch (error: any) {
-      console.error("Erro ao criar responsável:", error);
+    } catch (error) {
+      console.error("Erro ao criar respons\xE1vel:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
   app.put("/api/responsibles/:id", async (req, res) => {
     try {
       const respId = parseInt(req.params.id);
@@ -2206,9 +2005,8 @@ async function startServer() {
         );
         if (result.rows.length === 0) {
           await pool.query("ROLLBACK");
-          return res.status(404).json({ success: false, error: "Responsável não encontrado" });
+          return res.status(404).json({ success: false, error: "Respons\xE1vel n\xE3o encontrado" });
         }
-        
         await pool.query("DELETE FROM pl_responsible_areas WHERE responsible_id = $1", [respId]);
         if (Array.isArray(areaIds) && areaIds.length > 0) {
           for (const aId of areaIds) {
@@ -2221,41 +2019,36 @@ async function startServer() {
         throw err;
       }
       res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name, email: result.rows[0].email, role: result.rows[0].role, areaIds: areaIds || [], updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
-    } catch (error: any) {
-      console.error("Erro ao atualizar responsável:", error);
+    } catch (error) {
+      console.error("Erro ao atualizar respons\xE1vel:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
   app.delete("/api/responsibles/:id", async (req, res) => {
     try {
       const respId = parseInt(req.params.id);
       const pool = getDbPool();
       await pool.query("DELETE FROM pl_responsibles WHERE id = $1", [respId]);
       res.json({ success: true, deletedId: respId });
-    } catch (error: any) {
-      console.error("Erro ao deletar responsável:", error);
+    } catch (error) {
+      console.error("Erro ao deletar respons\xE1vel:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
-  // REST endpoints for categories
   app.get("/api/categories", async (req, res) => {
     try {
       const pool = getDbPool();
       const result = await pool.query("SELECT id, name, updated_at, updated_by FROM pl_categories ORDER BY id ASC");
       const mapping = await pool.query("SELECT category_id, area_id FROM pl_category_areas");
-      
-      const areaMap: Record<number, number[]> = {};
-      mapping.rows.forEach(r => {
+      const areaMap = {};
+      mapping.rows.forEach((r) => {
         const catId = Number(r.category_id);
         if (!areaMap[catId]) areaMap[catId] = [];
         areaMap[catId].push(Number(r.area_id));
       });
-
       res.json({
         success: true,
-        data: result.rows.map(c => ({
+        data: result.rows.map((c) => ({
           id: Number(c.id),
           name: c.name,
           updatedAt: c.updated_at,
@@ -2263,12 +2056,11 @@ async function startServer() {
           areaIds: areaMap[Number(c.id)] || []
         }))
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Erro ao carregar categorias:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
   app.post("/api/categories", async (req, res) => {
     try {
       const { name, areaIds, updatedBy } = req.body;
@@ -2283,7 +2075,6 @@ async function startServer() {
         );
         createdId = result.rows[0].id;
         finalResult = result;
-        
         if (Array.isArray(areaIds) && areaIds.length > 0) {
           for (const aId of areaIds) {
             await pool.query("INSERT INTO pl_category_areas (category_id, area_id) VALUES ($1, $2)", [createdId, aId]);
@@ -2294,7 +2085,6 @@ async function startServer() {
         await pool.query("ROLLBACK");
         throw err;
       }
-
       res.json({
         success: true,
         data: {
@@ -2305,12 +2095,11 @@ async function startServer() {
           updatedBy: finalResult.rows[0].updated_by
         }
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Erro ao criar categoria:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
   app.put("/api/categories/:id", async (req, res) => {
     try {
       const catId = parseInt(req.params.id);
@@ -2325,9 +2114,8 @@ async function startServer() {
         );
         if (result.rows.length === 0) {
           await pool.query("ROLLBACK");
-          return res.status(404).json({ success: false, error: "Categoria não encontrada" });
+          return res.status(404).json({ success: false, error: "Categoria n\xE3o encontrada" });
         }
-        
         await pool.query("DELETE FROM pl_category_areas WHERE category_id = $1", [catId]);
         if (Array.isArray(areaIds) && areaIds.length > 0) {
           for (const aId of areaIds) {
@@ -2339,7 +2127,6 @@ async function startServer() {
         await pool.query("ROLLBACK");
         throw err;
       }
-      
       res.json({
         success: true,
         data: {
@@ -2350,24 +2137,22 @@ async function startServer() {
           updatedBy: result.rows[0].updated_by
         }
       });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Erro ao atualizar categoria:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
   app.delete("/api/categories/:id", async (req, res) => {
     try {
       const catId = parseInt(req.params.id);
       const pool = getDbPool();
       await pool.query("DELETE FROM pl_categories WHERE id = $1", [catId]);
       res.json({ success: true, deletedId: catId });
-    } catch (error: any) {
+    } catch (error) {
       console.error("Erro ao deletar categoria:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
   app.get("/api/tasks", async (req, res) => {
     try {
       const pool = getDbPool();
@@ -2394,48 +2179,42 @@ async function startServer() {
         const dbCategories = await client.query("SELECT * FROM pl_categories ORDER BY id ASC");
         const dbCategoryAreas = await client.query("SELECT * FROM pl_category_areas");
         const dbResponsibleAreas = await client.query("SELECT * FROM pl_responsible_areas");
-
-        const categoryAreasMap: Record<number, number[]> = {};
-        dbCategoryAreas.rows.forEach(r => {
+        const categoryAreasMap = {};
+        dbCategoryAreas.rows.forEach((r) => {
           const cid = Number(r.category_id);
           const aid = Number(r.area_id);
           if (!categoryAreasMap[cid]) categoryAreasMap[cid] = [];
           categoryAreasMap[cid].push(aid);
         });
-
-        const responsibleAreasMap: Record<number, number[]> = {};
-        dbResponsibleAreas.rows.forEach(r => {
+        const responsibleAreasMap = {};
+        dbResponsibleAreas.rows.forEach((r) => {
           const rid = Number(r.responsible_id);
           const aid = Number(r.area_id);
           if (!responsibleAreasMap[rid]) responsibleAreasMap[rid] = [];
           responsibleAreasMap[rid].push(aid);
         });
-
-        const taskAreasMap: Record<number, number[]> = {};
-        dbTaskAreas.rows.forEach(r => {
+        const taskAreasMap = {};
+        dbTaskAreas.rows.forEach((r) => {
           const tid = Number(r.task_id);
           const aid = Number(r.area_id);
           if (!taskAreasMap[tid]) taskAreasMap[tid] = [];
           taskAreasMap[tid].push(aid);
         });
-
-        const taskResponsiblesMap: Record<number, number[]> = {};
-        dbTaskResponsibles.rows.forEach(r => {
+        const taskResponsiblesMap = {};
+        dbTaskResponsibles.rows.forEach((r) => {
           const tid = Number(r.task_id);
           const rid = Number(r.responsible_id);
           if (!taskResponsiblesMap[tid]) taskResponsiblesMap[tid] = [];
           taskResponsiblesMap[tid].push(rid);
         });
-
-        const taskCategoriesMap: Record<number, number[]> = {};
-        dbTaskCategories.rows.forEach(r => {
+        const taskCategoriesMap = {};
+        dbTaskCategories.rows.forEach((r) => {
           const tid = Number(r.task_id);
           const cid = Number(r.category_id);
           if (!taskCategoriesMap[tid]) taskCategoriesMap[tid] = [];
           taskCategoriesMap[tid].push(cid);
         });
-        
-        const tasks = result.rows.map(t => ({
+        const tasks = result.rows.map((t) => ({
           id: Number(t.id),
           title: t.title,
           description: t.description,
@@ -2457,11 +2236,10 @@ async function startServer() {
           responsibleIds: taskResponsiblesMap[Number(t.id)] || [],
           categoryIds: taskCategoriesMap[Number(t.id)] || []
         }));
-        
-        res.json({ 
-          success: true, 
+        res.json({
+          success: true,
           data: tasks,
-          plans: dbPlans.rows.map(p => ({
+          plans: dbPlans.rows.map((p) => ({
             id: Number(p.id),
             name: p.name || p.title || "Plano Sem Nome",
             title: p.title || p.name || "Plano Sem Nome",
@@ -2469,7 +2247,7 @@ async function startServer() {
             updatedAt: p.updated_at,
             updatedBy: p.updated_by
           })),
-          areas: dbAreas.rows.map(a => ({
+          areas: dbAreas.rows.map((a) => ({
             id: Number(a.id),
             name: a.name,
             abbreviation: a.abbreviation,
@@ -2477,7 +2255,7 @@ async function startServer() {
             updatedAt: a.updated_at,
             updatedBy: a.updated_by
           })),
-          responsibles: dbResponsibles.rows.map(r => ({
+          responsibles: dbResponsibles.rows.map((r) => ({
             id: Number(r.id),
             name: r.name,
             email: r.email,
@@ -2486,7 +2264,7 @@ async function startServer() {
             updatedAt: r.updated_at,
             updatedBy: r.updated_by
           })),
-          categories: dbCategories.rows.map(c => ({
+          categories: dbCategories.rows.map((c) => ({
             id: Number(c.id),
             name: c.name,
             areaIds: categoryAreasMap[Number(c.id)] || [],
@@ -2497,15 +2275,14 @@ async function startServer() {
       } finally {
         client.release();
       }
-    } catch (error: any) {
-      if (error && error.message === "A variável DATABASE_URL (Neon PostgreSQL) está ausente no ambiente.") {
+    } catch (error) {
+      if (error && error.message === "A vari\xE1vel DATABASE_URL (Neon PostgreSQL) est\xE1 ausente no ambiente.") {
         return res.status(200).json({ success: false, error: "DATABASE_URL_MISSING", data: [] });
       }
       console.error("Erro ao carregar tarefas:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
   app.post("/api/tasks", async (req, res) => {
     try {
       const { title, description, startDate, endDate, status, parentId, progress, priority, category, assignedTo, notes, planId, areaIds, responsibleIds, categoryIds, dependsOnTaskId } = req.body;
@@ -2513,84 +2290,71 @@ async function startServer() {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
-        const finalProgress = progress !== undefined ? parseInt(progress) : 0;
-        const finalStatus = finalProgress === 100 ? "Concluída" : finalProgress > 0 ? "Em andamento" : "Não iniciada";
-        
+        const finalProgress = progress !== void 0 ? parseInt(progress) : 0;
+        const finalStatus = finalProgress === 100 ? "Conclu\xEDda" : finalProgress > 0 ? "Em andamento" : "N\xE3o iniciada";
         let finalAreaIds = areaIds || [];
         let finalCategoryIds = categoryIds || [];
         if (parentId) {
-            const parentAreasRes = await client.query("SELECT area_id FROM pl_task_areas WHERE task_id = $1", [parseInt(parentId)]);
-            if (parentAreasRes.rows.length > 0) {
-               finalAreaIds = parentAreasRes.rows.map(r => r.area_id);
-            }
-            const parentCatsRes = await client.query("SELECT category_id FROM pl_task_categories WHERE task_id = $1", [parseInt(parentId)]);
-            if (parentCatsRes.rows.length > 0) {
-               finalCategoryIds = parentCatsRes.rows.map(r => r.category_id);
-            }
+          const parentAreasRes = await client.query("SELECT area_id FROM pl_task_areas WHERE task_id = $1", [parseInt(parentId)]);
+          if (parentAreasRes.rows.length > 0) {
+            finalAreaIds = parentAreasRes.rows.map((r) => r.area_id);
+          }
+          const parentCatsRes = await client.query("SELECT category_id FROM pl_task_categories WHERE task_id = $1", [parseInt(parentId)]);
+          if (parentCatsRes.rows.length > 0) {
+            finalCategoryIds = parentCatsRes.rows.map((r) => r.category_id);
+          }
         }
-        
         const result = await client.query(
           `INSERT INTO pl_tasks (title, description, start_date, end_date, status, parent_id, progress, priority, category, assigned_to, notes, plan_id, depends_on_task_id, updated_at, updated_by)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), $14)
            RETURNING *`,
           [
-            title || "Sem título",
+            title || "Sem t\xEDtulo",
             description || "",
             startDate ? new Date(startDate) : null,
             endDate ? new Date(endDate) : null,
             finalStatus,
             parentId ? parseInt(parentId) : null,
             finalProgress,
-            priority || "Média",
+            priority || "M\xE9dia",
             category || "PONTUAIS",
-            "", // assigned_to will be updated below
+            "",
+            // assigned_to will be updated below
             notes || "",
             planId ? parseInt(planId) : null,
             dependsOnTaskId ? parseInt(dependsOnTaskId) : null,
             req.body.updatedBy || "SGI Pro"
           ]
         );
-        
         const createdTask = result.rows[0];
         const createdTaskId = Number(createdTask.id);
-
-        // Save task_areas
         if (Array.isArray(finalAreaIds) && finalAreaIds.length > 0) {
           for (const aid of finalAreaIds) {
             await client.query("INSERT INTO pl_task_areas (task_id, area_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [createdTaskId, aid]);
           }
         }
-
-        // Save task_responsibles
         if (Array.isArray(responsibleIds) && responsibleIds.length > 0) {
           for (const rid of responsibleIds) {
             await client.query("INSERT INTO pl_task_responsibles (task_id, responsible_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [createdTaskId, rid]);
           }
         }
-
-        // Save task_categories
         if (Array.isArray(finalCategoryIds) && finalCategoryIds.length > 0) {
           for (const cid of finalCategoryIds) {
             await client.query("INSERT INTO pl_task_categories (task_id, category_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [createdTaskId, cid]);
           }
         }
-
-        // Format and update assignedTo string based on actual responsible names
         let finalAssignedTo = assignedTo || "";
         if (Array.isArray(responsibleIds) && responsibleIds.length > 0) {
           const respNamesRes = await client.query("SELECT name FROM pl_responsibles WHERE id = ANY($1::integer[])", [responsibleIds]);
           if (respNamesRes.rows.length > 0) {
-            finalAssignedTo = respNamesRes.rows.map(r => r.name).join(", ");
+            finalAssignedTo = respNamesRes.rows.map((r) => r.name).join(", ");
           }
           await client.query("UPDATE pl_tasks SET assigned_to = $1 WHERE id = $2", [finalAssignedTo, createdTaskId]);
         }
-        
         if (createdTask.parent_id) {
           await rollUpTask(client, createdTask.parent_id);
         }
-        
         await client.query("COMMIT");
-        
         res.json({
           success: true,
           data: {
@@ -2619,12 +2383,11 @@ async function startServer() {
       } finally {
         client.release();
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Erro ao criar tarefa:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
   app.put("/api/tasks/:id", async (req, res) => {
     try {
       const taskId = parseInt(req.params.id);
@@ -2633,57 +2396,52 @@ async function startServer() {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
-        
         const currentTaskRes = await client.query("SELECT parent_id, start_date, end_date, progress, status, depends_on_task_id FROM pl_tasks WHERE id = $1", [taskId]);
         if (currentTaskRes.rows.length === 0) {
           await client.query("ROLLBACK");
-          return res.status(404).json({ success: false, error: "Tarefa não encontrada." });
+          return res.status(404).json({ success: false, error: "Tarefa n\xE3o encontrada." });
         }
         const oldParentId = currentTaskRes.rows[0].parent_id;
-
         const childrenCheck = await client.query("SELECT COUNT(*) FROM pl_tasks WHERE parent_id = $1", [taskId]);
         const hasChildren = parseInt(childrenCheck.rows[0].count, 10) > 0;
-
         let finalStartDate = startDate ? new Date(startDate) : null;
         let finalEndDate = endDate ? new Date(endDate) : null;
-        let finalProgress = progress !== undefined ? parseInt(progress) : 0;
-        let finalStatus = finalProgress === 100 ? "Concluída" : finalProgress > 0 ? "Em andamento" : "Não iniciada";
-
+        let finalProgress = progress !== void 0 ? parseInt(progress) : 0;
+        let finalStatus = finalProgress === 100 ? "Conclu\xEDda" : finalProgress > 0 ? "Em andamento" : "N\xE3o iniciada";
         if (hasChildren) {
           finalStartDate = currentTaskRes.rows[0].start_date;
           finalEndDate = currentTaskRes.rows[0].end_date;
           finalProgress = currentTaskRes.rows[0].progress || 0;
-          finalStatus = finalProgress === 100 ? "Concluída" : finalProgress > 0 ? "Em andamento" : "Não iniciada";
+          finalStatus = finalProgress === 100 ? "Conclu\xEDda" : finalProgress > 0 ? "Em andamento" : "N\xE3o iniciada";
         }
-
         let finalAreaIds = areaIds || [];
         let finalCategoryIds = categoryIds || [];
         if (parentId) {
-            const parentAreasRes = await client.query("SELECT area_id FROM pl_task_areas WHERE task_id = $1", [parseInt(parentId, 10)]);
-            if (parentAreasRes.rows.length > 0) {
-               finalAreaIds = parentAreasRes.rows.map(r => r.area_id);
-            }
-            const parentCatsRes = await client.query("SELECT category_id FROM pl_task_categories WHERE task_id = $1", [parseInt(parentId, 10)]);
-            if (parentCatsRes.rows.length > 0) {
-               finalCategoryIds = parentCatsRes.rows.map(r => r.category_id);
-            }
+          const parentAreasRes = await client.query("SELECT area_id FROM pl_task_areas WHERE task_id = $1", [parseInt(parentId, 10)]);
+          if (parentAreasRes.rows.length > 0) {
+            finalAreaIds = parentAreasRes.rows.map((r) => r.area_id);
+          }
+          const parentCatsRes = await client.query("SELECT category_id FROM pl_task_categories WHERE task_id = $1", [parseInt(parentId, 10)]);
+          if (parentCatsRes.rows.length > 0) {
+            finalCategoryIds = parentCatsRes.rows.map((r) => r.category_id);
+          }
         }
-
         const result = await client.query(
           `UPDATE pl_tasks 
            SET title = $1, description = $2, start_date = $3, end_date = $4, status = $5, progress = $6, priority = $7, category = $8, assigned_to = $9, notes = $10, parent_id = $11, plan_id = $12, depends_on_task_id = $13, updated_at = NOW(), updated_by = $14
            WHERE id = $15
            RETURNING *`,
           [
-            title || "Sem título",
+            title || "Sem t\xEDtulo",
             description || "",
             finalStartDate,
             finalEndDate,
             finalStatus,
             finalProgress,
-            priority || "Média",
+            priority || "M\xE9dia",
             category || "PONTUAIS",
-            "", // assigned_to will be updated below
+            "",
+            // assigned_to will be updated below
             notes || "",
             parentId ? parseInt(parentId) : null,
             planId ? parseInt(planId) : null,
@@ -2692,59 +2450,44 @@ async function startServer() {
             taskId
           ]
         );
-
         const updatedTask = result.rows[0];
-
-        // Reset and save task_areas
         await client.query("DELETE FROM pl_task_areas WHERE task_id = $1", [taskId]);
         if (Array.isArray(finalAreaIds) && finalAreaIds.length > 0) {
           for (const aid of finalAreaIds) {
             await client.query("INSERT INTO pl_task_areas (task_id, area_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [taskId, aid]);
           }
         }
-
-        // Reset and save task_responsibles
         await client.query("DELETE FROM pl_task_responsibles WHERE task_id = $1", [taskId]);
         if (Array.isArray(responsibleIds) && responsibleIds.length > 0) {
           for (const rid of responsibleIds) {
             await client.query("INSERT INTO pl_task_responsibles (task_id, responsible_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [taskId, rid]);
           }
         }
-
-        // Reset and save task_categories
         await client.query("DELETE FROM pl_task_categories WHERE task_id = $1", [taskId]);
         if (Array.isArray(finalCategoryIds) && finalCategoryIds.length > 0) {
           for (const cid of finalCategoryIds) {
             await client.query("INSERT INTO pl_task_categories (task_id, category_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [taskId, cid]);
           }
         }
-
-        // Format and update assignedTo string based on actual responsible names
         let finalAssignedTo = assignedTo || "";
         if (Array.isArray(responsibleIds) && responsibleIds.length > 0) {
           const respNamesRes = await client.query("SELECT name FROM pl_responsibles WHERE id = ANY($1::integer[])", [responsibleIds]);
           if (respNamesRes.rows.length > 0) {
-            finalAssignedTo = respNamesRes.rows.map(r => r.name).join(", ");
+            finalAssignedTo = respNamesRes.rows.map((r) => r.name).join(", ");
           }
           await client.query("UPDATE pl_tasks SET assigned_to = $1 WHERE id = $2", [finalAssignedTo, taskId]);
         }
-
-        // Trigger cascade to override children
         await cascadeAreasAndCategories(client, taskId, finalAreaIds, finalCategoryIds);
-
         if (hasChildren) {
           await rollUpTask(client, taskId);
         }
-
         if (updatedTask.parent_id) {
           await rollUpTask(client, updatedTask.parent_id);
         }
         if (oldParentId && oldParentId !== updatedTask.parent_id) {
           await rollUpTask(client, oldParentId);
         }
-
         await client.query("COMMIT");
-        
         res.json({
           success: true,
           data: {
@@ -2773,12 +2516,11 @@ async function startServer() {
       } finally {
         client.release();
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Erro ao atualizar tarefa:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
   app.delete("/api/tasks/:id", async (req, res) => {
     try {
       const taskId = parseInt(req.params.id);
@@ -2786,20 +2528,16 @@ async function startServer() {
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
-        
         const taskRes = await client.query("SELECT parent_id FROM pl_tasks WHERE id = $1", [taskId]);
         if (taskRes.rows.length === 0) {
           await client.query("ROLLBACK");
-          return res.status(404).json({ success: false, error: "Tarefa não encontrada." });
+          return res.status(404).json({ success: false, error: "Tarefa n\xE3o encontrada." });
         }
         const parentId = taskRes.rows[0].parent_id;
-
         await client.query("DELETE FROM pl_tasks WHERE id = $1", [taskId]);
-
         if (parentId) {
           await rollUpTask(client, parentId);
         }
-
         await client.query("COMMIT");
         res.json({ success: true, deletedId: taskId });
       } catch (err) {
@@ -2808,12 +2546,11 @@ async function startServer() {
       } finally {
         client.release();
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Erro ao demover tarefa:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
   app.delete("/api/tasks", async (req, res) => {
     try {
       console.log("[LOG] DELETE /api/tasks: Deletando todas as tarefas...");
@@ -2822,50 +2559,42 @@ async function startServer() {
       try {
         await client.query("BEGIN");
         const result = await client.query("DELETE FROM pl_tasks");
-        
-        const markerPath = process.env.VERCEL ? "/tmp/tasks_cleared_marker.txt" : path.join("/tmp", "tasks_cleared_marker.txt");
-        fs.writeFileSync(markerPath, "tasks_cleared_" + Date.now(), "utf8");
-        
+        const markerPath = process.env.VERCEL ? "/tmp/tasks_cleared_marker.txt" : import_path.default.join("/tmp", "tasks_cleared_marker.txt");
+        import_fs.default.writeFileSync(markerPath, "tasks_cleared_" + Date.now(), "utf8");
         await client.query("COMMIT");
         console.log(`[LOG] DELETE /api/tasks: Sucesso! Deletadas ${result.rowCount} tarefas.`);
-        res.json({ success: true, message: "Todos os registros da tabela 'pl_tasks' foram excluídos com sucesso!", deletedCount: result.rowCount });
-      } catch (err: any) {
+        res.json({ success: true, message: "Todos os registros da tabela 'pl_tasks' foram exclu\xEDdos com sucesso!", deletedCount: result.rowCount });
+      } catch (err) {
         await client.query("ROLLBACK");
         throw err;
       } finally {
         client.release();
       }
-    } catch (error: any) {
+    } catch (error) {
       console.error("Erro ao excluir todas as tarefas:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
-
-  // Global API error handler for things like PayloadTooLargeError from body-parser
-  app.use("/api", (err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  app.use("/api", (err, req, res, next) => {
     console.error("Express API error:", err);
     res.status(err.status || 500).json({ success: false, error: err.message || "Internal Server Error" });
   });
-
-  // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
+    const vite = await (0, import_vite.createServer)({
       server: { middlewareMode: true },
-      appType: "spa",
+      appType: "spa"
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-       if (req.path.startsWith('/api')) return res.status(404).end();
-       res.sendFile(path.join(distPath, 'index.html'));
+    const distPath = import_path.default.join(process.cwd(), "dist");
+    app.use(import_express.default.static(distPath));
+    app.get("*", (req, res) => {
+      if (req.path.startsWith("/api")) return res.status(404).end();
+      res.sendFile(import_path.default.join(distPath, "index.html"));
     });
   }
-
   app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
 }
-
 startServer();

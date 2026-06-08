@@ -786,6 +786,9 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
     try {
       const res = await fetch("/api/tasks");
       const data = await res.json();
+      if (!res.ok || (data.success === false)) {
+         throw new Error(data.error || "Unknown server error");
+      }
       if (data.success && data.data) {
         setTasks(data.data);
         if (data.plans) setPlans(data.plans);
@@ -794,7 +797,8 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
         if (data.responsibles) setResponsibles(data.responsibles);
       }
     } catch (e: any) {
-      showToast("Erro", "Falha ao recarregar tarefas do banco de dados.", "error");
+      console.error("Task load error:", e);
+      showToast("Erro", `Falha ao recarregar: ${e.message}`, "error");
     } finally {
       setIsSyncing(false);
     }

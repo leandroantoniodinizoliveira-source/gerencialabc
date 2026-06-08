@@ -2847,25 +2847,15 @@ async function startServer() {
     res.status(err.status || 500).json({ success: false, error: err.message || "Internal Server Error" });
   });
 
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-       if (req.path.startsWith('/api')) return res.status(404).end();
-       res.sendFile(path.join(distPath, 'index.html'));
-    });
-  }
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  return app;
 }
 
-startServer();
+let appPromise: Promise<express.Express> | null = null;
+export default async function handler(req: any, res: any) {
+  if (!appPromise) {
+    appPromise = startServer();
+  }
+  const app = await appPromise;
+  return app(req, res);
+}
+
