@@ -312,11 +312,7 @@ async function runStartupMigration() {
       `);
 
       // Add sei_process column
-      try {
-        await client.query("ALTER TABLE pl_tasks ADD COLUMN sei_process TEXT;");
-      } catch (err: any) {
-        if (err.code !== '42701') console.warn("Could not add sei_process column:", err);
-      }
+      await client.query("ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS sei_process TEXT;");
 
       await client.query("CREATE INDEX IF NOT EXISTS idx_tasks_parent_id ON pl_tasks(parent_id);");
 
@@ -400,14 +396,22 @@ async function runStartupMigration() {
       await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS depends_on_task_id INTEGER REFERENCES pl_tasks(id) ON DELETE SET NULL;`);
       
       // Add updated_at and updated_by to tables
-      await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
-      await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(), ADD COLUMN IF NOT EXISTS completed_by VARCHAR(255), ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP;`);
+      await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP;`);
+      await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
+      await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW();`);
+      await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS completed_by VARCHAR(255);`);
+      await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP;`);
       await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS is_programmed BOOLEAN DEFAULT TRUE;`);
       await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS weight NUMERIC DEFAULT 1;`);
-      await client.query(`ALTER TABLE pl_plans ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
-      await client.query(`ALTER TABLE pl_areas ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
-      await client.query(`ALTER TABLE pl_responsibles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
-      await client.query(`ALTER TABLE pl_categories ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
+      
+      await client.query(`ALTER TABLE pl_plans ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP;`);
+      await client.query(`ALTER TABLE pl_plans ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
+      await client.query(`ALTER TABLE pl_areas ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP;`);
+      await client.query(`ALTER TABLE pl_areas ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
+      await client.query(`ALTER TABLE pl_responsibles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP;`);
+      await client.query(`ALTER TABLE pl_responsibles ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
+      await client.query(`ALTER TABLE pl_categories ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP;`);
+      await client.query(`ALTER TABLE pl_categories ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
 
       await client.query("COMMIT");
       console.log("Database tables verified successfully on server start!");
