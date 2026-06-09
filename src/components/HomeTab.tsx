@@ -46,14 +46,14 @@ export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas }:
   return (
     <div className="space-y-10 max-w-5xl mx-auto pb-16">
       {/* Dynamic Header Promo Banner */}
-      <div className="bg-gradient-to-br from-slate-900 via-slate-800 to-blue-950 rounded-3xl p-8 sm:p-12 text-white shadow-xl relative overflow-hidden border border-slate-700/30">
+      <div className="bg-adasa-dark rounded-3xl p-8 sm:p-12 text-white shadow-xl relative overflow-hidden border border-slate-700/30">
         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-white/5 blur-3xl"></div>
-        <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 rounded-full bg-blue-500/10 blur-3xl"></div>
+        <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 rounded-full bg-adasa-light/10 blur-3xl"></div>
         
         <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
           <div className="space-y-4 max-w-2xl">
-            <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full border border-white/10 text-xs font-black uppercase tracking-widest text-blue-200">
-              <Droplets size={12} className="text-blue-400 animate-pulse" />
+            <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full border border-white/10 text-xs font-black uppercase tracking-widest text-adasa-light/80">
+              <Droplets size={12} className="text-adasa-light animate-pulse" />
               Gerencial SAE
             </div>
             <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-none">

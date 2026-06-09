@@ -669,18 +669,6 @@ export default function App() {
     }
   }, [waterBalances, systems, regions, demands, supplySources, operationalAdjustments, lastSavedStateStr, isDataLoaded]);
 
-  useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (hasPendingChanges) {
-        e.preventDefault();
-        e.returnValue = "Deseja salvar as alterações do balanço hídrico?";
-        return e.returnValue;
-      }
-    };
-    window.addEventListener("beforeunload", handleBeforeUnload);
-    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [hasPendingChanges]);
-
   const handleSync = async () => {
     try {
       await fetchCloudData(true);
@@ -858,20 +846,8 @@ export default function App() {
   };
 
   const handleTabChange = (newTab: typeof activeTab) => {
-    if (activeTab === "manage" && newTab !== "manage" && hasPendingChanges) {
-      setConfirmState({
-        message: "Deseja salvar as alterações do balanço hídrico? Clique em Confirmar para salvar e sair.",
-        onConfirm: () => {
-          handleSaveToCloud().then(() => {
-            setActiveTab(newTab);
-            setIsMobileMenuOpen(false);
-          });
-        }
-      });
-    } else {
-      setActiveTab(newTab);
-      setIsMobileMenuOpen(false);
-    }
+    setActiveTab(newTab);
+    setIsMobileMenuOpen(false);
   };
 
   const handleAddSystem = () => {
@@ -3232,7 +3208,6 @@ const renderSupplyTable = () => {
             <TrendingUp size={22} className="text-adasa-light" />
             <div className="flex flex-col">
               <span className="font-bold text-lg leading-tight">Gerencial SAE</span>
-              <span className="text-[10px] text-white/50 tracking-widest uppercase mt-0.5">Gerenciamento ABC</span>
             </div>
          </div>
          <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="p-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors">
@@ -3397,9 +3372,6 @@ const renderSupplyTable = () => {
               <div className="flex flex-col">
                 <span className="text-xl font-black text-white tracking-tight block leading-tight">
                   Gerencial SAE
-                </span>
-                <span className="text-[10px] font-medium text-white/40 block mt-1 tracking-widest uppercase">
-                  Gerenciamento ABC
                 </span>
               </div>
             </div>
