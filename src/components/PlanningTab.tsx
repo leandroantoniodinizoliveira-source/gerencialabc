@@ -46,7 +46,9 @@ import {
   Users,
   Copy,
   FileDigit,
-  Upload
+  Upload,
+  CalendarCheck,
+  CalendarX
 } from "lucide-react";
 import { Task, Plan, Area, Category, Responsible } from "../types";
 import { cn } from "../lib/utils";
@@ -2343,13 +2345,15 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
       const url = isEdit ? `/api/tasks/${editingTask.id}` : "/api/tasks";
       const method = isEdit ? "PUT" : "POST";
 
-      const finalProgress = editingTask.progress ?? 0;
+      const finalProgress = parseInt(editingTask.progress as any) || 0;
+      const finalWeight = parseFloat(editingTask.weight as any) || 0;
       const finalStatus = finalProgress === 100 ? "Concluída" : finalProgress > 0 ? "Em andamento" : "Não iniciada";
       const author = currentUser?.name || "Administrador";
 
       const payload = {
         ...editingTask,
         progress: finalProgress,
+        weight: finalWeight,
         status: finalStatus,
         updatedBy: author
       };
@@ -2535,33 +2539,33 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
   const timelineTasks = useMemo(() => {
     if (timelineTaskId === null) return [];
     
-    // Find ancestors up to root
-    const ancestors: Task[] = [];
-    let currId: number | null | undefined = taskById[timelineTaskId]?.parentId;
+    // Find absolute root and the path to target
+    const pathIds = new Set<number>();
+    let currId: number | null | undefined = timelineTaskId;
+    let rootId = timelineTaskId;
+    
     while (currId && taskById[currId]) {
-      ancestors.unshift(taskById[currId]);
+      pathIds.add(currId);
+      rootId = currId;
       currId = taskById[currId].parentId;
     }
 
     const result: { task: Task; depth: number; isTarget: boolean; isAncestor: boolean }[] = [];
     
-    // Add ancestors
-    ancestors.forEach((anc, idx) => {
-      result.push({ task: anc, depth: idx, isTarget: false, isAncestor: true });
-    });
-
-    const targetDepth = ancestors.length;
-
-    // Collect target and its descendants
-    const collect = (id: number, currentDepth: number, isTargetNode: boolean = false) => {
+    // Collect from root to all descendants
+    const collect = (id: number, currentDepth: number) => {
       const t = taskById[id];
-      if (t) result.push({ task: t, depth: currentDepth, isTarget: isTargetNode, isAncestor: false });
+      if (t) {
+        const isTarget = id === timelineTaskId;
+        const isAncestor = pathIds.has(id) && !isTarget;
+        result.push({ task: t, depth: currentDepth, isTarget, isAncestor });
+      }
       const children = childrenMap[id] || [];
       const sortedChildren = [...children].sort((a, b) => new Date(a.endDate || "2099-01-01").getTime() - new Date(b.endDate || "2099-01-01").getTime());
-      sortedChildren.forEach(c => collect(c.id, currentDepth + 1, false));
+      sortedChildren.forEach(c => collect(c.id, currentDepth + 1));
     };
     
-    collect(timelineTaskId, targetDepth, true);
+    collect(rootId, 0);
     
     return result;
   }, [timelineTaskId, taskById, childrenMap]);
@@ -4861,9 +4865,14 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                     Exibindo a hierarquia da tarefa (predecessores e subtarefas dependentes). As estatísticas referem-se à tarefa selecionada e suas filhas.
                   </p>
                   {(() => {
-                    const targetIdx = timelineTasks.findIndex(t => t.isTarget);
-                    // Include target and descendants for stats, or just descendants? Let's include target too since the UI says "tarefa selecionada e suas filhas"
-                    const childrenTasks = timelineTasks.slice(targetIdx);
+                    const getDescendantsAndSelf = (id: number): number[] => {
+                      const res = [id];
+                      const children = childrenMap[id] || [];
+                      children.forEach(c => res.push(...getDescendantsAndSelf(c.id)));
+                      return res;
+                    };
+                    const descendantsIds = new Set(getDescendantsAndSelf(timelineTaskId));
+                    const childrenTasks = timelineTasks.filter(t => descendantsIds.has(t.task.id));
                     const total = childrenTasks.length;
                     if (total === 0) return null;
                     
@@ -6332,8 +6341,14 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   Exibindo a hierarquia da tarefa (predecessores e subtarefas dependentes). As estatísticas referem-se à tarefa selecionada e suas filhas.
                 </p>
                 {(() => {
-                  const targetIdx = timelineTasks.findIndex(t => t.isTarget);
-                  const childrenTasks = timelineTasks.slice(targetIdx);
+                  const getDescendantsAndSelf = (id: number): number[] => {
+                    const res = [id];
+                    const children = childrenMap[id] || [];
+                    children.forEach(c => res.push(...getDescendantsAndSelf(c.id)));
+                    return res;
+                  };
+                  const descendantsIds = new Set(getDescendantsAndSelf(timelineTaskId));
+                  const childrenTasks = timelineTasks.filter(t => descendantsIds.has(t.task.id));
                   const total = childrenTasks.length;
                   if (total === 0) return null;
                   
@@ -6784,10 +6799,15 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                       type="number"
                       min="0"
                       max="100"
-                      value={editingTask.progress ?? 0}
+                      value={editingTask.progress !== undefined ? editingTask.progress : ""}
                       onChange={(e) => {
-                        const val = Math.min(100, Math.max(0, parseInt(e.target.value) || 0));
-                        setEditingTask(prev => ({ ...prev, progress: val }));
+                        const valStr = e.target.value;
+                        if (valStr === '') {
+                          setEditingTask(prev => ({ ...prev, progress: "" as any }));
+                        } else {
+                          const val = Math.min(100, Math.max(0, parseInt(valStr)));
+                          setEditingTask(prev => ({ ...prev, progress: isNaN(val) ? 0 : val }));
+                        }
                       }}
                       disabled={editingTask.id !== undefined && hasChildren(editingTask.id)}
                       className={`w-full border-2 border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-700 focus:border-adasa-mid outline-none ${
@@ -6858,8 +6878,16 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                       type="number"
                       min="0"
                       step="0.1"
-                      value={editingTask.weight !== undefined ? editingTask.weight : 1}
-                      onChange={(e) => setEditingTask(prev => ({ ...prev, weight: parseFloat(e.target.value) || 0 }))}
+                      value={editingTask.weight !== undefined ? editingTask.weight : ""}
+                      onChange={(e) => {
+                        const valStr = e.target.value;
+                        if (valStr === '') {
+                          setEditingTask(prev => ({ ...prev, weight: "" as any }));
+                        } else {
+                          const val = parseFloat(valStr);
+                          setEditingTask(prev => ({ ...prev, weight: isNaN(val) ? 0 : val }));
+                        }
+                      }}
                       className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-600 font-semibold focus:border-adasa-mid outline-none transition-all placeholder:text-slate-400"
                     />
                   </div>
@@ -7224,7 +7252,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
       <div 
         key={task.id} 
         id={`task-node-${task.id}`}
-        className="w-full border-b border-indigo-100 shadow-[0_4px_12px_-4px_rgba(0,0,0,0.05)_inset] last:border-none last:shadow-none"
+        className={`w-full border-b border-indigo-100 shadow-[0_4px_12px_-4px_rgba(0,0,0,0.05)_inset] last:border-none last:shadow-none ${depth > 0 ? "bg-indigo-50/40" : "bg-white"}`}
       >
         {/* Node Layout block */}
         <div 
@@ -7280,9 +7308,11 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   )}
 
                   {task.priority && (
-                    <span className={`text-[9px] font-bold uppercase py-0.5 px-2 rounded-md border flex items-center gap-1 ${getPriorityBadgeClass(task.priority)}`}>
-                      <Flag size={10} className={task.priority === "Alta" ? "fill-rose-100" : task.priority === "Média" ? "fill-amber-100" : ""} />
-                      {task.priority}
+                    <span 
+                      className={`text-[9px] font-bold uppercase p-1 rounded-md border flex items-center justify-center ${getPriorityBadgeClass(task.priority)}`}
+                      title={`Prioridade: ${task.priority}`}
+                    >
+                      <Flag size={12} className={task.priority === "Alta" ? "fill-rose-100" : task.priority === "Média" ? "fill-amber-100" : ""} />
                     </span>
                   )}
 
@@ -7299,9 +7329,11 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                     }
 
                     return (
-                      <span className={`text-[9px] font-black uppercase py-0.5 px-2 rounded-md border flex items-center gap-1 ${statusClasses}`}>
-                        <StatusIcon size={10} />
-                        {normStatus}
+                      <span 
+                        className={`text-[9px] font-black uppercase p-1 rounded-md border flex items-center justify-center ${statusClasses}`}
+                        title={`Status: ${normStatus}`}
+                      >
+                        <StatusIcon size={12} />
                       </span>
                     );
                   })()}
@@ -7312,31 +7344,39 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                     let dlClasses = "bg-slate-550 text-slate-500 border-slate-200";
                     let DlIcon = CheckCircle2;
                     if (dlStatus === "Atrasada") {
-                      dlClasses = "bg-rose-500 text-white border-rose-500 font-extrabold shadow-xs";
+                      dlClasses = "bg-rose-500 text-white border-rose-500 shadow-xs";
                       DlIcon = AlertCircle;
                     } else if (dlStatus === "Crítica") {
-                      dlClasses = "bg-amber-500 text-white border-amber-500 font-extrabold shadow-xs";
+                      dlClasses = "bg-amber-500 text-white border-amber-500 shadow-xs";
                       DlIcon = AlertTriangle;
                     } else {
-                      dlClasses = "bg-emerald-50 text-emerald-800 border-emerald-200 font-semibold";
+                      dlClasses = "bg-emerald-50 text-emerald-800 border-emerald-200";
                       DlIcon = CheckCircle2;
                     }
 
                     return (
-                      <span className={`text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-md border flex items-center gap-1 ${dlClasses}`}>
-                        <DlIcon size={10} />
-                        {dlStatus}
+                      <span 
+                        className={`text-[9px] uppercase tracking-wider p-1 rounded-md border flex items-center justify-center ${dlClasses}`}
+                        title={`Situação: ${dlStatus}`}
+                      >
+                        <DlIcon size={12} />
                       </span>
                     );
                   })()}
 
                   {task.isProgrammed !== false ? (
-                    <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border flex items-center gap-1 bg-indigo-50 text-indigo-700 border-indigo-200">
-                      PROGRAMADA
+                    <span 
+                      className="text-[9px] font-black uppercase tracking-wider p-1 rounded-md border flex items-center justify-center bg-indigo-50 text-indigo-700 border-indigo-200"
+                      title="PROGRAMADA"
+                    >
+                      <CalendarCheck size={12} />
                     </span>
                   ) : (
-                    <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border flex items-center gap-1 bg-rose-50 text-rose-700 border-rose-200">
-                      NÃO PROGRAMADA
+                    <span 
+                      className="text-[9px] font-black uppercase tracking-wider p-1 rounded-md border flex items-center justify-center bg-rose-50 text-rose-700 border-rose-200"
+                      title="NÃO PROGRAMADA"
+                    >
+                      <CalendarX size={12} />
                     </span>
                   )}
                 </div>

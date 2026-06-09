@@ -3175,7 +3175,7 @@ const renderSupplyTable = () => {
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-adasa-light selection:text-adasa-dark">
       {toastMessage && (
-        <div className={`fixed bottom-4 right-4 z-50 px-6 py-4 rounded-xl shadow-xl border flex items-center gap-3 transition-all ${
+        <div className={`fixed bottom-4 right-4 z-[9999] px-6 py-4 rounded-xl shadow-xl border flex items-center gap-3 transition-all ${
           toastMessage.type === "success" ? "bg-green-50/95 border-green-200 text-green-800" : 
           toastMessage.type === "error" ? "bg-red-50/95 border-red-200 text-red-800" :
           toastMessage.type === "warning" ? "bg-amber-50/95 border-amber-200 text-amber-800" :
