@@ -45,7 +45,8 @@ import {
   Link2,
   Users,
   Copy,
-  FileDigit
+  FileDigit,
+  Upload
 } from "lucide-react";
 import { Task, Plan, Area, Category, Responsible } from "../types";
 import { cn } from "../lib/utils";
@@ -56,7 +57,7 @@ interface PlanningTabProps {
   tasks: Task[];
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
   showToast: (title: string, message: string, type: "success" | "error" | "warning" | "info") => void;
-  activeSubTab?: "tasks" | "dashboard" | "plans" | "areas" | "categories" | "responsibles";
+  activeSubTab?: "tasks" | "dashboard" | "plans" | "areas" | "categories" | "responsibles" | "import";
   setConfirmState?: React.Dispatch<React.SetStateAction<{ title?: string; message: string; type?: "confirm" | "alert"; onConfirm?: () => void } | null>>;
 }
  
@@ -234,6 +235,104 @@ const CustomAreaStatusTooltip = ({ active, payload, label }: any) => {
     );
   }
   return null;
+};
+
+const ImportPanel = ({ areas, showToast, onSuccess }: { areas: any[], showToast: any, onSuccess: () => void }) => {
+  const [selectedArea, setSelectedArea] = useState<string>("");
+  const [file, setFile] = useState<File | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
+
+  const handleImport = async () => {
+    if (!selectedArea) {
+      showToast("Validação", "Selecione uma área para vincular as tarefas.", "warning");
+      return;
+    }
+    if (!file) {
+      showToast("Validação", "Selecione um arquivo CSV.", "warning");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const text = e.target?.result;
+      if (typeof text !== "string") return;
+      
+      setIsImporting(true);
+      try {
+        const res = await fetch("/api/tasks/import", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            areaId: Number(selectedArea),
+            csvText: text
+          })
+        });
+        
+        const data = await res.json();
+        if (data.success) {
+          showToast("Sucesso", `Foram importadas ${data.count} tarefas com sucesso.`, "success");
+          onSuccess();
+        } else {
+          showToast("Erro", data.error || "Erro na importação", "error");
+        }
+      } catch (err: any) {
+        showToast("Erro", "Falha na comunicação com o servidor", "error");
+      } finally {
+        setIsImporting(false);
+      }
+    };
+    reader.readAsText(file, "UTF-8");
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto w-full bg-white rounded-3xl p-8 shadow-sm border border-slate-200 flex flex-col items-center">
+      <div className="flex bg-indigo-50 p-4 rounded-2xl mb-8 w-full items-start gap-4">
+        <div className="bg-indigo-100 p-3 rounded-xl">
+          <Upload size={24} className="text-indigo-600" />
+        </div>
+        <div>
+          <h3 className="text-lg font-black text-slate-800 tracking-tight">Importação de Tarefas</h3>
+          <p className="text-sm text-slate-500 font-medium mt-1">
+            Faça a carga inicial ou importação em lote a partir de uma planilha CSV.
+          </p>
+        </div>
+      </div>
+      
+      <div className="w-full space-y-6">
+        <div className="space-y-2">
+          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Área de Vinculação Padrão</label>
+          <select 
+            value={selectedArea}
+            onChange={(e) => setSelectedArea(e.target.value)}
+            className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 bg-white outline-none focus:border-indigo-500 transition-colors"
+          >
+            <option value="">Selecione a área para vincular as tarefas importadas...</option>
+            {[...areas].sort((a,b) => a.name.localeCompare(b.name)).map((a: any) => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </select>
+        </div>
+        
+        <div className="space-y-2">
+          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Arquivo CSV (Delimitado por ponto e vírgula)</label>
+          <input 
+            type="file" 
+            accept=".csv"
+            onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
+            className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 outline-none file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+          />
+        </div>
+        
+        <button 
+          onClick={handleImport}
+          disabled={isImporting}
+          className="w-full mt-4 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white py-4 rounded-xl font-black uppercase text-sm tracking-wider transition-colors shadow-lg shadow-indigo-600/20"
+        >
+          {isImporting ? "Importando..." : "Realizar Importação"}
+        </button>
+      </div>
+    </div>
+  );
 };
 
 export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks", setConfirmState = () => {} }: PlanningTabProps) {
@@ -833,6 +932,16 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
       }
     }
   }, [plans]);
+
+  // Reset category filter if it becomes invalid due to area selection change
+  React.useEffect(() => {
+    if (categoryFilter !== "all" && selectedAreaIds.length > 0) {
+      const cat = categories.find(c => c.id.toString() === categoryFilter);
+      if (cat && (!cat.areaIds || !cat.areaIds.some(aid => selectedAreaIds.includes(Number(aid))))) {
+        setCategoryFilter("all");
+      }
+    }
+  }, [selectedAreaIds, categoryFilter, categories]);
 
   // Match keyword in title or description or custom filters
   const matchesFilters = (t: Task): boolean => {
@@ -2516,6 +2625,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
     return `${prefix}${t.title.replace(/^\[.*?\]\s*/, '')}`;
   };
 
+  if (activeSubTab === "import") {
+    return <ImportPanel areas={areas} showToast={showToast} onSuccess={reloadTasks} />;
+  }
+
   if (activeSubTab !== "tasks" && activeSubTab !== "dashboard") {
     const configActiveTab = activeSubTab;
     return (
@@ -2755,77 +2868,129 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
           )}
 
           {configActiveTab === "categories" && (
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-5">
-              {categories.map(c => (
-                <div key={c.id} className="p-5 border border-slate-200 rounded-3xl bg-white hover:border-indigo-200 transition-all shadow-sm hover:shadow-md flex flex-col">
-                  <div className="flex items-start gap-4 mb-4">
-                    <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-xl flex items-center justify-center shrink-0 border border-indigo-100">
-                      <FileText size={18} />
-                    </div>
-                    <div className="min-w-0 flex-1 pt-1">
-                      <span className="block text-sm font-black text-slate-800 line-clamp-2 leading-tight mb-1">{c.name}</span>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {c.areaIds?.map(aid => {
-                           const areaName = areas.find(a => a.id === aid)?.name;
-                           return areaName ? <span key={aid} className="inline-block text-[9px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md uppercase tracking-wider">{areaName}</span> : null;
-                        })}
-                        {(!c.areaIds || c.areaIds.length === 0) && <span className="inline-block text-[9px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md uppercase tracking-wider">Sem área</span>}
-                      </div>
-                    </div>
-                  </div>
-                  {c.updatedAt && (
-                    <div className="text-[10px] text-slate-400 mb-2 font-semibold flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-2 py-1 rounded w-fit">
-                      <Clock size={10} /> Atualizado: {formatDateTime(c.updatedAt)} por {c.updatedBy || 'Sistema'}
-                    </div>
-                  )}
-                  <div className="mt-auto flex items-center justify-end pt-3 border-t border-slate-100">
-                    <div className="flex gap-1.5">
-                       <button onClick={() => { setEditingRegId(c.id); setRegName(c.name); setRegAreaIds(c.areaIds || []); setIsRegModalOpen(true); }} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit2 size={14} /></button>
-                       <button onClick={() => handleCategoryDelete(c.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={14} /></button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {categories.length === 0 && (
-                <div className="col-span-full text-center text-slate-400 font-medium italic text-sm py-10 bg-slate-50 rounded-2xl border">Nenhuma categoria cadastrada.</div>
-              )}
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+              <div className="overflow-x-auto min-h-[300px]">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase tracking-widest font-black">
+                      <th className="px-5 py-4">Categoria</th>
+                      <th className="px-5 py-4">Áreas Temáticas</th>
+                      <th className="px-5 py-4 w-48 hidden sm:table-cell">Atualização</th>
+                      <th className="px-5 py-4 w-28 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-sm">
+                    {[...categories].sort((a,b) => a.name.localeCompare(b.name)).map(c => (
+                      <tr key={c.id} className="hover:bg-slate-50/50 transition-colors group">
+                        <td className="px-5 py-3 align-middle">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center shrink-0 border border-indigo-100 group-hover:bg-indigo-100 group-hover:border-indigo-200 transition-colors">
+                              <Tag size={14} />
+                            </div>
+                            <span className="font-extrabold text-slate-700">{c.name}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-3 align-middle text-left">
+                          <div className="flex flex-wrap gap-1.5 justify-start">
+                            {c.areaIds?.map(aid => {
+                               const areaName = areas.find(a => a.id === aid)?.name;
+                               return areaName ? <span key={aid} className="inline-block text-[10px] font-bold text-slate-500 bg-slate-100 border border-slate-200 px-2 py-0.5 rounded-md uppercase tracking-wider">{areaName}</span> : null;
+                            })}
+                            {(!c.areaIds || c.areaIds.length === 0) && <span className="inline-block text-[10px] font-bold text-slate-400 bg-slate-50 border border-slate-100 px-2 py-0.5 rounded-md uppercase tracking-wider italic">Sem área</span>}
+                          </div>
+                        </td>
+                        <td className="px-5 py-3 align-middle hidden sm:table-cell">
+                          {c.updatedAt ? (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] text-slate-400 font-semibold flex items-center gap-1"><Clock size={10}/> {formatDateTime(c.updatedAt)}</span>
+                              <span className="text-[10px] text-slate-400 line-clamp-1">por {c.updatedBy || 'Sistema'}</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-xs text-center border-t-0 p-0 m-0">--</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3 align-middle text-right">
+                          <div className="flex gap-1 justify-end">
+                             <button onClick={() => { setEditingRegId(c.id); setRegName(c.name); setRegAreaIds(c.areaIds || []); setIsRegModalOpen(true); }} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Editar"><Edit2 size={16} /></button>
+                             <button onClick={() => handleCategoryDelete(c.id)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Excluir"><Trash2 size={16} /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {categories.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-5 py-8 text-center text-slate-400 text-sm font-medium">
+                          Nenhuma categoria cadastrada.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
 
           {configActiveTab === "responsibles" && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {responsibles.map(r => (
-                <div key={r.id} className="p-5 border border-slate-200 rounded-3xl bg-white hover:border-indigo-200 transition-all shadow-sm hover:shadow-md flex flex-col">
-                  <div className="flex items-start gap-4 mb-4">
-                    <div className="w-14 h-14 bg-indigo-600 text-white rounded-2xl flex items-center justify-center font-black text-xl shrink-0 shadow-lg shadow-indigo-600/20 uppercase tracking-tighter">
-                      {r.name.substring(0, 2)}
-                    </div>
-                    <div className="min-w-0 flex-1 pt-1">
-                      <span className="block text-base font-black text-slate-800 line-clamp-1 truncate" title={r.name}>{r.name}</span>
-                      <div className="flex items-center gap-1.5 mt-1 text-slate-400 font-bold text-[10px] uppercase tracking-wider">
-                        <Briefcase size={12} /> {r.role || "REGULADOR"}
-                      </div>
-                    </div>
-                  </div>
-                  {r.updatedAt && (
-                    <div className="text-[10px] text-slate-400 mb-2 font-semibold flex items-center gap-1.5 bg-slate-50 border border-slate-100 px-2 py-1 rounded w-fit">
-                      <Clock size={10} /> Atualizado: {formatDateTime(r.updatedAt)} por {r.updatedBy || 'Sistema'}
-                    </div>
-                  )}
-                  <div className="mt-auto flex items-center justify-between pt-4 border-t border-slate-100">
-                    <div className="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-[10px] font-black text-slate-600 uppercase">
-                      <FileText size={12} /> {tasks.filter(t => t.responsibleIds?.includes(r.id)).length} Tarefas Atribuídas
-                    </div>
-                    <div className="flex gap-2">
-                       <button onClick={() => { setEditingRegId(r.id); setRegName(r.name); setRegEmail(r.email || ""); setRegRole(r.role || ""); setRegAreaIds(r.areaIds || []); setIsRegModalOpen(true); }} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"><Edit2 size={16} /></button>
-                       <button onClick={() => handleResponsibleDelete(r.id)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"><Trash2 size={16} /></button>
-                    </div>
-                  </div>
-                </div>
-              ))}
-              {responsibles.length === 0 && (
-                <div className="col-span-full text-center text-slate-400 font-medium italic text-sm py-10 bg-slate-50 rounded-2xl border">Nenhum responsável cadastrado.</div>
-              )}
+            <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+              <div className="overflow-x-auto min-h-[300px]">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase tracking-widest font-black">
+                      <th className="px-5 py-4">Responsável</th>
+                      <th className="px-5 py-4 w-48 hidden sm:table-cell">Atualização</th>
+                      <th className="px-5 py-4 w-32 text-center">Tarefas</th>
+                      <th className="px-5 py-4 w-28 text-right">Ações</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 text-sm">
+                    {[...responsibles].sort((a,b) => a.name.localeCompare(b.name)).map(r => (
+                      <tr key={r.id} className="hover:bg-slate-50/50 transition-colors group">
+                        <td className="px-5 py-3 align-middle">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-indigo-600 text-white rounded-xl flex items-center justify-center font-black text-sm shrink-0 shadow-sm uppercase tracking-tighter group-hover:bg-indigo-700 transition-colors">
+                              {r.name.substring(0, 2)}
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="font-extrabold text-slate-700">{r.name}</span>
+                              <div className="flex items-center gap-1.5 mt-0.5 text-slate-400 font-bold text-[10px] uppercase tracking-wider">
+                                <Briefcase size={10} /> {r.role || "REGULADOR"}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-5 py-3 align-middle hidden sm:table-cell">
+                          {r.updatedAt ? (
+                            <div className="flex flex-col gap-0.5">
+                              <span className="text-[10px] text-slate-400 font-semibold flex items-center gap-1"><Clock size={10}/> {formatDateTime(r.updatedAt)}</span>
+                              <span className="text-[10px] text-slate-400 line-clamp-1">por {r.updatedBy || 'Sistema'}</span>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 text-xs text-center border-t-0 p-0 m-0">--</span>
+                          )}
+                        </td>
+                        <td className="px-5 py-3 align-middle text-center">
+                          <div className="bg-slate-50 border border-slate-200 px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 text-[10px] font-black text-slate-600 uppercase w-fit mx-auto">
+                            <FileText size={12} /> {tasks.filter(t => t.responsibleIds?.includes(r.id)).length} Atribuídas
+                          </div>
+                        </td>
+                        <td className="px-5 py-3 align-middle text-right">
+                          <div className="flex gap-1 justify-end">
+                             <button onClick={() => { setEditingRegId(r.id); setRegName(r.name); setRegEmail(r.email || ""); setRegRole(r.role || ""); setRegAreaIds(r.areaIds || []); setIsRegModalOpen(true); }} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Editar"><Edit2 size={16} /></button>
+                             <button onClick={() => handleResponsibleDelete(r.id)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Excluir"><Trash2 size={16} /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                    {responsibles.length === 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-5 py-8 text-center text-slate-400 text-sm font-medium">
+                          Nenhum responsável cadastrado.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
@@ -2963,59 +3128,57 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
               </div>
             </div>
 
-            {/* Row 2.5: Responsible selection */}
-            <div className="flex flex-col gap-1.5 pt-1">
-              <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">👥 Filtro por Responsável</span>
-              <div className="flex flex-wrap gap-2">
-                <label className={cn(
-                  "flex items-center gap-2 cursor-pointer px-3.5 py-2 rounded-xl border text-xs font-black tracking-wide transition-all select-none",
-                  selectedResponsibleIds.length === 0 
-                    ? "bg-indigo-600 border-indigo-600 text-white shadow-sm" 
-                    : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100"
-                )}>
-                  <input
-                    type="checkbox"
-                    className="hidden"
-                    checked={selectedResponsibleIds.length === 0}
-                    onChange={() => setSelectedResponsibleIds([])}
-                  />
-                  <span>TODOS OS RESPONSÁVEIS</span>
-                </label>
-                {responsibles
-                  .filter((resp) => {
-                    if (selectedAreaIds.length === 0) return true;
-                    return resp.areaIds?.some((id) => selectedAreaIds.includes(Number(id)));
-                  })
-                  .map((resp) => {
-                    const isChecked = selectedResponsibleIds.includes(resp.id);
-                    return (
-                      <label key={resp.id} className={cn(
-                        "flex items-center gap-2 cursor-pointer px-3.5 py-2 rounded-xl border text-xs font-black tracking-wide transition-all select-none uppercase",
-                        isChecked 
-                          ? "bg-indigo-50 border-indigo-300 text-indigo-700 shadow-xs ring-2 ring-indigo-50" 
-                          : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100"
-                      )}>
-                        <input
-                          type="checkbox"
-                          className="w-3.5 h-3.5 text-indigo-600 rounded border-slate-350 focus:ring-indigo-100 cursor-pointer"
-                          checked={isChecked}
-                          onChange={(e) => {
-                            if (e.target.checked) {
-                              setSelectedResponsibleIds((prev) => [...prev, resp.id]);
-                            } else {
-                              setSelectedResponsibleIds((prev) => prev.filter((id) => id !== resp.id));
-                            }
-                          }}
-                        />
-                        <span>{resp.name}</span>
-                      </label>
-                    );
-                  })}
+            {/* Row 2.5: Responsible and Category selection */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">👥 Filtro por Responsável</span>
+                <select
+                  value={selectedResponsibleIds.length === 0 ? "all" : selectedResponsibleIds[0]}
+                  onChange={(e) => {
+                    if (e.target.value === "all") {
+                      setSelectedResponsibleIds([]);
+                    } else {
+                      setSelectedResponsibleIds([Number(e.target.value)]);
+                    }
+                  }}
+                  className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-black text-slate-700 bg-white focus:border-indigo-500 outline-none transition-colors uppercase tracking-wide"
+                >
+                  <option value="all">TODOS OS RESPONSÁVEIS</option>
+                  {responsibles
+                    .filter((resp) => {
+                      if (selectedAreaIds.length === 0) return true;
+                      return resp.areaIds?.some((id: any) => selectedAreaIds.includes(Number(id)));
+                    })
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((resp) => (
+                      <option key={resp.id} value={resp.id}>{resp.name}</option>
+                    ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">📂 Categoria</span>
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border-2 border-slate-200 rounded-xl text-xs font-black bg-white text-slate-700 focus:border-indigo-500 outline-none transition-colors uppercase tracking-wide"
+                >
+                  <option value="all">TODAS AS CATEGORIAS</option>
+                  {categories
+                    .filter((c) => {
+                      if (selectedAreaIds.length === 0) return true;
+                      return c.areaIds?.some((id: any) => selectedAreaIds.includes(Number(id)));
+                    })
+                    .sort((a,b) => a.name.localeCompare(b.name))
+                    .map((c) => (
+                    <option key={c.id} value={c.id.toString()}>{c.name}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
-            {/* Row 3: Status, Situation, Priority and Category */}
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+            {/* Row 3: Status, Situation, Priority and Programmed */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
               <div className="flex flex-col gap-1.5">
                 <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">🚦 Status</span>
                 <select
@@ -3055,20 +3218,6 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   <option value="Alta">ALTA</option>
                   <option value="Média">MÉDIA</option>
                   <option value="Baixa">BAIXA</option>
-                </select>
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">📂 Categoria</span>
-                <select
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
-                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-600 bg-white text-slate-700 font-bold"
-                >
-                  <option value="all">Todas as Categorias</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id.toString()}>{c.name}</option>
-                  ))}
                 </select>
               </div>
               
@@ -3166,7 +3315,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
             </div>
 
             {/* Clear Filters Button if any is changed */}
-            {(planFilter !== "all" || selectedAreaIds.length > 0 || selectedResponsibleIds.length > 0 || statusFilter !== "all" || situationFilter !== "all" || priorityFilter !== "all" || categoryFilter !== "all" || periodTypeFilter !== "all") && (
+            {(planFilter !== "all" || selectedAreaIds.length > 0 || selectedResponsibleIds.length > 0 || statusFilter !== "all" || situationFilter !== "all" || priorityFilter !== "all" || categoryFilter !== "all" || periodTypeFilter !== "all" || isProgrammedFilter !== "all") && (
               <div className="pt-2 flex justify-end">
                 <button
                   onClick={() => {
@@ -3179,6 +3328,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                     setCategoryFilter("all");
                     setPeriodTypeFilter("all");
                     setPeriodValueFilter("all");
+                    setIsProgrammedFilter("all");
                   }}
                   className="text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 font-black uppercase tracking-wider px-4 py-2 rounded-xl transition-all flex items-center gap-1.5"
                 >
@@ -5035,60 +5185,58 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
               </div>
             </div>
 
-            {/* Row 2.5: Responsible checkbox filter (synchronized with areas) */}
-            <div className="flex flex-col gap-1.5 pt-1">
-              <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">👥 Filtro por Responsável</span>
-              <div className="flex flex-wrap gap-2">
-                <label className={cn(
-                  "flex items-center gap-2 cursor-pointer px-3.5 py-2 rounded-xl border text-xs font-black tracking-wide transition-all select-none",
-                  selectedResponsibleIds.length === 0 
-                    ? "bg-indigo-600 border-indigo-600 text-white shadow-sm" 
-                    : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100"
-                )}>
-                  <input
-                    type="checkbox"
-                    className="hidden"
-                    checked={selectedResponsibleIds.length === 0}
-                    onChange={() => setSelectedResponsibleIds([])}
-                  />
-                  <span>TODOS OS RESPONSÁVEIS</span>
-                </label>
-                {responsibles
-                  .filter((resp) => {
-                    // if no areas selected, show all
-                    if (selectedAreaIds.length === 0) return true;
-                    // if areas selected, show if responsible has ANY of the selected areas
-                    return resp.areaIds?.some((id) => selectedAreaIds.includes(Number(id)));
-                  })
-                  .map((resp) => {
-                  const isChecked = selectedResponsibleIds.includes(resp.id);
-                  return (
-                    <label key={resp.id} className={cn(
-                      "flex items-center gap-2 cursor-pointer px-3.5 py-2 rounded-xl border text-xs font-black tracking-wide transition-all select-none uppercase",
-                      isChecked 
-                        ? "bg-indigo-50 border-indigo-300 text-indigo-700 shadow-xs ring-2 ring-indigo-50" 
-                        : "bg-white border-slate-200 text-slate-600 hover:bg-slate-100"
-                    )}>
-                      <input
-                        type="checkbox"
-                        className="w-3.5 h-3.5 text-indigo-600 rounded border-slate-350 focus:ring-indigo-100 cursor-pointer"
-                        checked={isChecked}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setSelectedResponsibleIds((prev) => [...prev, resp.id]);
-                          } else {
-                            setSelectedResponsibleIds((prev) => prev.filter((id) => id !== resp.id));
-                          }
-                        }}
-                      />
-                      <span>{resp.name}</span>
-                    </label>
-                  );
-                })}
+            {/* Row 2.5: Responsible and Category checkbox filter (synchronized with areas) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">👥 Filtro por Responsável</span>
+                <select
+                  value={selectedResponsibleIds.length === 0 ? "all" : selectedResponsibleIds[0]}
+                  onChange={(e) => {
+                    if (e.target.value === "all") {
+                      setSelectedResponsibleIds([]);
+                    } else {
+                      setSelectedResponsibleIds([Number(e.target.value)]);
+                    }
+                  }}
+                  className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-black text-slate-700 bg-white focus:border-indigo-500 outline-none transition-colors uppercase tracking-wide"
+                >
+                  <option value="all">TODOS OS RESPONSÁVEIS</option>
+                  {responsibles
+                    .filter((resp) => {
+                      // if no areas selected, show all
+                      if (selectedAreaIds.length === 0) return true;
+                      // if areas selected, show if responsible has ANY of the selected areas
+                      return resp.areaIds?.some((id: any) => selectedAreaIds.includes(Number(id)));
+                    })
+                    .sort((a, b) => a.name.localeCompare(b.name))
+                    .map((resp) => (
+                      <option key={resp.id} value={resp.id}>{resp.name}</option>
+                    ))}
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">📂 Categoria</span>
+                <select
+                  value={categoryFilter}
+                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  className="w-full px-3.5 py-2.5 border-2 border-slate-200 rounded-xl text-xs font-black bg-white text-slate-700 focus:border-indigo-500 outline-none transition-colors uppercase tracking-wide"
+                >
+                  <option value="all">TODAS AS CATEGORIAS</option>
+                  {categories
+                    .filter((c) => {
+                      if (selectedAreaIds.length === 0) return true;
+                      return c.areaIds?.some((id: any) => selectedAreaIds.includes(Number(id)));
+                    })
+                    .sort((a,b) => a.name.localeCompare(b.name))
+                    .map((c) => (
+                    <option key={c.id} value={c.id.toString()}>{c.name}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
-            {/* Row 3: Status, Situation, Priority and Category Select filters */}
+            {/* Row 3: Status, Situation, Priority and Classification Select filters */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="flex flex-col gap-1.5">
                 <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">🚦 Status</span>
@@ -5133,16 +5281,15 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">📂 Categoria</span>
+                <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">🏷️ Classificação</span>
                 <select
-                  value={categoryFilter}
-                  onChange={(e) => setCategoryFilter(e.target.value)}
+                  value={isProgrammedFilter}
+                  onChange={(e) => setIsProgrammedFilter(e.target.value)}
                   className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-adasa-mid bg-white text-slate-700 font-bold"
                 >
-                  <option value="all">Todas as Categorias</option>
-                  {categories.map((c) => (
-                    <option key={c.id} value={c.id.toString()}>{c.name}</option>
-                  ))}
+                  <option value="all">Todas as Classificações</option>
+                  <option value="true">PROGRAMADAS</option>
+                  <option value="false">EXTRAORDINÁRIAS</option>
                 </select>
               </div>
             </div>
@@ -5161,6 +5308,28 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                 />
               </div>
             </div>
+
+            {/* Clear Filters Button if any is changed */}
+            {(planFilter !== "all" || selectedAreaIds.length > 0 || selectedResponsibleIds.length > 0 || statusFilter !== "all" || situationFilter !== "all" || priorityFilter !== "all" || categoryFilter !== "all" || isProgrammedFilter !== "all" || searchTerm !== "") && (
+              <div className="pt-2 flex justify-end">
+                <button
+                  onClick={() => {
+                    setPlanFilter("all");
+                    setSelectedAreaIds([]);
+                    setSelectedResponsibleIds([]);
+                    setStatusFilter("all");
+                    setSituationFilter("all");
+                    setPriorityFilter("all");
+                    setCategoryFilter("all");
+                    setSearchTerm("");
+                    setIsProgrammedFilter("all");
+                  }}
+                  className="text-xs bg-slate-200 hover:bg-slate-300 text-slate-700 font-black uppercase tracking-wider px-4 py-2 rounded-xl transition-all flex items-center gap-1.5"
+                >
+                  <X size={14} /> Limpar Todos os Filtros
+                </button>
+              </div>
+            )}
             </div>
           )}
           </div>
@@ -5237,6 +5406,18 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
 
           {/* Main Container */}
           <div className="space-y-4">
+              <div className="flex bg-white border border-slate-200 rounded-2xl p-3 px-5 shadow-sm items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <div className="bg-indigo-100 text-indigo-600 p-2 rounded-xl border border-indigo-200 shadow-sm">
+                      <ListTodo size={20} />
+                    </div>
+                    <div className="flex flex-col">
+                       <span className="text-[10px] uppercase font-black tracking-widest text-slate-400 leading-none mb-1">Tarefas Listadas / Filtradas</span>
+                       <span className="text-lg font-extrabold text-slate-800 leading-none">{enhancedTasks.filter(t => matchesFilters(t)).length} <span className="text-xs font-semibold text-slate-400">tarefas</span></span>
+                    </div>
+                </div>
+              </div>
+
               {["status", "category", "area", "responsible"].includes(viewMode) && (
                 <div className="flex flex-col sm:flex-row items-center gap-3 justify-between bg-slate-50 border border-slate-200/80 rounded-2xl p-3 px-4 shadow-xs mt-2 select-none">
                   <div className="flex items-center gap-2">
@@ -5357,9 +5538,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                        <table className="w-full text-left text-xs border-collapse min-w-[1050px]">
                          <thead>
                             <tr className="bg-slate-50 border-b border-slate-200 text-slate-500 uppercase tracking-wider text-[10px] font-black">
-                              <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none" onClick={() => handleSort("title")}>
+                              <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none min-w-[500px]" onClick={() => handleSort("title")}>
                                 <div className="flex items-center gap-1.5">Tarefa <SortIcon field="title" /></div>
                               </th>
+                              <th className="px-4 py-3 text-center w-24">Timeline</th>
                               <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none" onClick={() => handleSort("area")}>
                                 <div className="flex items-center gap-1.5">Área <SortIcon field="area" /></div>
                               </th>
@@ -5408,7 +5590,6 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                               <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none min-w-[140px]" onClick={() => handleSort("progress")}>
                                 <div className="flex items-center gap-1.5">Progresso <SortIcon field="progress" /></div>
                               </th>
-                              <th className="px-4 py-3 text-center">Timeline</th>
                             </tr>
                           </thead>
                          <tbody className="divide-y divide-slate-100">
@@ -5433,15 +5614,24 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
 
                                return (
                                  <tr key={task.id} className="hover:bg-slate-50/50 transition-colors group">
-                                   <td className="px-4 py-3 border-r border-slate-50">
+                                   <td className="px-4 py-3 border-r border-slate-50 min-w-[500px] w-[500px] whitespace-normal">
                                      <span className="font-bold text-slate-800 hover:text-indigo-600 block cursor-pointer transition-colors" onClick={() => handleEditTask(task)}>
-                                       {getTaskDisplayName(task)} {taskChildrenCount > 0 && <span className="text-slate-400 font-normal">({taskChildrenCount})</span>}
+                                       {getTaskDisplayName(task)} <span className="text-slate-400 font-normal">({taskChildrenCount})</span>
                                      </span>
                                      {task.parentId && taskById[task.parentId] && (
                                        <span className="text-[9px] text-indigo-500 font-bold uppercase mt-0.5 block truncate max-w-xs" title={`Subtarefa de: ${taskById[task.parentId].title}`}>
                                           Subtarefa de: {taskById[task.parentId].title}
                                        </span>
                                      )}
+                                   </td>
+                                   <td className="px-4 py-3 border-r border-slate-50 text-center">
+                                     <button
+                                       onClick={() => setTimelineTaskId(task.id)}
+                                       className="p-1 px-2 bg-white border border-slate-200 text-slate-600 hover:text-adasa-mid hover:border-adasa-200 rounded-lg transition shadow-sm text-xs font-bold inline-flex items-center justify-center"
+                                       title="Ver Linha do Tempo"
+                                     >
+                                       <Activity size={12} className="text-indigo-600" />
+                                     </button>
                                    </td>
                                    <td className="px-4 py-3 border-r border-slate-50">
                                      <div className="flex flex-wrap gap-1">
@@ -5550,15 +5740,6 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                                         </div>
                                      </div>
                                    </td>
-                                   <td className="px-4 py-3 text-center">
-                                     <button
-                                       onClick={() => setTimelineTaskId(task.id)}
-                                       className="p-1 px-2 bg-white border border-slate-200 text-slate-600 hover:text-adasa-mid hover:border-adasa-200 rounded-lg transition shadow-sm text-xs font-bold inline-flex items-center justify-center"
-                                       title="Ver Linha do Tempo"
-                                     >
-                                       <Activity size={12} className="text-indigo-600" />
-                                     </button>
-                                   </td>
                                  </tr>
                                );
                            })}
@@ -5570,9 +5751,9 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
               })()}
               {viewMode === "status" && (() => {
                  const groups = {
-                   "Não iniciada": rootTasks.filter(t => normalizeStatus(t.status) === "Não iniciada"),
-                   "Em andamento": rootTasks.filter(t => normalizeStatus(t.status) === "Em andamento"),
-                   "Concluída": rootTasks.filter(t => normalizeStatus(t.status) === "Concluída")
+                   "Não iniciada": rootTasks.filter(t => normalizeStatus(t.status) === "Não iniciada" && childMatchesOrIsPath(t.id)),
+                   "Em andamento": rootTasks.filter(t => normalizeStatus(t.status) === "Em andamento" && childMatchesOrIsPath(t.id)),
+                   "Concluída": rootTasks.filter(t => normalizeStatus(t.status) === "Concluída" && childMatchesOrIsPath(t.id))
                  };
                  return (
                    <div className="space-y-4 mt-2">
@@ -5590,7 +5771,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                                  {status === "Concluída" ? <CheckCircle2 size={14} className="text-emerald-500" /> : status === "Em andamento" ? <Activity size={14} className="text-blue-500" /> : <Clock size={14} className="text-slate-400" />}
                                  {status}
                               </h3>
-                              <span className="bg-white border border-slate-200 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full">{groupRootTasks.length} grupos estruturais</span>
+                              <span className="bg-white border border-slate-200 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full">{groupRootTasks.length} tarefas</span>
                             </div>
                             {expandedGroupContainers[`status-${status}`] !== false && (
                               <div>
@@ -5608,7 +5789,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                  return (
                    <div className="space-y-4 mt-2">
                      {cats.map(cat => {
-                       const groupRootTasks = rootTasks.filter(t => cat.id === -1 ? (!t.categoryIds || t.categoryIds.length === 0) : (t.categoryIds && t.categoryIds.includes(cat.id)));
+                       const groupRootTasks = rootTasks.filter(t => (cat.id === -1 ? (!t.categoryIds || t.categoryIds.length === 0) : (t.categoryIds && t.categoryIds.includes(cat.id))) && childMatchesOrIsPath(t.id));
                        if (groupRootTasks.length === 0) return null;
                        
                        return (
@@ -5622,7 +5803,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                                  <Tag size={14} className="text-slate-400" />
                                  {cat.name}
                               </h3>
-                              <span className="bg-white border border-slate-200 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full">{groupRootTasks.length} grupos estruturais</span>
+                              <span className="bg-white border border-slate-200 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full">{groupRootTasks.length} tarefas</span>
                             </div>
                             {expandedGroupContainers[`category-${cat.id}`] !== false && (
                               <div>
@@ -5640,7 +5821,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                  return (
                    <div className="space-y-4 mt-2">
                      {ars.map(ar => {
-                       const groupRootTasks = rootTasks.filter(t => ar.id === -1 ? (!t.areaIds || t.areaIds.length === 0) : (t.areaIds && t.areaIds.includes(ar.id)));
+                       const groupRootTasks = rootTasks.filter(t => (ar.id === -1 ? (!t.areaIds || t.areaIds.length === 0) : (t.areaIds && t.areaIds.includes(ar.id))) && childMatchesOrIsPath(t.id));
                        if (groupRootTasks.length === 0) return null;
                        
                        return (
@@ -5654,7 +5835,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                                  <Briefcase size={14} className="text-slate-400" />
                                  {ar.name}
                               </h3>
-                              <span className="bg-white border border-slate-200 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full">{groupRootTasks.length} grupos estruturais</span>
+                              <span className="bg-white border border-slate-200 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full">{groupRootTasks.length} tarefas</span>
                             </div>
                             {expandedGroupContainers[`area-${ar.id}`] !== false && (
                               <div>
@@ -5700,17 +5881,15 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                     });
                   }
 
-                  if (boardGroupBy !== "status") {
-                    Object.keys(groups).forEach(key => {
-                      if (groups[key].length === 0) {
-                        delete groups[key];
-                      }
-                    });
-                  }
+                  Object.keys(groups).forEach(key => {
+                    if (groups[key].length === 0) {
+                      delete groups[key];
+                    }
+                  });
 
                   const isStatusGroup = boardGroupBy === "status";
                   const wrapperClass = isStatusGroup
-                    ? "grid grid-cols-1 lg:grid-cols-3 gap-6 items-start mt-2 font-sans text-slate-800 w-full"
+                    ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start mt-2 font-sans text-slate-800 w-full"
                     : "flex flex-col lg:flex-row gap-6 overflow-x-auto pb-4 items-start mt-2 font-sans text-slate-800 w-full pr-2 scrollbar-thin";
 
                   const colClass = isStatusGroup
@@ -6104,7 +6283,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                  return (
                    <div className="space-y-4 mt-2">
                      {resps.map(resp => {
-                       const groupRootTasks = rootTasks.filter(t => resp.id === -1 ? (!t.responsibleIds || t.responsibleIds.length === 0) : (t.responsibleIds && t.responsibleIds.includes(resp.id)));
+                       const groupRootTasks = rootTasks.filter(t => (resp.id === -1 ? (!t.responsibleIds || t.responsibleIds.length === 0) : (t.responsibleIds && t.responsibleIds.includes(resp.id))) && childMatchesOrIsPath(t.id));
                        if (groupRootTasks.length === 0) return null;
                        
                        return (
@@ -6118,7 +6297,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                                  <Users size={14} className="text-slate-400" />
                                  {resp.name}
                               </h3>
-                              <span className="bg-white border border-slate-200 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full">{groupRootTasks.length} grupos estruturais</span>
+                              <span className="bg-white border border-slate-200 text-slate-500 text-[10px] font-bold px-2 py-0.5 rounded-full">{groupRootTasks.length} tarefas</span>
                             </div>
                             {expandedGroupContainers[`responsible-${resp.id}`] !== false && (
                               <div>

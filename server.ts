@@ -4,6 +4,7 @@ import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { Pool } from "pg";
+import { parse } from "csv-parse/sync";
 
 let dbPool: Pool | null = null;
 
@@ -1961,6 +1962,167 @@ async function startServer() {
       }
       console.error("Erro ao carregar tarefas:", error);
       res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/tasks/import", async (req, res) => {
+    try {
+      const { areaId, csvText } = req.body;
+      if (!areaId || !csvText) {
+        return res.status(400).json({ success: false, error: "Área e CSV são obrigatórios." });
+      }
+
+      // Parse CSV
+      const records = parse(csvText, {
+        columns: true,
+        skip_empty_lines: true,
+        delimiter: ';',
+        trim: true
+      });
+
+      const pool = getDbPool();
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        
+        // 1. Create missing plans from 2019 to 2026
+        const plansToCreate = [
+          "Plano de Atividades 2019", "Plano de Atividades 2020", "Plano de Atividades 2021",
+          "Plano de Atividades 2022", "Plano de Atividades 2023", "Plano de Atividades 2024",
+          "Plano de Atividades 2025", "Plano de Atividades 2026"
+        ];
+        
+        const planNameToId: Record<string, number> = {};
+        for (const planName of plansToCreate) {
+           const planRes = await client.query("SELECT id FROM pl_plans WHERE name = $1", [planName]);
+           if (planRes.rows.length > 0) {
+              planNameToId[planName] = Number(planRes.rows[0].id);
+           } else {
+              const insertRes = await client.query("INSERT INTO pl_plans (name, updated_at, updated_by) VALUES ($1, NOW(), 'Importação') RETURNING id", [planName]);
+              planNameToId[planName] = Number(insertRes.rows[0].id);
+           }
+        }
+        
+        // Caches for categories and responsibles
+        const catNameToId: Record<string, number> = {};
+        const respNameToId: Record<string, number> = {};
+        
+        for (const record of records) {
+            let catId = null;
+            const catName = record.category?.trim();
+            if (catName) {
+                if (!catNameToId[catName]) {
+                    const catRes = await client.query("SELECT id FROM pl_categories WHERE name = $1", [catName]);
+                    if (catRes.rows.length > 0) {
+                        catNameToId[catName] = Number(catRes.rows[0].id);
+                    } else {
+                        const insRes = await client.query("INSERT INTO pl_categories (name, updated_at, updated_by) VALUES ($1, NOW(), 'Importação') RETURNING id", [catName]);
+                        catNameToId[catName] = Number(insRes.rows[0].id);
+                        
+                        // link category to area
+                        await client.query("INSERT INTO pl_category_areas (category_id, area_id) VALUES ($1, $2)", [catNameToId[catName], areaId]);
+                    }
+                }
+                catId = catNameToId[catName];
+            }
+            
+            const respNamesStr = record.assigned_to || "";
+            const respNames = respNamesStr.split(/[,;]/).map((n: string) => n.trim()).filter(Boolean);
+            const taskRespIds: number[] = [];
+            for (const rName of respNames) {
+                if (!respNameToId[rName]) {
+                    const rRes = await client.query("SELECT id FROM pl_responsibles WHERE name = $1", [rName]);
+                    if (rRes.rows.length > 0) {
+                        respNameToId[rName] = Number(rRes.rows[0].id);
+                    } else {
+                        const insR = await client.query("INSERT INTO pl_responsibles (name, email, role, updated_at, updated_by) VALUES ($1, '', '', NOW(), 'Importação') RETURNING id", [rName]);
+                        respNameToId[rName] = Number(insR.rows[0].id);
+                    }
+                }
+                taskRespIds.push(respNameToId[rName]);
+            }
+            
+            let prio = record.priority || "Média";
+            if (prio === "Importante" || prio === "Urgente") prio = "Alta";
+            
+            let isProg = false;
+            // The file might contain 'Rotulo', 'PROGRAMADA;Alta prioridade', etc.
+            if (record.is_programmed) {
+                const progValue = record.is_programmed.trim();
+                if (progValue.includes("Rotulo") || progValue.includes("PROGRAMADA")) {
+                    isProg = true;
+                }
+            }
+            
+            let progress = 0;
+            let planYear = "2026";
+            const compAt = record.completed_at?.trim();
+            if (compAt) {
+                progress = 100;
+                let y = compAt.substring(0, 4);
+                if (y.match(/^\d{4}$/)) {
+                   planYear = y;
+                } else {
+                   const yMatch = compAt.match(/\d{4}/);
+                   if (yMatch) planYear = yMatch[0];
+                }
+            }
+            
+            const planKey = `Plano de Atividades ${planYear}`;
+            let planId = planNameToId[planKey] || planNameToId["Plano de Atividades 2026"];
+            
+            let status = record.status || "Não iniciada";
+            if (progress === 100) status = "Concluída";
+            
+            let startDate = record.start_date?.trim() ? new Date(record.start_date) : null;
+            if (startDate && isNaN(startDate.getTime())) startDate = null;
+            let endDate = record.end_date?.trim() ? new Date(record.end_date) : null;
+            if (endDate && isNaN(endDate.getTime())) endDate = null;
+            let completedAtDate = compAt ? new Date(compAt) : null;
+            if (completedAtDate && isNaN(completedAtDate.getTime())) completedAtDate = null;
+            
+            let weightStr = record.weight?.replace(',', '.');
+            let weight = parseFloat(weightStr);
+            if (isNaN(weight) || weight <= 0) weight = 1;
+
+            const insTask = await client.query(`
+               INSERT INTO pl_tasks (
+                 title, description, start_date, end_date, status, progress, weight, priority, 
+                 category, assigned_to, notes, plan_id, sei_process, 
+                 created_by, completed_at, completed_by, is_programmed, updated_at, updated_by
+               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, NOW(), 'Importação')
+               RETURNING id
+            `, [
+               record.title || "Sem título", "", startDate, endDate, status, progress, weight, prio,
+               catName || "", "", record.notes || "", planId, record.sei_process || null,
+               record.created_by || "Importação", completedAtDate, record.completed_by || null, isProg
+            ]);
+            
+            const newTaskId = Number(insTask.rows[0].id);
+            
+            await client.query("INSERT INTO pl_task_areas (task_id, area_id) VALUES ($1, $2)", [newTaskId, areaId]);
+            
+            if (catId) {
+                await client.query("INSERT INTO pl_task_categories (task_id, category_id) VALUES ($1, $2)", [newTaskId, catId]);
+            }
+            
+            for (const rId of taskRespIds) {
+                await client.query("INSERT INTO pl_task_responsibles (task_id, responsible_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [newTaskId, rId]);
+            }
+        }
+        
+        await client.query("COMMIT");
+        res.json({ success: true, count: records.length });
+      } catch (err: any) {
+        await client.query("ROLLBACK");
+        console.error("Erro importação:", err);
+        throw err;
+      } finally {
+        client.release();
+      }
+    } catch (error: any) {
+      console.error("Erro no import-tasks:", error);
+      res.status(500).json({ success: false, error: error.message || "Erro desconhecido na importação" });
     }
   });
 

@@ -337,7 +337,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<"home" | "edit" | "compare" | "manage" | "analyze" | "templates" | "planning" | "users">(
     "home",
   );
-  const [activePlanningSubTab, setActivePlanningSubTab] = useState<"tasks" | "dashboard" | "plans" | "areas" | "categories" | "responsibles">("dashboard");
+  const [activePlanningSubTab, setActivePlanningSubTab] = useState<"tasks" | "dashboard" | "plans" | "areas" | "categories" | "responsibles" | "import">("dashboard");
   const [tasks, setTasks] = useState<Task[]>([]);
   const [plans, setPlans] = useState<any[]>([]);
   const [areas, setAreas] = useState<any[]>([]);
@@ -3284,6 +3284,13 @@ const renderSupplyTable = () => {
                     <Users size={20} className={activeTab === "planning" && activePlanningSubTab === "responsibles" ? "text-adasa-mid" : "text-white/60"} />
                     Cadastrar Responsáveis
                   </button>
+                  <button
+                    onClick={() => { setActivePlanningSubTab("import"); handleTabChange("planning"); }}
+                    className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "planning" && activePlanningSubTab === "import" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                  >
+                    <Upload size={20} className={activeTab === "planning" && activePlanningSubTab === "import" ? "text-adasa-mid" : "text-white/60"} />
+                    Importar Tarefas
+                  </button>
                 </div>
               </div>
 
@@ -3524,6 +3531,25 @@ const renderSupplyTable = () => {
                 />
                 {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Responsáveis</span>}
               </button>
+              <button
+                title={isSidebarCollapsed ? "Importar Tarefas" : undefined}
+                onClick={() => { setActivePlanningSubTab("import"); handleTabChange("planning"); }}
+                className={cn(
+                  "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                  activeTab === "planning" && activePlanningSubTab === "import"
+                    ? "bg-white/10 text-white shadow-sm border border-white/10"
+                    : "text-white/60 hover:text-white hover:bg-white/5",
+                )}
+              >
+                <Upload
+                  size={16}
+                  className={cn(
+                    "flex-shrink-0 transition-colors",
+                    activeTab === "planning" && activePlanningSubTab === "import" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                  )}
+                />
+                {!isSidebarCollapsed && <span className="hidden md:inline">Importar Tarefas</span>}
+              </button>
             </div>
           </div>
 
@@ -3683,7 +3709,7 @@ const renderSupplyTable = () => {
                          activePlanningSubTab === "plans" ? "Cadastrar Planos" : 
                          activePlanningSubTab === "areas" ? "Cadastrar Áreas Temáticas" : 
                          activePlanningSubTab === "categories" ? "Cadastrar Categorias" :
-                         "Cadastrar Responsáveis")
+                         activePlanningSubTab === "responsibles" ? "Cadastrar Responsáveis" : "Importar Tarefas")
                       : "Cadastrar Balanço"}
             </h1>
             <p className="text-slate-500 text-sm font-medium">
