@@ -109,6 +109,21 @@ export interface CalculationResult extends DemandEntry {
   projectedDemand: number; // L/s
 }
 
+export interface TaskComment {
+  id: string;
+  author: string;
+  content: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface TaskLink {
+  id: string;
+  url: string;
+  title: string;
+  createdAt: string;
+}
+
 export interface Task {
   id: number;
   title: string;
@@ -118,11 +133,16 @@ export interface Task {
   status: 'pending' | 'in_progress' | 'completed' | string;
   parentId: number | null;
   progress: number;
+  weight?: number;
+  isProgrammed?: boolean;
   seiProcess?: string;
   priority?: string;
   categoryIds?: number[];
   assignedTo?: string;
   createdBy?: string;
+  createdAt?: string;
+  completedAt?: string;
+  completedBy?: string;
   notes?: string;
   planId?: number | null;
   areaIds?: number[];
@@ -130,6 +150,8 @@ export interface Task {
   dependsOnTaskId?: number | null;
   updatedAt?: string | null;
   updatedBy?: string | null;
+  comments?: TaskComment[];
+  links?: TaskLink[];
 }
 
 export interface Plan {

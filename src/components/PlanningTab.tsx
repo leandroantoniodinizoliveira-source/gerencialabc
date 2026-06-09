@@ -246,6 +246,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
   const [situationFilter, setSituationFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
   const [categoryFilter, setCategoryFilter] = useState<string>("all");
+  const [isProgrammedFilter, setIsProgrammedFilter] = useState<string>("all");
   
   // New plan and area filters
   const [planFilter, setPlanFilter] = useState<string>("all");
@@ -262,6 +263,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
       situationFilter !== "all" ||
       priorityFilter !== "all" ||
       categoryFilter !== "all" ||
+      isProgrammedFilter !== "all" ||
       searchTerm.trim() !== "" ||
       (planFilter !== "all" && planFilter !== "") ||
       selectedAreaIds.length > 0 ||
@@ -273,6 +275,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
     situationFilter,
     priorityFilter,
     categoryFilter,
+    isProgrammedFilter,
     searchTerm,
     planFilter,
     selectedAreaIds,
@@ -315,6 +318,11 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
   const [tableSort, setTableSort] = useState<{ field: string, dir: "asc" | "desc" } | null>({ field: "end", dir: "asc" });
   const [boardGroupBy, setBoardGroupBy] = useState<"status" | "category">("category");
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [taskFormTab, setTaskFormTab] = useState<"form" | "comments" | "links">("form");
+  const [newComment, setNewComment] = useState("");
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
+  const [newLinkUrl, setNewLinkUrl] = useState("");
+  const [newLinkTitle, setNewLinkTitle] = useState("");
   const [isRegModalOpen, setIsRegModalOpen] = useState(false);
   const [formMode, setFormMode] = useState<"create" | "edit">("create");
   const [editingTask, setEditingTask] = useState<Partial<Task>>({});
@@ -856,6 +864,13 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
     if (categoryFilter !== "all") {
       if (!t.categoryIds?.includes(Number(categoryFilter))) return false;
     }
+    
+    // Check classification (isProgrammed)
+    if (isProgrammedFilter !== "all") {
+      const wantProgrammed = isProgrammedFilter === "true";
+      const isProgrammed = t.isProgrammed !== false;
+      if (isProgrammed !== wantProgrammed) return false;
+    }
 
     // Check plan
     if (planFilter !== "all" && planFilter !== "" && Number(t.planId) !== Number(planFilter)) {
@@ -1105,6 +1120,13 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
     // Check category
     if (categoryFilter !== "all") {
       if (!t.categoryIds?.includes(Number(categoryFilter))) return false;
+    }
+    
+    // Check classification (isProgrammed)
+    if (isProgrammedFilter !== "all") {
+      const wantProgrammed = isProgrammedFilter === "true";
+      const isProgrammed = t.isProgrammed !== false;
+      if (isProgrammed !== wantProgrammed) return false;
     }
 
     // Check plan
@@ -2089,6 +2111,66 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
     }
   };
 
+  const handleAddComment = () => {
+    if (!newComment.trim()) return;
+    const comment = {
+      id: Math.random().toString(36).substr(2, 9),
+      author: currentUser?.name || "Administrador",
+      content: newComment.trim(),
+      createdAt: new Date().toISOString()
+    };
+    
+    setEditingTask(prev => ({
+      ...prev,
+      comments: [...(prev.comments || []), comment]
+    }));
+    setNewComment("");
+  };
+
+  const handleDeleteComment = (commentId: string) => {
+    if(!confirm("Tem certeza que deseja excluir este comentário?")) return;
+    setEditingTask(prev => ({
+      ...prev,
+      comments: prev.comments?.filter(c => c.id !== commentId) || []
+    }));
+  };
+
+  const handleUpdateComment = (commentId: string, newContent: string) => {
+    if(!newContent.trim()) return;
+    setEditingTask(prev => ({
+      ...prev,
+      comments: prev.comments?.map(c => 
+        c.id === commentId ? { ...c, content: newContent.trim(), updatedAt: new Date().toISOString() } : c
+      ) || []
+    }));
+    setEditingCommentId(null);
+  };
+
+  const handleAddLink = () => {
+    if (!newLinkUrl.trim()) return;
+    const link = {
+      id: Math.random().toString(36).substr(2, 9),
+      url: newLinkUrl.trim(),
+      title: newLinkTitle.trim() || newLinkUrl.trim(),
+      createdAt: new Date().toISOString()
+    };
+    
+    setEditingTask(prev => ({
+      ...prev,
+      links: [...(prev.links || []), link]
+    }));
+    setNewLinkUrl("");
+    setNewLinkTitle("");
+  };
+
+  const handleDeleteLink = (linkId: string) => {
+    if(!confirm("Tem certeza que deseja excluir este link?")) return;
+    setEditingTask(prev => ({
+      ...prev,
+      links: prev.links?.filter(l => l.id !== linkId) || []
+    }));
+  };
+
   // Submit task create or edit form
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2217,6 +2299,8 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
       parentId: parentId,
       progress: 0,
       priority: "Média",
+      isProgrammed: true,
+      weight: 1,
       categoryIds: defaultCategoryIds,
       assignedTo: "",
       notes: "",
@@ -2224,6 +2308,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
       areaIds: defaultAreaIds,
       responsibleIds: defaultResponsibleIds
     });
+    setTaskFormTab("form");
     setIsFormOpen(true);
   };
 
@@ -2246,8 +2331,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
       endDate: fmtDate(task.endDate),
       planId: task.planId || null,
       areaIds: task.areaIds || [],
-      responsibleIds: task.responsibleIds || []
+      responsibleIds: task.responsibleIds || [],
+      weight: task.weight !== undefined ? task.weight : 1
     });
+    setTaskFormTab("form");
     setIsFormOpen(true);
   };
 
@@ -2928,7 +3015,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
             </div>
 
             {/* Row 3: Status, Situation, Priority and Category */}
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
               <div className="flex flex-col gap-1.5">
                 <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">🚦 Status</span>
                 <select
@@ -2982,6 +3069,19 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   {categories.map((c) => (
                     <option key={c.id} value={c.id.toString()}>{c.name}</option>
                   ))}
+                </select>
+              </div>
+              
+              <div className="flex flex-col gap-1.5 border-l border-slate-100 pl-4">
+                <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">🏷️ Classificação</span>
+                <select
+                  value={isProgrammedFilter}
+                  onChange={(e) => setIsProgrammedFilter(e.target.value)}
+                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-indigo-600 bg-white text-slate-700 font-bold"
+                >
+                  <option value="all">Todas</option>
+                  <option value="true">Programadas</option>
+                  <option value="false">Não programadas</option>
                 </select>
               </div>
             </div>
@@ -5201,6 +5301,9 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                        } else if (tableSort.field === "situation") {
                           valA = getDeadlineStatus(a.endDate, a.status);
                           valB = getDeadlineStatus(b.endDate, b.status);
+                       } else if (tableSort.field === "isProgrammed") {
+                          valA = a.isProgrammed !== false ? 1 : 0;
+                          valB = b.isProgrammed !== false ? 1 : 0;
                        } else if (tableSort.field === "priority") {
                           const getPrioValue = (tk: Task) => {
                             if (tk.priority === "Alta") return 1;
@@ -5277,6 +5380,27 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                               </th>
                               <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none text-center" onClick={() => handleSort("status")}>
                                 <div className="flex items-center justify-center gap-1.5">Status <SortIcon field="status" /></div>
+                              </th>
+                              <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none text-center" onClick={() => handleSort("isProgrammed")}>
+                                <div className="flex items-center justify-center gap-1.5">Classificação <SortIcon field="isProgrammed" /></div>
+                              </th>
+                              <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none text-center" onClick={() => handleSort("createdBy")}>
+                                <div className="flex items-center justify-center gap-1.5">Criado por <SortIcon field="createdBy" /></div>
+                              </th>
+                              <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none text-center" onClick={() => handleSort("createdAt")}>
+                                <div className="flex items-center justify-center gap-1.5">Criado em <SortIcon field="createdAt" /></div>
+                              </th>
+                              <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none text-center" onClick={() => handleSort("completedBy")}>
+                                <div className="flex items-center justify-center gap-1.5">Concluída por <SortIcon field="completedBy" /></div>
+                              </th>
+                              <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none text-center" onClick={() => handleSort("completedAt")}>
+                                <div className="flex items-center justify-center gap-1.5">Concluído em <SortIcon field="completedAt" /></div>
+                              </th>
+                              <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none text-center" onClick={() => handleSort("updatedBy")}>
+                                <div className="flex items-center justify-center gap-1.5">Atualizado por <SortIcon field="updatedBy" /></div>
+                              </th>
+                              <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none text-center" onClick={() => handleSort("updatedAt")}>
+                                <div className="flex items-center justify-center gap-1.5">Atualizado em <SortIcon field="updatedAt" /></div>
                               </th>
                               <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none text-center" onClick={() => handleSort("situation")}>
                                 <div className="flex items-center justify-center gap-1.5">Situação <SortIcon field="situation" /></div>
@@ -5373,6 +5497,31 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                                           <Circle size={16} />
                                         </div>
                                       )}
+                                    </td>
+                                    <td className="px-4 py-3 border-r border-slate-50 text-center text-[10px] whitespace-nowrap">
+                                      {task.isProgrammed !== false ? (
+                                        <span className="font-bold text-indigo-600 bg-indigo-50 px-2 py-1 rounded-sm border border-indigo-100">Programada</span>
+                                      ) : (
+                                        <span className="font-bold text-rose-600 bg-rose-50 px-2 py-1 rounded-sm border border-rose-100">Não programada</span>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-3 border-r border-slate-50 text-center text-[10px] text-slate-500 font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px]">
+                                      {task.createdBy || "-"}
+                                    </td>
+                                    <td className="px-4 py-3 border-r border-slate-50 text-center text-[10px] text-slate-500 font-medium whitespace-nowrap">
+                                      {task.createdAt ? formatDateTime(task.createdAt) : "-"}
+                                    </td>
+                                    <td className="px-4 py-3 border-r border-slate-50 text-center text-[10px] text-slate-500 font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px]">
+                                      {task.completedBy || "-"}
+                                    </td>
+                                    <td className="px-4 py-3 border-r border-slate-50 text-center text-[10px] text-slate-500 font-medium whitespace-nowrap">
+                                      {task.completedAt ? formatDateTime(task.completedAt) : "-"}
+                                    </td>
+                                    <td className="px-4 py-3 border-r border-slate-50 text-center text-[10px] text-slate-500 font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-[120px]">
+                                      {task.updatedBy || "-"}
+                                    </td>
+                                    <td className="px-4 py-3 border-r border-slate-50 text-center text-[10px] text-slate-500 font-medium whitespace-nowrap">
+                                      {task.updatedAt ? formatDateTime(task.updatedAt) : "-"}
                                     </td>
                                     <td className="px-4 py-3 border-r border-slate-50 text-center">
                                       {normStatus === "Concluída" ? (
@@ -5743,6 +5892,15 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                                                   </span>
                                                 );
                                               })()}
+                                              {task.isProgrammed !== false ? (
+                                                <span className="text-[8.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-sm border flex items-center gap-1 bg-indigo-50 text-indigo-700 border-indigo-200">
+                                                  PROG
+                                                </span>
+                                              ) : (
+                                                <span className="text-[8.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-sm border flex items-center gap-1 bg-rose-50 text-rose-700 border-rose-200">
+                                                  N. PROG
+                                                </span>
+                                              )}
                                             </div>
                                           </div>
                                         </div>
@@ -6094,6 +6252,17 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                                 </span>
                               );
                             })()}
+                            
+                            {task.isProgrammed !== false ? (
+                              <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border flex items-center gap-1 bg-indigo-50 text-indigo-700 border-indigo-200">
+                                PROGRAMADA
+                              </span>
+                            ) : (
+                              <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border flex items-center gap-1 bg-rose-50 text-rose-700 border-rose-200">
+                                NÃO PROGRAMADA
+                              </span>
+                            )}
+                            
                             {task.parentId && (
                               <span className="text-[10px] font-black tracking-widest uppercase text-indigo-500 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md flex items-center gap-1"><GitCommit size={10} /> Subatividade</span>
                             )}
@@ -6213,7 +6382,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
               initial={{ opacity: 0, scale: 0.95 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              className="bg-white rounded-3xl p-6 shadow-2xl max-w-xl w-full border border-slate-200 text-left max-h-[85vh] overflow-y-auto custom-scrollbar space-y-4"
+              className="bg-white rounded-3xl p-6 shadow-2xl max-w-2xl w-full border border-slate-200 text-left max-h-[85vh] overflow-y-auto custom-scrollbar space-y-4"
             >
               <div className="flex justify-between items-center pb-3 border-b border-slate-100">
                 <h3 className="text-base font-black text-slate-800 uppercase tracking-tight">
@@ -6227,7 +6396,33 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                 </button>
               </div>
 
-              <form onSubmit={handleFormSubmit} className="space-y-4">
+              {formMode === "edit" && (
+                <div className="flex gap-2 border-b border-slate-100 pb-2">
+                  <button
+                    type="button"
+                    onClick={() => setTaskFormTab("form")}
+                    className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${taskFormTab === "form" ? "bg-adasa-mid text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}
+                  >
+                    Formulário
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTaskFormTab("comments")}
+                    className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${taskFormTab === "comments" ? "bg-adasa-mid text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}
+                  >
+                    Comentários
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTaskFormTab("links")}
+                    className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${taskFormTab === "links" ? "bg-adasa-mid text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}
+                  >
+                    Links
+                  </button>
+                </div>
+              )}
+
+              <form onSubmit={handleFormSubmit} className={taskFormTab === "form" ? "space-y-4" : "hidden"}>
                 {/* Plan of Activities (Exactly One) */}
                 <div className="space-y-1">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Plano de Atividades (Vincular a um)</label>
@@ -6452,17 +6647,43 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Prioridade</label>
-                  <select
-                    value={editingTask.priority || "Média"}
-                    onChange={(e) => setEditingTask(prev => ({ ...prev, priority: e.target.value }))}
-                    className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-600 focus:border-adasa-mid outline-none"
-                  >
-                    <option value="Alta">Alta</option>
-                    <option value="Média">Média</option>
-                    <option value="Baixa">Baixa</option>
-                  </select>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Prioridade</label>
+                    <select
+                      value={editingTask.priority || "Média"}
+                      onChange={(e) => setEditingTask(prev => ({ ...prev, priority: e.target.value }))}
+                      className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-600 focus:border-adasa-mid outline-none"
+                    >
+                      <option value="Alta">Alta</option>
+                      <option value="Média">Média</option>
+                      <option value="Baixa">Baixa</option>
+                    </select>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Classificação</label>
+                    <select
+                      value={editingTask.isProgrammed === false ? "false" : "true"}
+                      onChange={(e) => setEditingTask(prev => ({ ...prev, isProgrammed: e.target.value === "true" }))}
+                      className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-600 focus:border-adasa-mid outline-none"
+                    >
+                      <option value="true">Programada</option>
+                      <option value="false">Não programada</option>
+                    </select>
+                  </div>
+                  
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Peso Relativo</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.1"
+                      value={editingTask.weight !== undefined ? editingTask.weight : 1}
+                      onChange={(e) => setEditingTask(prev => ({ ...prev, weight: parseFloat(e.target.value) || 0 }))}
+                      className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-600 font-semibold focus:border-adasa-mid outline-none transition-all placeholder:text-slate-400"
+                    />
+                  </div>
                 </div>
 
                 {/* Areas of Activities (One or More) */}
@@ -6619,6 +6840,188 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   </button>
                 </div>
               </form>
+
+              {taskFormTab === "comments" && (
+                <div className="space-y-4">
+                  <div className="space-y-3 max-h-[50vh] overflow-y-auto custom-scrollbar pr-2">
+                    {(!editingTask.comments || editingTask.comments.length === 0) ? (
+                      <p className="text-xs text-slate-400 italic font-medium">Nenhum comentário cadastrado para esta atividade.</p>
+                    ) : (
+                      editingTask.comments.map(c => (
+                        <div key={c.id} className="bg-slate-50 border border-slate-200 rounded-xl p-3 space-y-2">
+                          <div className="flex justify-between items-start gap-4">
+                            <span className="text-[10px] uppercase font-black tracking-wider text-slate-400">
+                              {c.author} • {formatDateTime(c.createdAt)} {c.updatedAt && <span className="opacity-70">(Editado)</span>}
+                            </span>
+                            {(currentUser?.name === c.author || currentUser?.role === "Administrador" || !currentUser) && (
+                              <div className="flex gap-1">
+                                <button onClick={() => setEditingCommentId(c.id)} className="p-1 text-slate-400 hover:text-slate-600 transition-colors" title="Editar">
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>
+                                </button>
+                                <button onClick={() => handleDeleteComment(c.id)} className="p-1 text-red-300 hover:text-red-500 transition-colors" title="Excluir">
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          
+                          {editingCommentId === c.id ? (
+                            <div className="space-y-2">
+                              <textarea
+                                id={`edit-comment-${c.id}`}
+                                defaultValue={c.content}
+                                className="w-full border border-slate-300 rounded-lg p-2 text-xs font-medium text-slate-700 outline-none focus:border-adasa-mid"
+                                rows={2}
+                              />
+                              <div className="flex gap-2 justify-end">
+                                <button 
+                                  onClick={() => setEditingCommentId(null)}
+                                  className="px-3 py-1 text-[10px] font-bold text-slate-500 bg-slate-200 hover:bg-slate-300 rounded-md transition-colors"
+                                >
+                                  Cancelar
+                                </button>
+                                <button 
+                                  onClick={() => {
+                                    const el = document.getElementById(`edit-comment-${c.id}`) as HTMLTextAreaElement;
+                                    handleUpdateComment(c.id, el.value);
+                                  }}
+                                  className="px-3 py-1 text-[10px] font-bold text-white bg-adasa-mid hover:bg-adasa-dark rounded-md transition-colors"
+                                >
+                                  Salvar
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="text-xs font-semibold text-slate-700 whitespace-pre-wrap">{c.content}</p>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  
+                  <div className="bg-white border rounded-xl overflow-hidden focus-within:ring-2 focus-within:ring-adasa-mid/30 focus-within:border-adasa-mid transition-all shadow-sm">
+                    <textarea 
+                      value={newComment}
+                      onChange={e => setNewComment(e.target.value)}
+                      placeholder="Adicione um comentário..."
+                      className="w-full border-none px-3 py-2 text-xs font-medium text-slate-700 bg-transparent resize-none outline-none min-h-[60px]"
+                    />
+                    <div className="bg-slate-50 px-3 py-2 flex justify-between items-center border-t border-slate-100">
+                      <span className="text-[10px] font-bold text-slate-400">Pressione Adicionar para salvar antes de aplicar as alterações na tarefa.</span>
+                      <button 
+                        onClick={handleAddComment}
+                        className="px-4 py-1.5 text-[10px] font-bold text-white bg-indigo-500 hover:bg-indigo-600 rounded-lg transition-colors flex items-center gap-1 shadow-sm"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/></svg>
+                        Adicionar
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 justify-end pt-4 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setIsFormOpen(false)}
+                      className="px-5 py-2 font-bold text-xs text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                    >
+                      Retroceder
+                    </button>
+                    <button
+                      onClick={handleFormSubmit}
+                      className="px-5 py-2 font-bold text-xs text-white bg-adasa-mid hover:bg-adasa-dark rounded-xl transition-colors shadow-sm"
+                    >
+                      {formMode === "create" ? "Inserir Atividade e Comentário" : "Gravar Alterações"}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {taskFormTab === "links" && (
+                <div className="space-y-4">
+                  <div className="space-y-3 max-h-[40vh] overflow-y-auto custom-scrollbar pr-2">
+                    {(!editingTask.links || editingTask.links.length === 0) ? (
+                      <p className="text-xs text-slate-400 italic font-medium">Nenhum link cadastrado para esta atividade.</p>
+                    ) : (
+                      editingTask.links.map(l => (
+                        <div key={l.id} className="bg-slate-50 border border-slate-200 rounded-xl p-3 flex justify-between items-center">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-semibold text-slate-700">{l.title}</span>
+                            <a href={l.url} target="_blank" rel="noopener noreferrer" className="text-xs text-adasa-mid hover:underline truncate max-w-[300px]">
+                              {l.url}
+                            </a>
+                            <span className="text-[9px] text-slate-400 mt-1">Adicionado em: {formatDateTime(l.createdAt)}</span>
+                          </div>
+                          <div>
+                            <button onClick={() => handleDeleteLink(l.id)} className="p-1.5 text-red-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors" title="Excluir">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  
+                  <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm space-y-4">
+                    <h4 className="text-sm font-bold text-slate-700">Link para um arquivo ou site</h4>
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <label className="block text-xs font-medium text-slate-600">Adicionar um link</label>
+                        <input 
+                          type="url"
+                          value={newLinkUrl}
+                          onChange={e => setNewLinkUrl(e.target.value)}
+                          placeholder="https:// Colar o link"
+                          className="w-full border-2 border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 outline-none transition-colors"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="block text-xs font-medium text-slate-600">Texto para exibição</label>
+                        <input 
+                          type="text"
+                          value={newLinkTitle}
+                          onChange={e => setNewLinkTitle(e.target.value)}
+                          placeholder="Insira um título de exibição"
+                          className="w-full border-2 border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 focus:border-indigo-500 outline-none transition-colors"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex gap-3 justify-end pt-2">
+                      <button 
+                        type="button"
+                        onClick={() => {
+                          setNewLinkUrl("");
+                          setNewLinkTitle("");
+                        }}
+                        className="px-4 py-2 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 rounded-lg transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                      <button 
+                        onClick={handleAddLink}
+                        className="px-4 py-2 text-xs font-bold text-white bg-indigo-500 hover:bg-indigo-600 rounded-lg transition-colors"
+                      >
+                        Adicionar
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3 justify-end pt-4 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setIsFormOpen(false)}
+                      className="px-5 py-2 font-bold text-xs text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                    >
+                      Retroceder
+                    </button>
+                    <button
+                      onClick={handleFormSubmit}
+                      className="px-5 py-2 font-bold text-xs text-white bg-adasa-mid hover:bg-adasa-dark rounded-xl transition-colors shadow-sm"
+                    >
+                      Gravar Alterações
+                    </button>
+                  </div>
+                </div>
+              )}
             </motion.div>
           </div>
         )}
@@ -6747,6 +7150,16 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                       </span>
                     );
                   })()}
+
+                  {task.isProgrammed !== false ? (
+                    <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border flex items-center gap-1 bg-indigo-50 text-indigo-700 border-indigo-200">
+                      PROGRAMADA
+                    </span>
+                  ) : (
+                    <span className="text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded-md border flex items-center gap-1 bg-rose-50 text-rose-700 border-rose-200">
+                      NÃO PROGRAMADA
+                    </span>
+                  )}
                 </div>
 
                 {/* Subtitle / Notes */}

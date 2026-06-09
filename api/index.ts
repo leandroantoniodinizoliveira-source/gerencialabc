@@ -71,7 +71,7 @@ async function rollUpTask(client: any, parentId: number | null) {
   if (!parentId) return;
 
   const res = await client.query(
-    "SELECT start_date, end_date, progress FROM pl_tasks WHERE parent_id = $1",
+    "SELECT start_date, end_date, progress, COALESCE(weight, 1) as weight FROM pl_tasks WHERE parent_id = $1",
     [parentId]
   );
   
@@ -92,8 +92,8 @@ async function rollUpTask(client: any, parentId: number | null) {
 
   let minStart: Date | null = null;
   let maxEnd: Date | null = null;
-  let totalProgress = 0;
-  let validChildrenCount = 0;
+  let totalWeightedProgress = 0;
+  let sumOfWeights = 0;
 
   for (const row of res.rows) {
     if (row.start_date) {
@@ -104,11 +104,17 @@ async function rollUpTask(client: any, parentId: number | null) {
       const d = new Date(row.end_date);
       if (!maxEnd || d > maxEnd) maxEnd = d;
     }
-    totalProgress += Number(row.progress) || 0;
-    validChildrenCount++;
+    const w = Number(row.weight) || 0;
+    totalWeightedProgress += (Number(row.progress) || 0) * w;
+    sumOfWeights += w;
   }
 
-  const avgProgress = validChildrenCount > 0 ? Math.round(totalProgress / validChildrenCount) : 0;
+  let avgProgress = 0;
+  if (sumOfWeights > 0) {
+    avgProgress = Math.round(totalWeightedProgress / sumOfWeights);
+  } else if (res.rows.length > 0) {
+    avgProgress = Math.round(res.rows.reduce((acc: number, row: any) => acc + (Number(row.progress) || 0), 0) / res.rows.length);
+  }
   
   let status = "Não iniciada";
   if (avgProgress === 100) {
@@ -395,6 +401,9 @@ async function runStartupMigration() {
       
       // Add updated_at and updated_by to tables
       await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
+      await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT NOW(), ADD COLUMN IF NOT EXISTS completed_by VARCHAR(255), ADD COLUMN IF NOT EXISTS completed_at TIMESTAMP;`);
+      await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS is_programmed BOOLEAN DEFAULT TRUE;`);
+      await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS weight NUMERIC DEFAULT 1;`);
       await client.query(`ALTER TABLE pl_plans ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
       await client.query(`ALTER TABLE pl_areas ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
       await client.query(`ALTER TABLE pl_responsibles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
@@ -1827,11 +1836,11 @@ async function startServer() {
       try {
         const result = await client.query(`
           WITH RECURSIVE task_tree AS (
-            SELECT id, title, description, start_date, end_date, status, parent_id, progress, priority, category, assigned_to, created_by, notes, plan_id, depends_on_task_id, updated_at, updated_by, sei_process, 1 AS depth
+            SELECT id, title, description, start_date, end_date, status, parent_id, progress, priority, category, assigned_to, created_by, notes, plan_id, depends_on_task_id, updated_at, updated_by, sei_process, created_at, completed_by, completed_at, is_programmed, weight, 1 AS depth
             FROM pl_tasks
             WHERE parent_id IS NULL
             UNION ALL
-            SELECT t.id, t.title, t.description, t.start_date, t.end_date, t.status, t.parent_id, t.progress, t.priority, t.category, t.assigned_to, t.created_by, t.notes, t.plan_id, t.depends_on_task_id, t.updated_at, t.updated_by, t.sei_process, tt.depth + 1
+            SELECT t.id, t.title, t.description, t.start_date, t.end_date, t.status, t.parent_id, t.progress, t.priority, t.category, t.assigned_to, t.created_by, t.notes, t.plan_id, t.depends_on_task_id, t.updated_at, t.updated_by, t.sei_process, t.created_at, t.completed_by, t.completed_at, t.is_programmed, t.weight, tt.depth + 1
             FROM pl_tasks t
             INNER JOIN task_tree tt ON t.parent_id = tt.id
           )
@@ -1896,11 +1905,16 @@ async function startServer() {
           status: t.status,
           parentId: t.parent_id ? Number(t.parent_id) : null,
           progress: Number(t.progress) || 0,
+          weight: Number(t.weight) !== 0 ? Number(t.weight) || 1 : 0,
+          isProgrammed: t.is_programmed !== false,
           seiProcess: t.sei_process,
           priority: t.priority,
           category: t.category,
           assignedTo: t.assigned_to,
           createdBy: t.created_by,
+          createdAt: t.created_at,
+          completedBy: t.completed_by,
+          completedAt: t.completed_at,
           notes: t.notes,
           planId: t.plan_id ? Number(t.plan_id) : null,
           dependsOnTaskId: t.depends_on_task_id ? Number(t.depends_on_task_id) : null,
@@ -1961,13 +1975,15 @@ async function startServer() {
 
   app.post("/api/tasks", async (req, res) => {
     try {
-      const { title, description, startDate, endDate, status, parentId, progress, priority, category, assignedTo, notes, planId, areaIds, responsibleIds, categoryIds, dependsOnTaskId } = req.body;
+      const { title, description, startDate, endDate, status, parentId, progress, weight, priority, category, assignedTo, notes, planId, areaIds, responsibleIds, categoryIds, dependsOnTaskId, isProgrammed } = req.body;
       const pool = getDbPool();
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
         const finalProgress = progress !== undefined ? parseInt(progress) : 0;
         const finalStatus = finalProgress === 100 ? "Concluída" : finalProgress > 0 ? "Em andamento" : "Não iniciada";
+        const finalIsProgrammed = isProgrammed !== undefined ? isProgrammed : true;
+        const finalWeight = weight !== undefined ? Math.max(0, Number(weight)) : 1;
         
         let finalAreaIds = areaIds || [];
         let finalCategoryIds = categoryIds || [];
@@ -1983,8 +1999,8 @@ async function startServer() {
         }
         
         const result = await client.query(
-          `INSERT INTO pl_tasks (title, description, start_date, end_date, status, parent_id, progress, priority, category, assigned_to, notes, plan_id, depends_on_task_id, updated_at, updated_by, sei_process)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), $14, $15)
+          `INSERT INTO pl_tasks (title, description, start_date, end_date, status, parent_id, progress, weight, priority, category, assigned_to, notes, plan_id, depends_on_task_id, updated_at, updated_by, sei_process, created_by, completed_at, completed_by, is_programmed)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), $14, $15, $16, $17, $18, $19, $20)
            RETURNING *`,
           [
             title || "Sem título",
@@ -1994,6 +2010,7 @@ async function startServer() {
             finalStatus,
             parentId ? parseInt(parentId) : null,
             finalProgress,
+            finalWeight,
             priority || "Média",
             category || "PONTUAIS",
             "", // assigned_to will be updated below
@@ -2001,7 +2018,11 @@ async function startServer() {
             planId ? parseInt(planId) : null,
             dependsOnTaskId ? parseInt(dependsOnTaskId) : null,
             req.body.updatedBy || "SGI Pro",
-            req.body.seiProcess || null
+            req.body.seiProcess || null,
+            req.body.updatedBy || "SGI Pro", // created_by is the same as updatedBy at creation
+            finalProgress === 100 ? new Date() : null,
+            finalProgress === 100 ? (req.body.updatedBy || "SGI Pro") : null,
+            finalIsProgrammed
           ]
         );
         
@@ -2082,13 +2103,13 @@ async function startServer() {
   app.put("/api/tasks/:id", async (req, res) => {
     try {
       const taskId = parseInt(req.params.id);
-      const { title, description, startDate, endDate, status, progress, priority, category, assignedTo, notes, parentId, planId, areaIds, responsibleIds, categoryIds, dependsOnTaskId, seiProcess } = req.body;
+      const { title, description, startDate, endDate, status, progress, weight, priority, category, assignedTo, notes, parentId, planId, areaIds, responsibleIds, categoryIds, dependsOnTaskId, seiProcess, isProgrammed } = req.body;
       const pool = getDbPool();
       const client = await pool.connect();
       try {
         await client.query("BEGIN");
         
-        const currentTaskRes = await client.query("SELECT parent_id, start_date, end_date, progress, status, depends_on_task_id FROM pl_tasks WHERE id = $1", [taskId]);
+        const currentTaskRes = await client.query("SELECT parent_id, start_date, end_date, progress, status, depends_on_task_id, completed_at, completed_by, weight, is_programmed FROM pl_tasks WHERE id = $1", [taskId]);
         if (currentTaskRes.rows.length === 0) {
           await client.query("ROLLBACK");
           return res.status(404).json({ success: false, error: "Tarefa não encontrada." });
@@ -2102,6 +2123,8 @@ async function startServer() {
         let finalEndDate = endDate ? new Date(endDate) : null;
         let finalProgress = progress !== undefined ? parseInt(progress) : 0;
         let finalStatus = finalProgress === 100 ? "Concluída" : finalProgress > 0 ? "Em andamento" : "Não iniciada";
+        const finalIsProgrammed = isProgrammed !== undefined ? isProgrammed : currentTaskRes.rows[0].is_programmed !== false;
+        const finalWeight = weight !== undefined ? Math.max(0, Number(weight)) : (Number(currentTaskRes.rows[0].weight) || 1);
 
         if (hasChildren) {
           finalStartDate = currentTaskRes.rows[0].start_date;
@@ -2123,9 +2146,22 @@ async function startServer() {
             }
         }
 
+        const wasCompleted = currentTaskRes.rows[0].progress === 100;
+        const isCompleted = finalProgress === 100;
+        let finalCompletedAt = currentTaskRes.rows[0].completed_at;
+        let finalCompletedBy = currentTaskRes.rows[0].completed_by;
+
+        if (isCompleted && !wasCompleted) {
+          finalCompletedAt = new Date();
+          finalCompletedBy = req.body.updatedBy || "SGI Pro";
+        } else if (!isCompleted) {
+          finalCompletedAt = null;
+          finalCompletedBy = null;
+        }
+
         const result = await client.query(
           `UPDATE pl_tasks 
-           SET title = $1, description = $2, start_date = $3, end_date = $4, status = $5, progress = $6, priority = $7, category = $8, assigned_to = $9, notes = $10, parent_id = $11, plan_id = $12, depends_on_task_id = $13, updated_at = NOW(), updated_by = $14, sei_process = $16
+           SET title = $1, description = $2, start_date = $3, end_date = $4, status = $5, progress = $6, weight = $20, priority = $7, category = $8, assigned_to = $9, notes = $10, parent_id = $11, plan_id = $12, depends_on_task_id = $13, updated_at = NOW(), updated_by = $14, sei_process = $16, completed_at = $17, completed_by = $18, is_programmed = $19
            WHERE id = $15
            RETURNING *`,
           [
@@ -2144,7 +2180,11 @@ async function startServer() {
             dependsOnTaskId ? parseInt(dependsOnTaskId) : null,
             req.body.updatedBy || "SGI Pro",
             taskId,
-            seiProcess || null
+            seiProcess || null,
+            finalCompletedAt,
+            finalCompletedBy,
+            finalIsProgrammed,
+            finalWeight
           ]
         );
 
