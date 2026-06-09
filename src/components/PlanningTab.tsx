@@ -5544,6 +5544,14 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                     });
                   }
 
+                  if (boardGroupBy !== "status") {
+                    Object.keys(groups).forEach(key => {
+                      if (groups[key].length === 0) {
+                        delete groups[key];
+                      }
+                    });
+                  }
+
                   const isStatusGroup = boardGroupBy === "status";
                   const wrapperClass = isStatusGroup
                     ? "grid grid-cols-1 lg:grid-cols-3 gap-6 items-start mt-2 font-sans text-slate-800 w-full"
