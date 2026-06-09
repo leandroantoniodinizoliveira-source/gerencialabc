@@ -37,6 +37,7 @@ import {
   CalendarRange,
   LayoutGrid,
   Briefcase,
+  BookOpen,
   GitCommit,
   Activity,
   AlignLeft,
@@ -341,7 +342,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
   const { currentUser } = useAuth();
   // Navigation, search & filter state
   const [isDashboardFiltersExpanded, setIsDashboardFiltersExpanded] = useState(false);
-  const [isTasksFiltersExpanded, setIsTasksFiltersExpanded] = useState(false);
+  const [isTasksFiltersExpanded, setIsTasksFiltersExpanded] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [situationFilter, setSituationFilter] = useState<string>("all");
@@ -419,7 +420,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
   const [tableSort, setTableSort] = useState<{ field: string, dir: "asc" | "desc" } | null>({ field: "end", dir: "asc" });
   const [boardGroupBy, setBoardGroupBy] = useState<"status" | "category">("category");
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [taskFormTab, setTaskFormTab] = useState<"form" | "comments" | "links">("form");
+  const [taskFormTab, setTaskFormTab] = useState<"form" | "notes" | "comments" | "links" | "calc">("form");
   const [newComment, setNewComment] = useState("");
   const [editingCommentId, setEditingCommentId] = useState<string | null>(null);
   const [newLinkUrl, setNewLinkUrl] = useState("");
@@ -427,6 +428,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
   const [isRegModalOpen, setIsRegModalOpen] = useState(false);
   const [formMode, setFormMode] = useState<"create" | "edit">("create");
   const [editingTask, setEditingTask] = useState<Partial<Task>>({});
+  const [isInitializing, setIsInitializing] = useState(true);
   
   // Quick status sync loader
   const [isSyncing, setIsSyncing] = useState(false);
@@ -917,23 +919,34 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
 
   // Mount effect to fetch starting elements
   React.useEffect(() => {
-    reloadTasks();
+    const fetchInit = async () => {
+      await reloadTasks();
+    };
+    fetchInit();
   }, []);
 
   // Pre-select most recent plan on mount / if plans are updated
   React.useEffect(() => {
-    if (plans && plans.length > 0 && planFilter === "all") {
-      const sortedPlans = [...plans].sort((a, b) => {
-        const yearA = parseInt(a.name.match(/\d{4}/)?.[0] || "0", 10);
-        const yearB = parseInt(b.name.match(/\d{4}/)?.[0] || "0", 10);
-        if (yearA !== yearB) return yearB - yearA;
-        return b.id - a.id;
-      });
-      if (sortedPlans.length > 0) {
-        setPlanFilter(sortedPlans[0].id.toString());
+    if (plans && plans.length > 0) {
+      if (planFilter === "all" && isInitializing) {
+        const sortedPlans = [...plans].sort((a, b) => {
+          const yearA = parseInt(a.name.match(/\d{4}/)?.[0] || "0", 10);
+          const yearB = parseInt(b.name.match(/\d{4}/)?.[0] || "0", 10);
+          if (yearA !== yearB) return yearB - yearA;
+          return b.id - a.id;
+        });
+        if (sortedPlans.length > 0) {
+          setPlanFilter(sortedPlans[0].id.toString());
+        }
       }
+      if (isInitializing && !isSyncing) {
+         // Data is loaded and (if needed) plan filter is set. Complete init.
+         setTimeout(() => setIsInitializing(false), 50);
+      }
+    } else if (isInitializing && !isSyncing) {
+         setTimeout(() => setIsInitializing(false), 50);
     }
-  }, [plans]);
+  }, [plans, planFilter, isInitializing, isSyncing]);
 
   // Reset category filter if it becomes invalid due to area selection change
   React.useEffect(() => {
@@ -1084,10 +1097,13 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
       let minStart: Date | null = null;
       let maxEnd: Date | null = null;
       let totalProgress = 0;
+      let totalWeight = 0;
 
       children.forEach(child => {
         const computedChild = computeNode(child.id);
-        totalProgress += computedChild.progress || 0;
+        const childWeight = computedChild.weight !== undefined && computedChild.weight !== ("" as any) ? Number(computedChild.weight) : 1;
+        totalProgress += (computedChild.progress || 0) * childWeight;
+        totalWeight += childWeight;
         
         if (computedChild.startDate) {
           const sd = new Date(computedChild.startDate);
@@ -1103,7 +1119,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
         }
       });
 
-      node.progress = Math.round(totalProgress / children.length);
+      node.progress = totalWeight > 0 ? Math.round(totalProgress / totalWeight) : 0;
       
       if (minStart) {
         node.startDate = minStart.toISOString().split('T')[0];
@@ -1200,13 +1216,16 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
     
     // Progress is weighted average of root tasks
     let progressSum = 0;
+    let weightSum = 0;
     const rootCount = rootTasks.length;
     if (rootCount > 0) {
       rootTasks.forEach(r => {
-        progressSum += r.progress || 0;
+        const w = r.weight !== undefined && r.weight !== ("" as any) ? Number(r.weight) : 1;
+        progressSum += (r.progress || 0) * w;
+        weightSum += w;
       });
     }
-    const avgRootProgress = rootCount > 0 ? Math.round(progressSum / rootCount) : 0;
+    const avgRootProgress = weightSum > 0 ? Math.round(progressSum / weightSum) : 0;
 
     return { total, completed, inProgress, pending, avgRootProgress };
   }, [enhancedTasks, rootTasks]);
@@ -2628,6 +2647,17 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
     // Remove old format if it was saved in the title (like "[FI] ") to avoid duplication, or we just trust clean titles
     return `${prefix}${t.title.replace(/^\[.*?\]\s*/, '')}`;
   };
+
+  if (isInitializing) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 bg-white border border-slate-200/80 rounded-[2rem] shadow-sm mt-8 max-w-7xl mx-auto min-h-[400px]">
+        <RefreshCw size={40} className="text-adasa-mid animate-spin mb-6" />
+        <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-2">Carregando Dados...</h3>
+        <p className="text-sm font-semibold text-slate-500">Filtrando e estruturando informações pelo plano mais recente.</p>
+        <p className="text-xs text-slate-400 mt-2">Por favor, aguarde um instante.</p>
+      </div>
+    );
+  }
 
   if (activeSubTab === "import") {
     return <ImportPanel areas={areas} showToast={showToast} onSuccess={reloadTasks} />;
@@ -5794,7 +5824,8 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                  );
               })()}
               {viewMode === "category" && (() => {
-                 const cats = [...categories, { id: -1, name: "Sem categoria", color: "", description: "" }];
+                 const sortedCategories = [...categories].sort((a, b) => a.name.localeCompare(b.name));
+                 const cats = [...sortedCategories, { id: -1, name: "Sem categoria", color: "", description: "" }];
                  return (
                    <div className="space-y-4 mt-2">
                      {cats.map(cat => {
@@ -6288,7 +6319,8 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   );
               })()}
               {viewMode === "responsible" && (() => {
-                 const resps = [...responsibles, { id: -1, name: "Sem responsável definido", areaIds: [] }];
+                 const sortedResponsibles = [...responsibles].sort((a, b) => a.name.localeCompare(b.name));
+                 const resps = [...sortedResponsibles, { id: -1, name: "Sem responsável definido", areaIds: [] }];
                  return (
                    <div className="space-y-4 mt-2">
                      {resps.map(resp => {
@@ -6601,6 +6633,13 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   </button>
                   <button
                     type="button"
+                    onClick={() => setTaskFormTab("notes")}
+                    className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${taskFormTab === "notes" ? "bg-adasa-mid text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}
+                  >
+                    Anotações
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => setTaskFormTab("comments")}
                     className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${taskFormTab === "comments" ? "bg-adasa-mid text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}
                   >
@@ -6612,6 +6651,13 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                     className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${taskFormTab === "links" ? "bg-adasa-mid text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}
                   >
                     Links
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTaskFormTab("calc")}
+                    className={`px-4 py-2 text-xs font-bold rounded-lg transition-colors ${taskFormTab === "calc" ? "bg-adasa-mid text-white" : "bg-slate-100 text-slate-500 hover:bg-slate-200"}`}
+                  >
+                    Cálculo do Progresso
                   </button>
                 </div>
               )}
@@ -6692,11 +6738,14 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                         }
                         return true;
                       })
-                      .map(t => (
-                        <option key={t.id} value={t.id}>
-                          {getTaskDisplayName(t)}
-                        </option>
-                      ))}
+                      .map(t => {
+                        const displayName = getTaskDisplayName(t);
+                        return (
+                          <option key={t.id} value={t.id} title={displayName}>
+                            {displayName.length > 70 ? displayName.slice(0, 70) + "..." : displayName}
+                          </option>
+                        );
+                      })}
                   </select>
                 </div>
 
@@ -6746,9 +6795,14 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                     className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-600 focus:border-adasa-mid outline-none"
                   >
                     <option value="">Nenhuma (Início Imediato)</option>
-                    {tasks.filter(t => t.parentId === editingTask.parentId && t.id !== editingTask.id && (editingTask.planId ? t.planId === editingTask.planId : true)).map(t => (
-                      <option key={t.id} value={t.id}>{getTaskDisplayName(t)}</option>
-                    ))}
+                    {tasks.filter(t => t.parentId === editingTask.parentId && t.id !== editingTask.id && (editingTask.planId ? t.planId === editingTask.planId : true)).map(t => {
+                      const displayName = getTaskDisplayName(t);
+                      return (
+                        <option key={t.id} value={t.id} title={displayName}>
+                          {displayName.length > 70 ? displayName.slice(0, 70) + "..." : displayName}
+                        </option>
+                      );
+                    })}
                   </select>
                 </div>
 
@@ -7009,17 +7063,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   </div>
                 </div>
 
-                {/* Description and notes */}
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider font-semibold">Notas técnicas / Justificativas</label>
-                  <textarea
-                    rows={3}
-                    value={editingTask.notes || ""}
-                    onChange={(e) => setEditingTask(prev => ({ ...prev, notes: e.target.value, description: e.target.value }))}
-                    placeholder="Justificativa técnica, observações sobre o andamento e fontes dos dados..."
-                    className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-700 focus:border-adasa-mid outline-none transition-all placeholder:text-slate-400"
-                  ></textarea>
-                </div>
+
 
                 {formMode === "edit" && editingTask.updatedAt && (
                   <div className="space-y-1">
@@ -7048,6 +7092,36 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                 </div>
               </form>
 
+              {taskFormTab === "notes" && (
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider font-semibold flex items-center gap-2"><BookOpen size={14}/> Notas técnicas / Justificativas</label>
+                    <textarea
+                      rows={9}
+                      value={editingTask.notes || ""}
+                      onChange={(e) => setEditingTask(prev => ({ ...prev, notes: e.target.value, description: e.target.value }))}
+                      placeholder="Justificativa técnica, observações sobre o andamento e fontes dos dados..."
+                      className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-700 focus:border-adasa-mid outline-none transition-all placeholder:text-slate-400"
+                    ></textarea>
+                  </div>
+                  <div className="flex gap-3 justify-end pt-4 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setIsFormOpen(false)}
+                      className="px-5 py-2 font-bold text-xs text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                    >
+                      Fechar Ajustes
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => handleFormSubmit(e as any)}
+                      className="px-5 py-2 font-bold text-xs text-white bg-adasa-mid hover:bg-adasa-dark rounded-xl transition-colors shadow-sm"
+                    >
+                      {formMode === "create" ? "Inserir Atividade" : "Gravar Alterações"}
+                    </button>
+                  </div>
+                </div>
+              )}
               {taskFormTab === "comments" && (
                 <div className="space-y-4">
                   <div className="space-y-3 max-h-[50vh] overflow-y-auto custom-scrollbar pr-2">
@@ -7225,6 +7299,171 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                       className="px-5 py-2 font-bold text-xs text-white bg-adasa-mid hover:bg-adasa-dark rounded-xl transition-colors shadow-sm"
                     >
                       Gravar Alterações
+                    </button>
+                  </div>
+                </div>
+              )}
+              {taskFormTab === "calc" && (
+                <div className="space-y-4">
+                  <div className="space-y-4 max-h-[50vh] overflow-y-auto custom-scrollbar pr-2">
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-blue-800 text-sm">
+                      <h4 className="font-bold flex items-center gap-2 mb-2"><Activity size={16} /> Cálculo por Pesos Relativos Livres</h4>
+                      <p className="mb-2">O <strong>cálculo por pesos relativos livres</strong> permite que você defina a importância de cada subtarefa em relação às outras atribuindo-lhes um valor numérico ("peso"). Este peso não precisa somar 100.</p>
+                      <ul className="list-disc pl-5 space-y-1 mt-2 text-xs">
+                        <li>Uma subtarefa com peso <strong>2.0</strong> impacta o dobro no progresso da tarefa pai do que uma subtarefa com peso <strong>1.0</strong>.</li>
+                        <li>Se uma tarefa não possui subtarefas, seu progresso é inserido manualmente.</li>
+                        <li>Se possui subtarefas, o progresso da tarefa pai é a soma do progresso ponderado de cada componente, dividido pela soma total de todos os pesos.</li>
+                      </ul>
+                    </div>
+                    
+                    {(!editingTask.id || !childrenMap[editingTask.id] || childrenMap[editingTask.id].length === 0) ? (
+                      <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-center">
+                        <p className="text-sm font-semibold text-slate-500 mb-1">Cálculo Manual</p>
+                        <p className="text-xs text-slate-400">Esta atividade não possui subtarefas dependentes. Seu progresso deve ser informado e atualizado manualmente na aba Formulário.</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <h5 className="font-bold text-sm text-slate-700">Subtarefas Dependentes ({childrenMap[editingTask.id].length})</h5>
+                        <div className="border border-slate-200 rounded-xl overflow-hidden bg-white">
+                          <table className="w-full text-left">
+                            <thead className="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                              <tr>
+                                <th className="px-3 py-2">Subtarefa</th>
+                                <th className="px-3 py-2 text-right">Progresso</th>
+                                <th className="px-3 py-2 text-right">Peso</th>
+                                <th className="px-3 py-2 text-right">Impacto</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100 text-xs text-slate-700 font-medium">
+                              {(() => {
+                                let totalWeight = 0;
+                                let totalCalculated = 0;
+                                return childrenMap[editingTask.id].map(sub => {
+                                  // Re-calculate the child's computed values
+                                  const computeChildNode = (nodeId: number): any => {
+                                    const node = taskById[nodeId];
+                                    if (!node) return { progress: 0, weight: 1 };
+                                    const cList = childrenMap[nodeId] || [];
+                                    if (cList.length === 0) return { progress: node.progress || 0, weight: node.weight !== undefined && node.weight !== ("" as any) ? Number(node.weight) : 1 };
+                                    let cTotalP = 0;
+                                    let cTotalW = 0;
+                                    cList.forEach(c => {
+                                      const cChild = computeChildNode(c.id);
+                                      const w = cChild.weight;
+                                      cTotalP += (cChild.progress || 0) * w;
+                                      cTotalW += w;
+                                    });
+                                    return { 
+                                      progress: cTotalW > 0 ? Math.round(cTotalP / cTotalW) : 0, 
+                                      weight: node.weight !== undefined && node.weight !== ("" as any) ? Number(node.weight) : 1 
+                                    };
+                                  };
+                                  
+                                  const childInfo = computeChildNode(sub.id);
+                                  const prog = childInfo.progress;
+                                  const w = childInfo.weight;
+                                  const impacto = prog * w;
+                                  
+                                  totalWeight += w;
+                                  totalCalculated += impacto;
+
+                                  return (
+                                    <tr key={sub.id} className="hover:bg-slate-50/50">
+                                      <td className="px-3 py-2 font-bold max-w-[150px] truncate" title={getTaskDisplayName(sub)}>{getTaskDisplayName(sub)}</td>
+                                      <td className="px-3 py-2 text-right">{prog}%</td>
+                                      <td className="px-3 py-2 text-right font-black text-indigo-600">{w}</td>
+                                      <td className="px-3 py-2 text-right text-slate-500">{impacto.toFixed(1)}</td>
+                                    </tr>
+                                  );
+                                });
+                              })()}
+                            </tbody>
+                            <tfoot className="bg-slate-50/80 border-t border-slate-200 text-xs font-black text-slate-700">
+                              {(() => {
+                                let totalWeight = 0;
+                                let totalCalculated = 0;
+                                childrenMap[editingTask.id].forEach(sub => {
+                                  const computeChildNode = (nodeId: number): any => {
+                                    const node = taskById[nodeId];
+                                    if (!node) return { progress: 0, weight: 1 };
+                                    const cList = childrenMap[nodeId] || [];
+                                    if (cList.length === 0) return { progress: node.progress || 0, weight: node.weight !== undefined && node.weight !== ("" as any) ? Number(node.weight) : 1 };
+                                    let cTotalP = 0;
+                                    let cTotalW = 0;
+                                    cList.forEach(c => {
+                                      const cChild = computeChildNode(c.id);
+                                      const w = cChild.weight;
+                                      cTotalP += (cChild.progress || 0) * w;
+                                      cTotalW += w;
+                                    });
+                                    return { 
+                                      progress: cTotalW > 0 ? Math.round(cTotalP / cTotalW) : 0, 
+                                      weight: node.weight !== undefined && node.weight !== ("" as any) ? Number(node.weight) : 1 
+                                    };
+                                  };
+                                  const c = computeChildNode(sub.id);
+                                  totalWeight += c.weight;
+                                  totalCalculated += (c.progress * c.weight);
+                                });
+                                const finalResult = totalWeight > 0 ? Math.round(totalCalculated / totalWeight) : 0;
+                                
+                                return (
+                                  <tr>
+                                    <td colSpan={2} className="px-3 py-2 text-right uppercase tracking-widest text-[10px] text-slate-500">Totalizadores:</td>
+                                    <td className="px-3 py-2 text-right text-indigo-700 text-sm">∑ = {totalWeight}</td>
+                                    <td className="px-3 py-2 text-right text-emerald-600 text-sm">
+                                       {finalResult}%
+                                    </td>
+                                  </tr>
+                                );
+                              })()}
+                            </tfoot>
+                          </table>
+                        </div>
+                        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex flex-col items-center justify-center">
+                          <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block mb-1">Média Ponderada = (∑ Impactos) / (∑ Pesos)</span>
+                          {(() => {
+                                let totalWeight = 0;
+                                let totalCalculated = 0;
+                                childrenMap[editingTask.id].forEach(sub => {
+                                  const computeChildNode = (nodeId: number): any => {
+                                    const node = taskById[nodeId];
+                                    if (!node) return { progress: 0, weight: 1 };
+                                    const cList = childrenMap[nodeId] || [];
+                                    if (cList.length === 0) return { progress: node.progress || 0, weight: node.weight !== undefined && node.weight !== ("" as any) ? Number(node.weight) : 1 };
+                                    let cTotalP = 0;
+                                    let cTotalW = 0;
+                                    cList.forEach(c => {
+                                      const cChild = computeChildNode(c.id);
+                                      const w = cChild.weight;
+                                      cTotalP += (cChild.progress || 0) * w;
+                                      cTotalW += w;
+                                    });
+                                    return { 
+                                      progress: cTotalW > 0 ? Math.round(cTotalP / cTotalW) : 0, 
+                                      weight: node.weight !== undefined && node.weight !== ("" as any) ? Number(node.weight) : 1 
+                                    };
+                                  };
+                                  const c = computeChildNode(sub.id);
+                                  totalWeight += c.weight;
+                                  totalCalculated += (c.progress * c.weight);
+                                });
+                                const finalResult = totalWeight > 0 ? Math.round(totalCalculated / totalWeight) : 0;
+                                return (
+                                  <span className="text-2xl font-black text-emerald-700">{finalResult}%</span>
+                                );
+                          })()}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex gap-3 justify-end pt-4 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setIsFormOpen(false)}
+                      className="px-5 py-2 font-bold text-xs text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                    >
+                      Fechar
                     </button>
                   </div>
                 </div>
