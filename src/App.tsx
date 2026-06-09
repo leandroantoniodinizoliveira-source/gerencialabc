@@ -7022,14 +7022,7 @@ const renderSupplyTable = () => {
         </AnimatePresence>
       </main>
 
-      {/* Simplified Footer */}
-      <footer className="fixed bottom-6 right-8 hidden xl:block">
-        <div className="flex items-center gap-3">
-          <span className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] bg-white/80 backdrop-blur px-4 py-1.5 rounded-full border border-slate-200 shadow-sm">
-            Powered by SGI Pro Hídrido v2.4
-          </span>
-        </div>
-      </footer>
+
 
       {confirmState && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">

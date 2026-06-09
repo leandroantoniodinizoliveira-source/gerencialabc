@@ -73,9 +73,6 @@ export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas }:
             </div>
             <h2 className="text-lg font-black text-slate-800 tracking-tight">Planejamento e Cronogramas</h2>
           </div>
-          <span className="text-[11px] font-bold text-slate-500 bg-slate-100/80 px-2.5 py-1 rounded-full border border-slate-200/50">
-            {completedTasks}/{totalTasks} Metas Concluídas
-          </span>
         </div>
 
         {/* Master Card & Direct Fast Shortcuts Grid */}
