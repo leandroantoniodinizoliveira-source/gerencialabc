@@ -306,6 +306,13 @@ async function runStartupMigration() {
         );
       `);
 
+      // Add sei_process column
+      try {
+        await client.query("ALTER TABLE pl_tasks ADD COLUMN sei_process TEXT;");
+      } catch (err: any) {
+        if (err.code !== '42701') console.warn("Could not add sei_process column:", err);
+      }
+
       await client.query("CREATE INDEX IF NOT EXISTS idx_tasks_parent_id ON pl_tasks(parent_id);");
 
       await client.query(`
@@ -403,7 +410,7 @@ async function runStartupMigration() {
       client.release();
     }
   } catch (err) {
-    console.error("Failed to verify/migrate database schema on startup:", err);
+    console.warn("Aviso: Não foi possível verificar/migrar o esquema de banco de dados na inicialização (Verifique a configuração da variável DATABASE_URL). Continuando em modo offline/local.");
   }
 }
 
@@ -1825,11 +1832,11 @@ async function startServer() {
       try {
         const result = await client.query(`
           WITH RECURSIVE task_tree AS (
-            SELECT id, title, description, start_date, end_date, status, parent_id, progress, priority, category, assigned_to, created_by, notes, plan_id, depends_on_task_id, updated_at, updated_by, 1 AS depth
+            SELECT id, title, description, start_date, end_date, status, parent_id, progress, priority, category, assigned_to, created_by, notes, plan_id, depends_on_task_id, updated_at, updated_by, sei_process, 1 AS depth
             FROM pl_tasks
             WHERE parent_id IS NULL
             UNION ALL
-            SELECT t.id, t.title, t.description, t.start_date, t.end_date, t.status, t.parent_id, t.progress, t.priority, t.category, t.assigned_to, t.created_by, t.notes, t.plan_id, t.depends_on_task_id, t.updated_at, t.updated_by, tt.depth + 1
+            SELECT t.id, t.title, t.description, t.start_date, t.end_date, t.status, t.parent_id, t.progress, t.priority, t.category, t.assigned_to, t.created_by, t.notes, t.plan_id, t.depends_on_task_id, t.updated_at, t.updated_by, t.sei_process, tt.depth + 1
             FROM pl_tasks t
             INNER JOIN task_tree tt ON t.parent_id = tt.id
           )
@@ -1894,6 +1901,7 @@ async function startServer() {
           status: t.status,
           parentId: t.parent_id ? Number(t.parent_id) : null,
           progress: Number(t.progress) || 0,
+          seiProcess: t.sei_process,
           priority: t.priority,
           category: t.category,
           assignedTo: t.assigned_to,
@@ -1980,8 +1988,8 @@ async function startServer() {
         }
         
         const result = await client.query(
-          `INSERT INTO pl_tasks (title, description, start_date, end_date, status, parent_id, progress, priority, category, assigned_to, notes, plan_id, depends_on_task_id, updated_at, updated_by)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), $14)
+          `INSERT INTO pl_tasks (title, description, start_date, end_date, status, parent_id, progress, priority, category, assigned_to, notes, plan_id, depends_on_task_id, updated_at, updated_by, sei_process)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), $14, $15)
            RETURNING *`,
           [
             title || "Sem título",
@@ -1997,7 +2005,8 @@ async function startServer() {
             notes || "",
             planId ? parseInt(planId) : null,
             dependsOnTaskId ? parseInt(dependsOnTaskId) : null,
-            req.body.updatedBy || "SGI Pro"
+            req.body.updatedBy || "SGI Pro",
+            req.body.seiProcess || null
           ]
         );
         
@@ -2078,7 +2087,7 @@ async function startServer() {
   app.put("/api/tasks/:id", async (req, res) => {
     try {
       const taskId = parseInt(req.params.id);
-      const { title, description, startDate, endDate, status, progress, priority, category, assignedTo, notes, parentId, planId, areaIds, responsibleIds, categoryIds, dependsOnTaskId } = req.body;
+      const { title, description, startDate, endDate, status, progress, priority, category, assignedTo, notes, parentId, planId, areaIds, responsibleIds, categoryIds, dependsOnTaskId, seiProcess } = req.body;
       const pool = getDbPool();
       const client = await pool.connect();
       try {
@@ -2121,7 +2130,7 @@ async function startServer() {
 
         const result = await client.query(
           `UPDATE pl_tasks 
-           SET title = $1, description = $2, start_date = $3, end_date = $4, status = $5, progress = $6, priority = $7, category = $8, assigned_to = $9, notes = $10, parent_id = $11, plan_id = $12, depends_on_task_id = $13, updated_at = NOW(), updated_by = $14
+           SET title = $1, description = $2, start_date = $3, end_date = $4, status = $5, progress = $6, priority = $7, category = $8, assigned_to = $9, notes = $10, parent_id = $11, plan_id = $12, depends_on_task_id = $13, updated_at = NOW(), updated_by = $14, sei_process = $16
            WHERE id = $15
            RETURNING *`,
           [
@@ -2139,7 +2148,8 @@ async function startServer() {
             planId ? parseInt(planId) : null,
             dependsOnTaskId ? parseInt(dependsOnTaskId) : null,
             req.body.updatedBy || "SGI Pro",
-            taskId
+            taskId,
+            seiProcess || null
           ]
         );
 

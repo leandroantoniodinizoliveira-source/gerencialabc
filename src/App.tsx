@@ -3293,33 +3293,33 @@ const renderSupplyTable = () => {
                 </h4>
                 <div className="pl-4 border-l border-white/10 ml-3.5 space-y-2 mt-2 mb-4">
                   <h5 className="text-[11px] font-bold text-white/60 uppercase tracking-wider mb-2 flex items-center gap-1.5 px-1">
-                    <Droplets size={12} /> Balanço Hídricos
+                    <Droplets size={12} /> Balanço Hídrico
                   </h5>
                   <div className="space-y-1">
                     <button
                       onClick={() => handleTabChange("manage")}
-                      className={cn("w-full px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "manage" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                      className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "manage" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
                     >
                       <FilePlus size={20} className={activeTab === "manage" ? "text-adasa-mid" : "text-white/60"} />
                       Cadastrar Balanço
                     </button>
                     <button
                       onClick={() => handleTabChange("analyze")}
-                      className={cn("w-full px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "analyze" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                      className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "analyze" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
                     >
                       <BarChart2 size={20} className={activeTab === "analyze" ? "text-adasa-mid" : "text-white/60"} />
                       Analisar Balanço
                     </button>
                     <button
                       onClick={() => handleTabChange("compare")}
-                      className={cn("w-full px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "compare" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                      className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "compare" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
                     >
                       <GitCompare size={20} className={activeTab === "compare" ? "text-adasa-mid" : "text-white/60"} />
                       Comparar Balanço
                     </button>
                     <button
                       onClick={() => handleTabChange("templates")}
-                      className={cn("w-full px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "templates" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                      className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "templates" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
                     >
                       <FileText size={20} className={activeTab === "templates" ? "text-adasa-mid" : "text-white/60"} />
                       Arquivos de Modelo
@@ -3536,7 +3536,7 @@ const renderSupplyTable = () => {
             <div className={cn(isSidebarCollapsed ? "" : "pl-3 border-l border-white/10 ml-3", "space-y-2 mt-2 mb-3")}>
               {!isSidebarCollapsed && (
                 <h5 className="text-[9px] font-bold text-white/55 uppercase tracking-wider mb-1 flex items-center gap-1.5 px-1">
-                  <Droplets size={10} /> Balanço Hídricos
+                  <Droplets size={10} /> Balanço Hídrico
                 </h5>
               )}
               <div className="space-y-1">
@@ -3544,7 +3544,7 @@ const renderSupplyTable = () => {
                   title={isSidebarCollapsed ? "Cadastrar Balanço" : undefined}
                   onClick={() => handleTabChange("manage")}
                   className={cn(
-                    "w-full px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
                     activeTab === "manage"
                       ? "bg-white/10 text-white shadow-sm border border-white/10"
                       : "text-white/60 hover:text-white hover:bg-white/5",
@@ -3563,7 +3563,7 @@ const renderSupplyTable = () => {
                   title={isSidebarCollapsed ? "Analisar Balanço" : undefined}
                   onClick={() => handleTabChange("analyze")}
                   className={cn(
-                    "w-full px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
                     activeTab === "analyze"
                       ? "bg-white/10 text-white shadow-sm border border-white/10"
                       : "text-white/60 hover:text-white hover:bg-white/5",
@@ -3582,7 +3582,7 @@ const renderSupplyTable = () => {
                   title={isSidebarCollapsed ? "Comparar Balanços" : undefined}
                   onClick={() => handleTabChange("compare")}
                   className={cn(
-                    "w-full px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
                     activeTab === "compare"
                       ? "bg-white/10 text-white shadow-sm border border-white/10"
                       : "text-white/60 hover:text-white hover:bg-white/5",
@@ -3601,7 +3601,7 @@ const renderSupplyTable = () => {
                   title={isSidebarCollapsed ? "Arquivos de Modelo" : undefined}
                   onClick={() => handleTabChange("templates")}
                   className={cn(
-                    "w-full px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
                     activeTab === "templates"
                       ? "bg-white/10 text-white shadow-sm border border-white/10"
                       : "text-white/60 hover:text-white hover:bg-white/5",

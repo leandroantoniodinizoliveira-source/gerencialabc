@@ -118,6 +118,7 @@ export interface Task {
   status: 'pending' | 'in_progress' | 'completed' | string;
   parentId: number | null;
   progress: number;
+  seiProcess?: string;
   priority?: string;
   categoryIds?: number[];
   assignedTo?: string;

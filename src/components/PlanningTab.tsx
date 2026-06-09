@@ -43,7 +43,9 @@ import {
   List,
   Flag,
   Link2,
-  Users
+  Users,
+  Copy,
+  FileDigit
 } from "lucide-react";
 import { Task, Plan, Area, Category, Responsible } from "../types";
 import { cn } from "../lib/utils";
@@ -4806,43 +4808,45 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
     <div className="space-y-6 max-w-7xl mx-auto w-full pb-16">
       {/* Main split work-desk */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left side: Search filters and Task tree */}
-        <div className="lg:col-span-12 bg-white border border-slate-200/80 rounded-[2rem] p-6 shadow-sm space-y-6">
-          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-            <button
-              onClick={() => setIsTasksFiltersExpanded(!isTasksFiltersExpanded)}
-              className="flex-1 text-left flex justify-between items-center group focus:outline-none cursor-pointer"
-            >
-              <div>
-                <h3 className="text-base font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
-                  <ListTodo size={18} className="text-adasa-mid" /> Filtro de Atividades
-                </h3>
-                <p className="text-xs font-semibold text-slate-500 mt-1">
-                  Navegação multinível, subtarefas e consolidação automática temporo-produtiva.
-                </p>
-              </div>
-              <div className="bg-slate-50 group-hover:bg-slate-100 border border-slate-200 group-hover:border-slate-350 text-slate-400 group-hover:text-slate-600 p-2 rounded-xl transition-colors mr-2">
-                {isTasksFiltersExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
-              </div>
-            </button>
-
-            <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+        <div className="lg:col-span-12 space-y-10">
+          
+          {/* Filters Card */}
+          <div className="bg-white border border-slate-200/80 rounded-[2rem] p-6 shadow-sm space-y-4 relative">
+            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
               <button
-                onClick={reloadTasks}
-                disabled={isSyncing}
-                className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all flex items-center justify-center animate-none"
-                title="Sincronizar tarefas"
+                onClick={() => setIsTasksFiltersExpanded(!isTasksFiltersExpanded)}
+                className="flex-1 text-left flex justify-between items-center group focus:outline-none cursor-pointer"
               >
-                <RefreshCw size={14} className={isSyncing ? "animate-spin" : ""} />
+                <div>
+                  <h3 className="text-base font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
+                    <Filter size={18} className="text-indigo-600" /> Filtro de Atividades
+                  </h3>
+                  <p className="text-xs font-semibold text-slate-500 mt-1">
+                    Filtre as atividades em tempo real para analisar o status de execução correspondente.
+                  </p>
+                </div>
+                <div className="bg-slate-50 group-hover:bg-slate-100 border border-slate-200 group-hover:border-slate-350 text-slate-400 group-hover:text-slate-600 p-2 rounded-xl transition-colors mr-2">
+                  {isTasksFiltersExpanded ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                </div>
               </button>
-            </div>
-          </div>
 
-          {/* Filter Bar */}
-          {isTasksFiltersExpanded && (
-            <div className="bg-slate-50/60 rounded-3xl border border-slate-200/60 p-5 space-y-5 animate-in slide-in-from-top-4 fade-in duration-300">
-            {/* Row 1: Plan Select (sorted to show most recent first) */}
-            <div className="flex flex-col gap-1.5 max-w-xs">
+              <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+                <button
+                  onClick={reloadTasks}
+                  disabled={isSyncing}
+                  className="p-2 bg-slate-50 border border-slate-200 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-all flex items-center justify-center animate-none"
+                  title="Sincronizar tarefas"
+                >
+                  <RefreshCw size={14} className={isSyncing ? "animate-spin" : ""} />
+                </button>
+              </div>
+            </div>
+
+            {/* Filter Bar */}
+            {isTasksFiltersExpanded && (
+              <div className="bg-slate-50/60 rounded-3xl border border-slate-200/60 p-5 space-y-5 animate-in slide-in-from-top-4 fade-in duration-300 mt-4">
+                {/* Row 1: Plan Select (sorted to show most recent first) */}
+                <div className="flex flex-col gap-1.5 max-w-xs">
               <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">📁 Plano</span>
               <select
                 value={planFilter}
@@ -5057,16 +5061,19 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                 />
               </div>
             </div>
-          </div>
-        )}
-          <div className="mt-6 mb-2 border-l-4 border-adasa-mid pl-2.5 py-0.5">
-            <h3 className="text-xs sm:text-sm font-black text-slate-800 uppercase tracking-widest">
-              Visualização
-            </h3>
+            </div>
+          )}
           </div>
 
-          {/* View Toggle & Adicionar Tarefa Actions */}
-          <div className="flex flex-col xl:flex-row justify-center items-center bg-slate-50 border border-slate-200 rounded-2xl p-3 w-full gap-4">
+          <div className="bg-white border border-slate-200/80 rounded-[2rem] p-6 shadow-sm space-y-6">
+            <div className="mb-2 border-l-4 border-adasa-mid pl-2.5 py-0.5">
+              <h3 className="text-xs sm:text-sm font-black text-slate-800 uppercase tracking-widest">
+                Visualização
+              </h3>
+            </div>
+
+            {/* View Toggle & Adicionar Tarefa Actions */}
+            <div className="flex flex-col xl:flex-row justify-center items-center bg-slate-50 border border-slate-200 rounded-2xl p-3 w-full gap-4">
             <div className="flex flex-wrap items-center justify-center gap-2 overflow-x-auto pb-1 xl:pb-0 w-full xl:w-auto">
               <button
                 onClick={() => { setViewMode("category"); setTimelineTaskId(null); }}
@@ -5793,9 +5800,27 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                                           </div>
                                         )}
 
+                                        {/* SEI Process in Board */}
+                                        {task.seiProcess && (
+                                          <div className="flex items-center self-start text-[9px] font-bold text-slate-500 bg-white border border-slate-200 px-1.5 py-0.5 rounded-md max-w-full">
+                                            <span className="truncate mr-1 font-mono flex items-center gap-1 text-slate-600"><FileDigit size={10} className="text-slate-400" /> {task.seiProcess}</span>
+                                            <button 
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                navigator.clipboard.writeText(task.seiProcess || "");
+                                                showToast("Sucesso", "Processo SEI copiado", "success");
+                                              }}
+                                              className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600 transition-colors ml-auto flex-shrink-0"
+                                              title="Copiar Processo SEI"
+                                            >
+                                              <Copy size={10} />
+                                            </button>
+                                          </div>
+                                        )}
+
                                         {/* Tags/Users/Categories and Quick Actions */}
                                         <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 mt-0.5">
-                                          <div className="flex flex-wrap gap-1 max-w-[65%]">
+                                          <div className="flex flex-wrap gap-1 max-w-[65%] items-center">
                                             {task.categoryIds?.slice(0, 2).map(catId => {
                                               const cat = categories.find(c => c.id === catId);
                                               if (!cat) return null;
@@ -5814,6 +5839,25 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                                                 </span>
                                               );
                                             })}
+                                            {task.responsibleIds && task.responsibleIds.length > 0 && (
+                                              <div className="flex items-center ml-1">
+                                                {task.responsibleIds.slice(0, 3).map((rid, idx) => {
+                                                  const resp = responsibles.find(r => r.id === rid);
+                                                  if (!resp) return null;
+                                                  const initials = resp.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
+                                                  return (
+                                                    <div key={rid} className={`flex items-center justify-center w-5 h-5 text-[8px] font-bold text-slate-700 bg-slate-50 relative z-[${10-idx}] rounded-full border border-slate-200 shadow-[0_1px_2px_rgba(0,0,0,0.05)] ${idx > 0 ? '-ml-1.5' : ''}`} title={resp.name}>
+                                                      {initials}
+                                                    </div>
+                                                  );
+                                                })}
+                                                {task.responsibleIds.length > 3 && (
+                                                  <div className="flex items-center justify-center w-5 h-5 text-[8px] font-bold text-slate-700 bg-slate-50 relative z-0 rounded-full border border-slate-200 shadow-sm -ml-1.5" title={`+${task.responsibleIds.length - 3} Responsáveis`}>
+                                                    +{task.responsibleIds.length - 3}
+                                                  </div>
+                                                )}
+                                              </div>
+                                            )}
                                           </div>
 
                                           <div className="flex items-center gap-1">
@@ -5830,6 +5874,15 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                                                 <ChevronRight size={14} className="rotate-180" />
                                               </button>
                                             )}
+
+                                            {/* Timeline Action */}
+                                            <button
+                                              onClick={(e) => { e.stopPropagation(); setTimelineTaskId(task.id); }}
+                                              className="p-1 text-slate-400 hover:text-indigo-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                                              title="Ver Timeline"
+                                            >
+                                              <Activity size={12} />
+                                            </button>
 
                                             {/* Edit */}
                                             <button
@@ -6105,6 +6158,27 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                               </div>
                             </div>
                           )}
+                          
+                          {task.seiProcess && (
+                            <div className="space-y-2">
+                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block">Processo SEI</span>
+                              <div className="flex items-center gap-2 text-[11px] font-bold text-slate-700 bg-white pl-2.5 pr-1 py-1 rounded-lg border border-slate-200 shadow-sm w-max">
+                                <FileDigit size={14} className="text-slate-400" />
+                                <span className="max-w-[200px] truncate font-mono">{task.seiProcess}</span>
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigator.clipboard.writeText(task.seiProcess || "");
+                                    showToast("Sucesso", "Processo SEI copiado", "success");
+                                  }}
+                                  className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600 transition-colors"
+                                  title="Copiar Processo SEI"
+                                >
+                                  <Copy size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          )}
                         </div>
 
                         <div className="space-y-2">
@@ -6154,6 +6228,28 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
               </div>
 
               <form onSubmit={handleFormSubmit} className="space-y-4">
+                {/* Plan of Activities (Exactly One) */}
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Plano de Atividades (Vincular a um)</label>
+                  <select
+                    required
+                    value={editingTask.planId || ""}
+                    onChange={(e) => {
+                      const val = e.target.value ? Number(e.target.value) : "";
+                      setEditingTask(prev => ({ 
+                        ...prev, 
+                        planId: val || null
+                      }));
+                    }}
+                    className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white focus:border-adasa-mid outline-none"
+                  >
+                    <option value="">Selecione um Plano...</option>
+                    {plans.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </div>
+
                 {/* Title */}
                 <div className="space-y-1">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Título da Tarefa/Etapa</label>
@@ -6165,19 +6261,6 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                     placeholder="Ex: Ampliação de Captação SAA Descoberto"
                     className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2.5 text-sm font-semibold text-slate-700 focus:border-adasa-mid outline-none transition-all placeholder:text-slate-400 bg-slate-50/10 focus:bg-white"
                   />
-                </div>
-
-                {/* Form Author */}
-                <div className="space-y-1">
-                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                     <User size={12} className="text-slate-400" /> Autor da Modificação
-                   </label>
-                   <input
-                     type="text"
-                     disabled
-                     value={editingTask.updatedBy || currentUser?.name || "Administrador"}
-                     className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2.5 text-xs font-semibold text-slate-500 bg-slate-100 cursor-not-allowed outline-none"
-                   />
                 </div>
 
                 {/* Tarefa Pai */}
@@ -6225,6 +6308,58 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                           {getTaskDisplayName(t)}
                         </option>
                       ))}
+                  </select>
+                </div>
+
+                {/* Dependency (Depends On) */}
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Depende de (Pré-requisito)</label>
+                  <select
+                    value={editingTask.dependsOnTaskId || ""}
+                    onChange={(e) => {
+                      const val = e.target.value ? Number(e.target.value) : null;
+                      
+                      setEditingTask(prev => {
+                        const next = { ...prev, dependsOnTaskId: val };
+                        if (val && taskById[val]) {
+                          const parentTask = taskById[val];
+                          if (parentTask.endDate) {
+                            // Parse as UTC to avoid local timezone shifts
+                            const [yyyy, mm, dd] = parentTask.endDate.split("T")[0].split("-").map(Number);
+                            const newStart = new Date(Date.UTC(yyyy, mm - 1, dd));
+                            
+                            // Push the start date to the day AFTER the parent's end date
+                            newStart.setUTCDate(newStart.getUTCDate() + 1);
+                            
+                            const startStr = newStart.toISOString().split("T")[0];
+                            
+                            // Check if we need to push the end date
+                            if (prev.startDate && prev.endDate) {
+                              const s = new Date(prev.startDate);
+                              const eD = new Date(prev.endDate);
+                              const diffTime = Math.abs(eD.getTime() - s.getTime());
+                              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                              
+                              const newEnd = new Date(newStart);
+                              newEnd.setUTCDate(newEnd.getUTCDate() + Math.max(0, diffDays));
+                              next.endDate = newEnd.toISOString().split("T")[0];
+                            } else if (!prev.endDate) {
+                              // If no end date, just set it identically
+                              next.endDate = startStr;
+                            }
+                            
+                            next.startDate = startStr;
+                          }
+                        }
+                        return next;
+                      });
+                    }}
+                    className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-600 focus:border-adasa-mid outline-none"
+                  >
+                    <option value="">Nenhuma (Início Imediato)</option>
+                    {tasks.filter(t => t.parentId === editingTask.parentId && t.id !== editingTask.id && (editingTask.planId ? t.planId === editingTask.planId : true)).map(t => (
+                      <option key={t.id} value={t.id}>{getTaskDisplayName(t)}</option>
+                    ))}
                   </select>
                 </div>
 
@@ -6307,6 +6442,17 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
 
                 {/* Technical Meta Filters */}
                 <div className="space-y-1">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Processo SEI</label>
+                  <input
+                    type="text"
+                    value={editingTask.seiProcess || ""}
+                    onChange={(e) => setEditingTask(prev => ({ ...prev, seiProcess: e.target.value }))}
+                    placeholder="Ex: 00197-00001234/2024-56"
+                    className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2 text-xs text-slate-600 focus:border-adasa-mid outline-none"
+                  />
+                </div>
+
+                <div className="space-y-1">
                   <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Prioridade</label>
                   <select
                     value={editingTask.priority || "Média"}
@@ -6316,80 +6462,6 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                     <option value="Alta">Alta</option>
                     <option value="Média">Média</option>
                     <option value="Baixa">Baixa</option>
-                  </select>
-                </div>
-
-                {/* Dependency (Depends On) */}
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Depende de (Pré-requisito)</label>
-                  <select
-                    value={editingTask.dependsOnTaskId || ""}
-                    onChange={(e) => {
-                      const val = e.target.value ? Number(e.target.value) : null;
-                      
-                      setEditingTask(prev => {
-                        const next = { ...prev, dependsOnTaskId: val };
-                        if (val && taskById[val]) {
-                          const parentTask = taskById[val];
-                          if (parentTask.endDate) {
-                            // Parse as UTC to avoid local timezone shifts
-                            const [yyyy, mm, dd] = parentTask.endDate.split("T")[0].split("-").map(Number);
-                            const newStart = new Date(Date.UTC(yyyy, mm - 1, dd));
-                            
-                            // Push the start date to the day AFTER the parent's end date
-                            newStart.setUTCDate(newStart.getUTCDate() + 1);
-                            
-                            const startStr = newStart.toISOString().split("T")[0];
-                            
-                            // Check if we need to push the end date
-                            if (prev.startDate && prev.endDate) {
-                              const s = new Date(prev.startDate);
-                              const eD = new Date(prev.endDate);
-                              const diffTime = Math.abs(eD.getTime() - s.getTime());
-                              const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                              
-                              const newEnd = new Date(newStart);
-                              newEnd.setUTCDate(newEnd.getUTCDate() + Math.max(0, diffDays));
-                              next.endDate = newEnd.toISOString().split("T")[0];
-                            } else if (!prev.endDate) {
-                              // If no end date, just set it identically
-                              next.endDate = startStr;
-                            }
-                            
-                            next.startDate = startStr;
-                          }
-                        }
-                        return next;
-                      });
-                    }}
-                    className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2 text-xs font-medium text-slate-600 focus:border-adasa-mid outline-none"
-                  >
-                    <option value="">Nenhuma (Início Imediato)</option>
-                    {tasks.filter(t => t.parentId === editingTask.parentId && t.id !== editingTask.id && (editingTask.planId ? t.planId === editingTask.planId : true)).map(t => (
-                      <option key={t.id} value={t.id}>{getTaskDisplayName(t)}</option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Plan of Activities (Exactly One) */}
-                <div className="space-y-1">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Plano de Atividades (Vincular a um)</label>
-                  <select
-                    required
-                    value={editingTask.planId || ""}
-                    onChange={(e) => {
-                      const val = e.target.value ? Number(e.target.value) : "";
-                      setEditingTask(prev => ({ 
-                        ...prev, 
-                        planId: val || null
-                      }));
-                    }}
-                    className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white focus:border-adasa-mid outline-none"
-                  >
-                    <option value="">Selecione um Plano...</option>
-                    {plans.map(p => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))}
                   </select>
                 </div>
 
@@ -6521,6 +6593,16 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   ></textarea>
                 </div>
 
+                {formMode === "edit" && editingTask.updatedAt && (
+                  <div className="space-y-1">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider font-semibold">Atualização</label>
+                    <div className="px-3.5 py-2 text-xs font-semibold text-slate-500 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-2">
+                      <Clock size={12} className="text-slate-400" />
+                      <span>{formatDateTime(editingTask.updatedAt)} por {editingTask.updatedBy || 'Sistema'}</span>
+                    </div>
+                  </div>
+                )}
+
                 <div className="flex gap-3 justify-end pt-4 border-t border-slate-100">
                   <button
                     type="button"
@@ -6542,7 +6624,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
         )}
       </AnimatePresence>
 
-
+      </div>
     </div>
   );
 
@@ -6702,18 +6784,30 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                       <span className="truncate max-w-[150px]">Depende de: {getTaskDisplayName(taskById[task.dependsOnTaskId])}</span>
                     </span>
                   )}
-                  {task.updatedAt && (
-                    <span className="flex items-center gap-1 text-[9px] font-bold uppercase text-slate-400 bg-white border border-slate-200 px-2 py-0.5 rounded-md" title={`Última atualização: ${formatDateTime(task.updatedAt)} por ${task.updatedBy || 'Sistema'}`}>
-                      <Clock size={10} className="text-slate-400" />
-                      <span className="truncate max-w-[150px]">{formatDateTime(task.updatedAt)} • {task.updatedBy || 'Sistema'}</span>
-                    </span>
-                  )}
                 </div>
 
                 {/* Area & Category dynamic tags */}
-                {((task.areaIds && task.areaIds.length > 0) || (task.categoryIds && task.categoryIds.length > 0)) && (
-                  <div className="flex items-center gap-1.5 text-[9px] font-black flex-wrap mt-1">
-                    {task.areaIds && task.areaIds.map(aid => {
+                <div className="flex flex-col gap-1.5 mt-1.5 w-full">
+                  {task.seiProcess && (
+                    <div className="flex items-center self-start text-[10px] font-bold text-slate-500 bg-white border border-slate-200 px-2 py-1 rounded-md max-w-full">
+                      <span className="truncate mr-2 font-mono flex items-center gap-1.5 text-slate-600"><FileDigit size={12} className="text-slate-400" /> {task.seiProcess}</span>
+                      <button 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigator.clipboard.writeText(task.seiProcess || "");
+                          showToast("Sucesso", "Processo SEI copiado para a área de transferência", "success");
+                        }}
+                        className="p-1 hover:bg-slate-100 rounded text-slate-400 hover:text-indigo-600 transition-colors ml-auto flex-shrink-0"
+                        title="Copiar Processo SEI"
+                      >
+                        <Copy size={12} />
+                      </button>
+                    </div>
+                  )}
+
+                  {((task.areaIds && task.areaIds.length > 0) || (task.categoryIds && task.categoryIds.length > 0)) && (
+                    <div className="flex items-center gap-1.5 text-[9px] font-black flex-wrap">
+                      {task.areaIds && task.areaIds.map(aid => {
                       const area = areas.find(a => a.id === aid);
                       return (
                         <span key={aid} className="text-[9px] font-bold uppercase text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-md flex items-center gap-1">
@@ -6731,6 +6825,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                     })}
                   </div>
                 )}
+                </div>
               </div>
             </div>
           </div>
