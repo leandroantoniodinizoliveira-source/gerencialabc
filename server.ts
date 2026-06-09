@@ -2007,7 +2007,7 @@ async function startServer() {
         const catNameToId: Record<string, number> = {};
         const respNameToId: Record<string, number> = {};
         
-        for (const record of records as any[]) {
+        for (const record of records) {
             let catId = null;
             const catName = record.category?.trim();
             if (catName) {
