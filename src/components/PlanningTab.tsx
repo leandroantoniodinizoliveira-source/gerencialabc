@@ -418,7 +418,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
   const [timelineTaskId, setTimelineTaskId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<"tree" | "table" | "status" | "category" | "area" | "responsible" | "board">("category");
   const [tableSort, setTableSort] = useState<{ field: string, dir: "asc" | "desc" } | null>({ field: "end", dir: "asc" });
-  const [boardGroupBy, setBoardGroupBy] = useState<"status" | "category">("category");
+  const [boardGroupBy, setBoardGroupBy] = useState<"status" | "category" | "situation">("category");
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [taskFormTab, setTaskFormTab] = useState<"form" | "notes" | "comments" | "links" | "calc">("form");
   const [newComment, setNewComment] = useState("");
@@ -2408,6 +2408,11 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
     setFormMode("create");
     
     let defaultPlanId = planFilter !== "all" && planFilter !== "" ? Number(planFilter) : null;
+    if (!defaultPlanId && plans && plans.length > 0) {
+      const mostRecentPlan = [...plans].sort((a, b) => b.id - a.id)[0];
+      defaultPlanId = mostRecentPlan.id;
+    }
+    
     let defaultAreaIds = selectedAreaIds.length > 0 ? selectedAreaIds : [];
     let defaultCategoryIds: number[] = [];
     let defaultResponsibleIds = selectedResponsibleIds.length > 0 ? selectedResponsibleIds : [];
@@ -4688,6 +4693,15 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                                   <span className="w-6 shrink-0" />
                                 )}
                                 <span className={cn(depth > 0 ? "text-slate-500 font-medium font-sans text-xs" : "text-slate-700 font-semibold")}>{t.title}</span>
+                                {t.isProgrammed !== false ? (
+                                  <span className="ml-2 text-[8.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-sm border inline-flex items-center gap-1 bg-indigo-50 text-indigo-700 border-indigo-200" title="Classificação: Programada">
+                                    <CalendarCheck size={11} /> PROG
+                                  </span>
+                                ) : (
+                                  <span className="ml-2 text-[8.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-sm border inline-flex items-center gap-1 bg-rose-50 text-rose-700 border-rose-200" title="Classificação: Não Programada">
+                                    <CalendarX size={11} /> N. PROG
+                                  </span>
+                                )}
                                 {subTasksCount > 0 && (
                                   <span className="text-slate-400 font-normal ml-1">({subTasksCount})</span>
                                 )}
@@ -5896,8 +5910,14 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                     groups["Não iniciada"] = visibleTasks.filter(t => normalizeStatus(t.status) === "Não iniciada");
                     groups["Em andamento"] = visibleTasks.filter(t => normalizeStatus(t.status) === "Em andamento");
                     groups["Concluída"] = visibleTasks.filter(t => normalizeStatus(t.status) === "Concluída");
+                  } else if (boardGroupBy === "situation") {
+                    groups["No Prazo"] = visibleTasks.filter(t => normalizeStatus(t.status) !== "Concluída" && getDeadlineStatus(t.endDate, t.status) === "No Prazo");
+                    groups["Crítica"] = visibleTasks.filter(t => normalizeStatus(t.status) !== "Concluída" && getDeadlineStatus(t.endDate, t.status) === "Crítica");
+                    groups["Atrasada"] = visibleTasks.filter(t => normalizeStatus(t.status) !== "Concluída" && getDeadlineStatus(t.endDate, t.status) === "Atrasada");
+                    groups["Concluída"] = visibleTasks.filter(t => normalizeStatus(t.status) === "Concluída");
                   } else {
-                    categories.forEach(cat => {
+                    const sortedCategories = [...categories].sort((a, b) => a.name.localeCompare(b.name));
+                    sortedCategories.forEach(cat => {
                       groups[cat.name] = [];
                     });
                     groups["Sem Categoria"] = [];
@@ -5924,15 +5944,21 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   Object.keys(groups).forEach(key => {
                     if (groups[key].length === 0) {
                       delete groups[key];
+                    } else {
+                      groups[key].sort((a, b) => {
+                        const dateA = a.endDate ? new Date(a.endDate).getTime() : Infinity;
+                        const dateB = b.endDate ? new Date(b.endDate).getTime() : Infinity;
+                        return dateA - dateB;
+                      });
                     }
                   });
 
-                  const isStatusGroup = boardGroupBy === "status";
-                  const wrapperClass = isStatusGroup
-                    ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start mt-2 font-sans text-slate-800 w-full"
+                  const isStatusOrSituationGroup = boardGroupBy === "status" || boardGroupBy === "situation";
+                  const wrapperClass = isStatusOrSituationGroup
+                    ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 items-start mt-2 font-sans text-slate-800 w-full"
                     : "flex flex-col lg:flex-row gap-6 overflow-x-auto pb-4 items-start mt-2 font-sans text-slate-800 w-full pr-2 scrollbar-thin";
 
-                  const colClass = isStatusGroup
+                  const colClass = isStatusOrSituationGroup
                     ? "bg-slate-50/50 border border-slate-200/60 rounded-2xl p-4 flex flex-col h-[850px] min-w-0"
                     : "bg-slate-50/50 border border-slate-200/60 rounded-2xl p-4 flex flex-col h-[850px] w-full lg:w-[360px] lg:shrink-0 min-w-0 lg:min-w-[340px]";
 
@@ -5951,7 +5977,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                               onClick={() => setBoardGroupBy("category")}
                               className={cn(
                                 "px-3.5 py-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
-                                !isStatusGroup
+                                boardGroupBy === "category"
                                   ? "bg-white text-slate-800 shadow-sm font-extrabold"
                                   : "text-slate-600 hover:text-slate-800"
                               )}
@@ -5962,19 +5988,30 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                               onClick={() => setBoardGroupBy("status")}
                               className={cn(
                                 "px-3.5 py-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
-                                isStatusGroup
+                                boardGroupBy === "status"
                                   ? "bg-white text-slate-800 shadow-sm font-extrabold"
                                   : "text-slate-600 hover:text-slate-800"
                               )}
                             >
                               Status
                             </button>
+                            <button
+                              onClick={() => setBoardGroupBy("situation")}
+                              className={cn(
+                                "px-3.5 py-1.5 text-[10px] sm:text-[11px] font-black uppercase tracking-wider rounded-lg transition-all cursor-pointer",
+                                boardGroupBy === "situation"
+                                  ? "bg-white text-slate-800 shadow-sm font-extrabold"
+                                  : "text-slate-600 hover:text-slate-800"
+                              )}
+                            >
+                              Situação
+                            </button>
                           </div>
                         </div>
                       </div>
 
                       {/* Top horizontal scrollbar bar, only displayed if we have a scrollable board view */}
-                      {!isStatusGroup && boardScrollWidth > 0 && (
+                      {!isStatusOrSituationGroup && boardScrollWidth > 0 && (
                         <div 
                           ref={topScrollRef}
                           onScroll={handleTopScroll}
@@ -5989,10 +6026,24 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                           let headerBg = "bg-slate-100 border-slate-200 text-slate-700";
                           let statusIcon = <Clock size={16} className="text-slate-400" />;
 
-                          if (isStatusGroup) {
+                          if (boardGroupBy === "status") {
                             if (colKey === "Em andamento") {
                               headerBg = "bg-blue-50 border-blue-200 text-blue-700";
                               statusIcon = <Activity size={16} className="text-blue-500" />;
+                            } else if (colKey === "Concluída") {
+                              headerBg = "bg-emerald-50 border-emerald-250 text-emerald-700";
+                              statusIcon = <CheckCircle2 size={16} className="text-emerald-550" />;
+                            }
+                          } else if (boardGroupBy === "situation") {
+                            if (colKey === "Atrasada") {
+                              headerBg = "bg-rose-50 border-rose-200 text-rose-700";
+                              statusIcon = <AlertCircle size={16} className="text-rose-500" />;
+                            } else if (colKey === "Crítica") {
+                              headerBg = "bg-amber-50 border-amber-200 text-amber-700";
+                              statusIcon = <AlertTriangle size={16} className="text-amber-500" />;
+                            } else if (colKey === "No Prazo") {
+                              headerBg = "bg-emerald-50 border-emerald-200 text-emerald-700";
+                              statusIcon = <CheckCircle2 size={16} className="text-emerald-500" />;
                             } else if (colKey === "Concluída") {
                               headerBg = "bg-emerald-50 border-emerald-250 text-emerald-700";
                               statusIcon = <CheckCircle2 size={16} className="text-emerald-550" />;
@@ -6112,11 +6163,13 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                                                 );
                                               })()}
                                               {task.isProgrammed !== false ? (
-                                                <span className="text-[8.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-sm border flex items-center gap-1 bg-indigo-50 text-indigo-700 border-indigo-200">
+                                                <span className="text-[8.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-sm border flex items-center gap-1 bg-indigo-50 text-indigo-700 border-indigo-200" title="Classificação: Programada">
+                                                  <CalendarCheck size={9} />
                                                   PROG
                                                 </span>
                                               ) : (
-                                                <span className="text-[8.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-sm border flex items-center gap-1 bg-rose-50 text-rose-700 border-rose-200">
+                                                <span className="text-[8.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-sm border flex items-center gap-1 bg-rose-50 text-rose-700 border-rose-200" title="Classificação: Não Programada">
+                                                  <CalendarX size={9} />
                                                   N. PROG
                                                 </span>
                                               )}
@@ -6239,7 +6292,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
 
                                           <div className="flex items-center gap-1">
                                             {/* Move Left */}
-                                            {isStatusGroup && normalizeStatus(task.status) !== "Não iniciada" && (
+                                            {boardGroupBy === "status" && normalizeStatus(task.status) !== "Não iniciada" && (
                                               <button
                                                 onClick={() => {
                                                   const nextStatus = normalizeStatus(task.status) === "Concluída" ? "Em andamento" : "Não iniciada";
@@ -6280,7 +6333,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                                             </button>
 
                                             {/* Move Right */}
-                                            {isStatusGroup && normalizeStatus(task.status) !== "Concluída" && (
+                                            {boardGroupBy === "status" && normalizeStatus(task.status) !== "Concluída" && (
                                               <button
                                                 onClick={() => {
                                                   const nextStatus = normalizeStatus(task.status) === "Não iniciada" ? "Em andamento" : "Concluída";
@@ -7532,6 +7585,22 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   >
                     {getTaskDisplayName(task)}
                   </span>
+
+                  {task.isProgrammed !== false ? (
+                    <span 
+                      className="text-[8.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-sm border flex items-center gap-1 bg-indigo-50 text-indigo-700 border-indigo-200"
+                      title="Classificação: Programada"
+                    >
+                      <CalendarCheck size={11} /> PROG
+                    </span>
+                  ) : (
+                    <span 
+                      className="text-[8.5px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded-sm border flex items-center gap-1 bg-rose-50 text-rose-700 border-rose-200"
+                      title="Classificação: Não Programada"
+                    >
+                      <CalendarX size={11} /> N. PROG
+                    </span>
+                  )}
 
                   {hasSubs && (
                     <span 
