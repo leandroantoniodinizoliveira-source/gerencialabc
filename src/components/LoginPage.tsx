@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useAuth } from "../lib/auth";
-import { Lock, Mail, ArrowRight, ShieldAlert, Sparkles, Eye, EyeOff, UserCheck, TrendingUp, BarChart3 } from "lucide-react";
+import { Lock, Mail, ArrowRight, ShieldAlert, Sparkles, Eye, EyeOff, UserCheck, BarChart3 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 
 export function LoginPage() {

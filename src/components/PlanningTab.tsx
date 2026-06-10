@@ -20,7 +20,6 @@ import {
   Edit2,
   Edit3,
   Clock,
-  User,
   Tag,
   AlertCircle,
   AlertTriangle,
@@ -40,7 +39,6 @@ import {
   BookOpen,
   GitCommit,
   Activity,
-  AlignLeft,
   List,
   Flag,
   Link2,
@@ -54,7 +52,7 @@ import {
 import { Task, Plan, Area, Category, Responsible } from "../types";
 import { cn } from "../lib/utils";
 import { useAuth } from "../lib/auth";
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, PieChart, Pie, Cell, CartesianGrid, LabelList, LineChart, Line } from "recharts";
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, CartesianGrid, LabelList } from "recharts";
  
 interface PlanningTabProps {
   tasks: Task[];
@@ -130,28 +128,6 @@ const getDeadlineStatus = (endDate: string | null | undefined, status: string | 
 };
 
 // Custom Tooltips for Charts
-const CustomStatusTooltip = ({ active, payload }: any) => {
-  if (active && payload && payload.length) {
-    const data = payload[0].payload;
-    return (
-      <div className="bg-slate-900 border border-slate-700 p-3.5 rounded-2xl shadow-2xl flex flex-col gap-2 min-w-[180px] z-50 animate-in fade-in zoom-in-95 duration-150">
-        <p className="text-slate-100 font-black text-xs uppercase tracking-wide border-b border-slate-700/50 pb-2 mb-1 flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: data.color }}></span>
-          {data.name}
-        </p>
-        <div className="flex justify-between items-center gap-6">
-          <span className="text-slate-400 text-[10px] font-medium uppercase tracking-wider">Quantidade</span>
-          <span className="text-white font-black text-sm">{data.value}</span>
-        </div>
-        <div className="flex justify-between items-center gap-6">
-          <span className="text-slate-400 text-[10px] font-medium uppercase tracking-wider">Percentual</span>
-          <span className="text-slate-300 font-bold text-xs">{(data.percent * 100).toFixed(1).replace('.0', '')}%</span>
-        </div>
-      </div>
-    );
-  }
-  return null;
-};
 
 const CustomNestedStatusTooltip = ({ active, payload, totalTasks }: any) => {
   if (active && payload && payload.length) {
@@ -498,7 +474,6 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
   const [regEmail, setRegEmail] = useState("");
   const [regRole, setRegRole] = useState("");
   const [regUpdatedBy, setRegUpdatedBy] = useState("");
-  const [regPlanId, setRegPlanId] = useState<string>("");
   const [regAreaIds, setRegAreaIds] = useState<number[]>([]);
   const [editingRegId, setEditingRegId] = useState<number | null>(null);
 
@@ -510,6 +485,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
   const [expandedQuarterGroups, setExpandedQuarterGroups] = useState<Record<string, boolean>>({});
   const [expandedPlanQuarterAreaGroups, setExpandedPlanQuarterAreaGroups] = useState<Record<string, boolean>>({});
   const [collapsedAreas, setCollapsedAreas] = useState<Record<string, boolean>>({});
+  const [areaTableGroupMode, setAreaTableGroupMode] = useState<"category" | "status">("category");
   const [areaTableSort, setAreaTableSort] = useState<{ field: string, dir: "asc" | "desc" } | null>({ field: "end", dir: "asc" });
   const [collapsedTableCategories, setCollapsedTableCategories] = useState<Record<string, boolean>>({});
   const [quarterChartType, setQuarterChartType] = useState<"small-multiples" | "heatmap">("small-multiples");
@@ -1366,27 +1342,6 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
   };
 
   // Calculate stats
-  const stats = useMemo(() => {
-    const total = enhancedTasks.length;
-    const completed = enhancedTasks.filter(t => normalizeStatus(t.status) === "Concluída").length;
-    const inProgress = enhancedTasks.filter(t => normalizeStatus(t.status) === "Em andamento").length;
-    const pending = enhancedTasks.filter(t => normalizeStatus(t.status) === "Não iniciada").length;
-    
-    // Progress is weighted average of root tasks
-    let progressSum = 0;
-    let weightSum = 0;
-    const rootCount = rootTasks.length;
-    if (rootCount > 0) {
-      rootTasks.forEach(r => {
-        const w = r.weight !== undefined && r.weight !== ("" as any) ? Number(r.weight) : 1;
-        progressSum += (r.progress || 0) * w;
-        weightSum += w;
-      });
-    }
-    const avgRootProgress = weightSum > 0 ? Math.round(progressSum / weightSum) : 0;
-
-    return { total, completed, inProgress, pending, avgRootProgress };
-  }, [enhancedTasks, rootTasks]);
 
   // Filtered tasks and chart definitions for Dashboard
   const matchesFiltersDashboard = (t: Task): boolean => {
@@ -1508,13 +1463,6 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
   }, [filteredTasks]);
 
   // Chart data 1: Status Distribution
-  const statusData = useMemo(() => {
-    return [
-      { name: "Não Iniciada", value: dashboardStats.pending, color: "#94a3b8" }, // slate-400
-      { name: "Em Andamento", value: dashboardStats.inProgress, color: "#3b82f6" }, // blue-500
-      { name: "Concluída", value: dashboardStats.completed, color: "#10b981" } // emerald-500
-    ].filter(item => item.value > 0);
-  }, [dashboardStats]);
 
   const nestedDonutData = useMemo(() => {
     const groups: Record<string, { noPrazo: number; critica: number; atrasada: number; color: string }> = {
@@ -2887,22 +2835,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
   };
 
   // Get status class
-  const getStatusBadgeClass = (status: string | undefined) => {
-    switch (normalizeStatus(status)) {
-      case "Concluída":
-        return "bg-emerald-500/10 text-emerald-600 border-emerald-500/20";
-      case "Em andamento":
-        return "bg-blue-500/10 text-blue-600 border-blue-500/20";
-      case "Não iniciada":
-        return "bg-slate-100 text-slate-600 border-slate-200";
-      default:
-        return "bg-slate-100 text-slate-500 border-slate-200";
-    }
-  };
 
-  const getStatusLabel = (status: string | undefined) => {
-    return status || "Não iniciada";
-  };
 
   const getStatusFromProgress = (progress: number) => {
     if (progress === 100) return "Concluída";
@@ -3037,8 +2970,8 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                     <input type="text" required value={regName} onChange={(e) => setRegName(e.target.value)} placeholder="Ex: Regulação Econômica" className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-xs font-semibold text-slate-700 focus:border-adasa-mid outline-none transition-all placeholder:text-slate-400" />
                   </div>
                   <div className="space-y-1.5">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Sigla (Duas Letras)</label>
-                    <input type="text" required maxLength={2} value={regAbbreviation} onChange={(e) => setRegAbbreviation(e.target.value.toUpperCase())} placeholder="Ex: RE" className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-xs font-semibold text-slate-700 focus:border-adasa-mid outline-none transition-all placeholder:text-slate-400" />
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Sigla (4 dígitos)</label>
+                    <input type="text" required maxLength={4} value={regAbbreviation} onChange={(e) => setRegAbbreviation(e.target.value.toUpperCase())} placeholder="Ex: REGE" className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-xs font-semibold text-slate-700 focus:border-adasa-mid outline-none transition-all placeholder:text-slate-400" />
                   </div>
                   <button type="submit" className="w-full py-3.5 mt-2 font-black text-xs text-white bg-adasa-mid hover:bg-adasa-dark rounded-xl transition shadow-md">{editingRegId !== null ? "Salvar Alterações" : "Cadastrar Área"}</button>
                 </form>
@@ -3425,18 +3358,15 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
     return (
       <div className="space-y-6 max-w-7xl mx-auto w-full pb-16 text-left">
         {/* Info Header */}
-        <div className="bg-gradient-to-r from-indigo-900 to-slate-950 rounded-3xl p-6 md:p-8 text-white relative overflow-hidden shadow-lg border border-slate-800">
+        <div className="bg-adasa-dark rounded-3xl p-6 md:p-8 text-white relative overflow-hidden shadow-lg border border-slate-800">
           <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl"></div>
-          <div className="relative z-10 space-y-2">
-            <span className="text-[10px] bg-indigo-500/20 text-indigo-200 border border-indigo-400/30 px-3 py-1 rounded-full font-black uppercase tracking-widest leading-none">
+          <div className="relative z-10 font-bold">
+            <span className="text-[10px] bg-indigo-500/20 text-indigo-200 border border-indigo-400/30 px-3 py-1 rounded-full font-black uppercase tracking-widest leading-none mb-6 inline-block">
               Mapeamento & Monitoramento Estratégico
             </span>
             <h2 className="text-2xl md:text-3xl font-black tracking-tight leading-none">
               Painel de Acompanhamento de Atividades
             </h2>
-            <p className="text-xs md:text-sm text-indigo-200 font-medium max-w-3xl leading-relaxed">
-              Monitore de forma consolidada todos os cronogramas de atividades do Distrito Federal. Os indicadores e gráficos abaixo são recalculados instantaneamente de acordo com as seleções de filtros aplicadas.
-            </p>
           </div>
         </div>
 
@@ -5060,13 +4990,65 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
 
             {/* Tabela de Tarefas Agrupada por Área no Final do Painel */}
             <div className="lg:col-span-12 bg-white border border-slate-200/90 rounded-[2rem] p-6 shadow-sm text-left mt-6 space-y-4">
-              <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 border-b border-slate-100 pb-4">
+              <div className="flex flex-col xl:flex-row justify-between xl:items-center gap-4 border-b border-slate-100 pb-4">
                 <div>
                   <dt className="text-xs font-black tracking-widest text-slate-400 uppercase">Detalhamento Operacional</dt>
                   <h4 className="text-lg font-black text-slate-800 mt-1 font-sans">Tarefas Agrupadas por Área Temática</h4>
                   <p className="text-xs font-medium text-slate-500 mt-0.5 leading-snug">
                     Relação de atividades com referência na data fim, consolidando trimestre, mês e progresso atual, agrupadas por área/setor.
                   </p>
+                </div>
+                <div className="flex flex-wrap gap-2 isolate">
+                  <div className="flex bg-slate-100 p-1 rounded-xl">
+                    <button
+                      onClick={() => setAreaTableGroupMode("category")}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${areaTableGroupMode === "category" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                    >
+                      Área e Categoria
+                    </button>
+                    <button
+                      onClick={() => setAreaTableGroupMode("status")}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${areaTableGroupMode === "status" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                    >
+                      Área e Status
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => {
+                        setCollapsedAreas({});
+                        setCollapsedTableCategories({});
+                      }}
+                      className="px-3 py-1.5 text-xs bg-indigo-50 border border-indigo-100 text-indigo-700 font-bold rounded-xl hover:bg-indigo-100/80 transition-colors uppercase tracking-wider cursor-pointer"
+                    >
+                      Expandir Todos
+                    </button>
+                    <button
+                      onClick={() => {
+                        const newCollapsedAreas: Record<string, boolean> = {};
+                        const newCollapsedCategories: Record<string, boolean> = {};
+                        const targetAreas = selectedAreaIds.length > 0 ? areas.filter(a => selectedAreaIds.includes(a.id)) : areas;
+                        const allAreas = [...targetAreas, ...(selectedAreaIds.length === 0 ? [{ id: 0, name: "Sem Área de Atuação" } as any] : [])];
+                        allAreas.forEach((a: any) => newCollapsedAreas[a.name] = true);
+                        
+                        const allCats = [...categories, { id: -1, name: "Sem Categoria" } as any];
+                        const allStatuses = [{ name: "Não iniciada" }, { name: "Em andamento" }, { name: "Concluída" }];
+                        
+                        allAreas.forEach((a: any) => {
+                          if (areaTableGroupMode === "category") {
+                            allCats.forEach((c: any) => newCollapsedCategories[`${a.name}-${c.name}`] = true);
+                          } else {
+                            allStatuses.forEach((s: any) => newCollapsedCategories[`${a.name}-${s.name}`] = true);
+                          }
+                        });
+                        setCollapsedAreas(newCollapsedAreas);
+                        setCollapsedTableCategories(newCollapsedCategories);
+                      }}
+                      className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-100 transition-colors uppercase tracking-wider cursor-pointer"
+                    >
+                      Recolher Todos
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -5329,34 +5311,48 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                           );
 
                           if (!isAreaCollapsed) {
-                            allCategoriesForGroup.forEach(category => {
+                            const secondLevelGroups = areaTableGroupMode === "category" 
+                              ? allCategoriesForGroup 
+                              : [
+                                  { id: "Não iniciada", name: "Não iniciada" },
+                                  { id: "Em andamento", name: "Em andamento" },
+                                  { id: "Concluída", name: "Concluída" }
+                                ];
+
+                            secondLevelGroups.forEach(groupDesc => {
                               const groupTasks = areaTasks.filter(t => {
-                                const hasCat = t.categoryIds && t.categoryIds.length > 0;
-                                if (category.id === -1) {
-                                  return !hasCat;
+                                if (areaTableGroupMode === "category") {
+                                  const hasCat = t.categoryIds && t.categoryIds.length > 0;
+                                  if (groupDesc.id === -1) {
+                                    return !hasCat;
+                                  } else {
+                                    return t.categoryIds && t.categoryIds.includes(groupDesc.id as number);
+                                  }
                                 } else {
-                                  return t.categoryIds && t.categoryIds.includes(category.id);
+                                  return normalizeStatus(t.status) === groupDesc.name;
                                 }
                               });
 
                               if (groupTasks.length > 0) {
-                                const collKey = `${area.name}-${category.name}`;
+                                const collKey = `${area.name}-${groupDesc.name}`;
                                 const isCategoryCollapsed = collapsedTableCategories[collKey] || false;
 
                                 rows.push(
                                   <tr 
-                                    key={`cat-header-${area.name}-${category.name}`}
+                                    key={areaTableGroupMode === "category" ? `cat-header-${area.name}-${groupDesc.name}` : `status-header-${area.name}-${groupDesc.name}`}
                                     className="bg-slate-50/75 border-t border-t-slate-100 cursor-pointer hover:bg-slate-100/75 transition-colors select-none"
                                     onClick={() => setCollapsedTableCategories(prev => ({
                                       ...prev,
                                       [collKey]: !isCategoryCollapsed
                                     }))}
                                   >
-                                    <td colSpan={9} className="px-4 py-2 font-bold text-slate-600 border-l-[3px] border-l-amber-500/80">
+                                    <td colSpan={9} className={cn("px-4 py-2 font-bold text-slate-600 border-l-[3px]", areaTableGroupMode === "status" && groupDesc.name === "Concluída" ? "border-l-emerald-500" : areaTableGroupMode === "status" && groupDesc.name === "Em andamento" ? "border-l-blue-500" : areaTableGroupMode === "status" ? "border-l-slate-400" : "border-l-amber-500/80")}>
                                       <div className="flex items-center gap-2 pl-4">
                                         {isCategoryCollapsed ? <ChevronRight size={12} className="text-slate-400" /> : <ChevronDown size={12} className="text-slate-400" />}
-                                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">Categoria:</span>
-                                        <span className="text-xs font-black text-slate-700">{category.name}</span>
+                                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider">
+                                          {areaTableGroupMode === "category" ? "Categoria:" : "Status:"}
+                                        </span>
+                                        <span className="text-xs font-black text-slate-700">{groupDesc.name}</span>
                                         <span className="text-[9px] text-slate-500 font-bold ml-1.5 bg-slate-200/60 border border-slate-200/60 px-1.5 py-0.5 rounded-full">{groupTasks.length} TAREFA(S)</span>
                                       </div>
                                     </td>
@@ -5368,7 +5364,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                                   const sortedRoots = sortTaskList(groupRoots);
 
                                   sortedRoots.forEach(t => {
-                                    renderRowHierarchical(t, 0, area.name, category.name);
+                                    renderRowHierarchical(t, 0, area.name, groupDesc.name);
                                   });
                                 }
                               }
