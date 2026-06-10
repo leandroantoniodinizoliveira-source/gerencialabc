@@ -59,8 +59,8 @@ export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas, o
               Gerencial SAE
             </div>
             <h1 className="text-3xl sm:text-5xl font-black tracking-tight leading-none">
-              Plataforma de Gestão e <br className="hidden sm:block" />
-              Relatórios da SAE
+              Plataforma de Planejamento <br className="hidden sm:block" />
+              e Gestão da SAE
             </h1>
           </div>
         </div>
