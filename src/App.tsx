@@ -676,15 +676,6 @@ export default function App() {
     }
   }, [waterBalances, systems, regions, demands, supplySources, operationalAdjustments, lastSavedStateStr, isDataLoaded]);
 
-  const handleSync = async () => {
-    try {
-      await fetchCloudData(true);
-      showToast("Sincronizado", "Dados sincronizados com o banco de dados Neon.", "success");
-    } catch (error) {
-      showToast("Erro", "Falha ao sincronizar dados. Verifique o console.", "error");
-    }
-  };
-
   const payloadRef = useRef({ waterBalances, systems, regions, demands, supplySources, operationalAdjustments });
   useEffect(() => {
     payloadRef.current = { waterBalances, systems, regions, demands, supplySources, operationalAdjustments };
@@ -3793,16 +3784,6 @@ const renderSupplyTable = () => {
             </div>
           </RequirePermission>
         </nav>
-
-        <div className="mt-auto hidden md:block space-y-4">
-          <button
-            onClick={handleSync}
-            className="w-full p-4 bg-white/5 rounded-2xl border border-white/10 text-white/80 font-black uppercase tracking-widest text-[10px] hover:bg-white/10 hover:text-white transition-all flex items-center justify-center gap-2"
-            title="Sincronizar com banco de dados Neon"
-          >
-            <RefreshCw size={14} /> Sync
-          </button>
-        </div>
       </aside>
 
       {/* Main Content Area */}

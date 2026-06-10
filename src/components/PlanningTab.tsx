@@ -4998,21 +4998,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                     Relação de atividades com referência na data fim, consolidando trimestre, mês e progresso atual, agrupadas por área/setor.
                   </p>
                 </div>
-                <div className="flex flex-wrap gap-2 isolate">
-                  <div className="flex bg-slate-100 p-1 rounded-xl">
-                    <button
-                      onClick={() => setAreaTableGroupMode("category")}
-                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${areaTableGroupMode === "category" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
-                    >
-                      Área e Categoria
-                    </button>
-                    <button
-                      onClick={() => setAreaTableGroupMode("status")}
-                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${areaTableGroupMode === "status" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
-                    >
-                      Área e Status
-                    </button>
-                  </div>
+                <div className="flex flex-col items-end gap-4 isolate">
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => {
@@ -5047,6 +5033,20 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                       className="px-3 py-1.5 text-xs bg-slate-50 border border-slate-200 text-slate-600 font-bold rounded-xl hover:bg-slate-100 transition-colors uppercase tracking-wider cursor-pointer"
                     >
                       Recolher Todos
+                    </button>
+                  </div>
+                  <div className="flex bg-slate-100 p-1 rounded-xl">
+                    <button
+                      onClick={() => setAreaTableGroupMode("category")}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${areaTableGroupMode === "category" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                    >
+                      Área e Categoria
+                    </button>
+                    <button
+                      onClick={() => setAreaTableGroupMode("status")}
+                      className={`px-3 py-1.5 text-xs font-bold rounded-lg transition-colors ${areaTableGroupMode === "status" ? "bg-white text-slate-800 shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
+                    >
+                      Área e Status
                     </button>
                   </div>
                 </div>
