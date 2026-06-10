@@ -1,6 +1,6 @@
 {
-  "name": "Balanço Hídrico SA",
-  "description": "Sistema para gerenciar ABC",
+  "name": "Gerencial SAE",
+  "description": "Ferramenta Gerencial da Superintendência de Abastecimento de Água e Esgoto - SAE",
   "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"

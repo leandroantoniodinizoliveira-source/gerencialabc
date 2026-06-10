@@ -47,7 +47,12 @@ import {
   FileDigit,
   Upload,
   CalendarCheck,
-  CalendarX
+  CalendarX,
+  Type,
+  CalendarDays,
+  Percent,
+  Scale,
+  ListTree
 } from "lucide-react";
 import { Task, Plan, Area, Category, Responsible } from "../types";
 import { cn } from "../lib/utils";
@@ -3693,7 +3698,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
           {/* Global Progress Card (Highlighted on its own line) */}
           <div className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-sm flex items-center justify-between text-left">
             <div className="space-y-1 w-full mr-4">
-              <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Percentual de Conclusão</span>
+              <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase flex items-center gap-1.5 w-max" title="Média ponderada do progresso de todas as tarefas de acordo com os filtros selecionados, refletindo o andamento geral.">
+                Percentual de Conclusão
+                <Info size={12} className="text-indigo-400 hover:text-indigo-600 cursor-help transition-colors" />
+              </span>
               <div className="flex items-baseline gap-1.5">
                 <p className="text-3xl font-black text-slate-800">{dashboardStats.avgProgress}%</p>
                 <span className="text-[9px] font-bold text-slate-400 uppercase">Média</span>
@@ -3715,7 +3723,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
             {/* Total Tasks Card */}
             <div className="bg-white rounded-3xl border border-slate-200/80 p-5 shadow-sm flex items-center justify-between text-left transition-all hover:-translate-y-1 hover:shadow-md hover:scale-[1.02] cursor-default duration-300">
               <div className="space-y-1">
-                <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase">Total de Tarefas</span>
+                <span className="text-[10px] font-black tracking-widest text-slate-400 uppercase flex items-center gap-1.5 w-max" title="Número total de atividades contabilizadas (filhas ou não agrupadas) dentro dos filtros atuais.">
+                  Total de Tarefas
+                  <Info size={12} className="text-indigo-400 hover:text-indigo-600 cursor-help transition-colors" />
+                </span>
                 <p className="text-3xl font-black text-slate-800">{dashboardStats.total}</p>
                 <p className="text-[10px] text-slate-400 font-bold">filtradas no painel</p>
               </div>
@@ -3727,7 +3738,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
             {/* Actions in queue Card - Not Started */}
             <div className="bg-slate-100 rounded-3xl border border-slate-200/80 p-5 shadow-sm flex items-center justify-between text-left transition-all hover:-translate-y-1 hover:shadow-md hover:scale-[1.02] cursor-default duration-300">
               <div className="space-y-1">
-                <span className="text-[10px] font-black tracking-widest text-slate-500 uppercase">Não Iniciadas</span>
+                <span className="text-[10px] font-black tracking-widest text-slate-500 uppercase flex items-center gap-1.5 w-max" title="Quantidade de tarefas com progresso igual a 0%. Indicativo de passivo de execução inicial.">
+                  Não Iniciadas
+                  <Info size={12} className="text-slate-400 hover:text-slate-600 cursor-help transition-colors" />
+                </span>
                 <p className="text-3xl font-black text-slate-800">{dashboardStats.pending}</p>
                 <p className="text-[10px] text-slate-500 font-bold">tarefas pendentes</p>
               </div>
@@ -3739,7 +3753,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
             {/* Actions in queue Card - In Progress */}
             <div className="bg-blue-100 rounded-3xl border border-blue-200/80 p-5 shadow-sm flex items-center justify-between text-left transition-all hover:-translate-y-1 hover:shadow-md hover:scale-[1.02] cursor-default duration-300">
               <div className="space-y-1">
-                <span className="text-[10px] font-black tracking-widest text-blue-500 uppercase">Em Andamento</span>
+                <span className="text-[10px] font-black tracking-widest text-blue-500 uppercase flex items-center gap-1.5 w-max" title="Quantidade de tarefas sendo executadas no momento (progresso > 0% e < 100%).">
+                  Em Andamento
+                  <Info size={12} className="text-blue-400 hover:text-blue-600 cursor-help transition-colors" />
+                </span>
                 <p className="text-3xl font-black text-blue-900">{dashboardStats.inProgress}</p>
                 <p className="text-[10px] text-blue-500 font-bold">tarefas iniciadas</p>
               </div>
@@ -3751,7 +3768,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
             {/* Completed Card */}
             <div className="bg-emerald-100 rounded-3xl border border-emerald-200/80 p-5 shadow-sm flex items-center justify-between text-left transition-all hover:-translate-y-1 hover:shadow-md hover:scale-[1.02] cursor-default duration-300">
               <div className="space-y-1">
-                <span className="text-[10px] font-black tracking-widest text-emerald-600 uppercase">Concluídas</span>
+                <span className="text-[10px] font-black tracking-widest text-emerald-600 uppercase flex items-center gap-1.5 w-max" title="Quantidade de tarefas plenamente executadas e finalizadas com sucesso (100% de progresso).">
+                  Concluídas
+                  <Info size={12} className="text-emerald-400 hover:text-emerald-600 cursor-help transition-colors" />
+                </span>
                 <p className="text-3xl font-black text-emerald-900">{dashboardStats.completed}</p>
                 <p className="text-[10px] text-emerald-600 font-bold">tarefas finalizadas</p>
               </div>
@@ -3775,7 +3795,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
             <div className="lg:col-span-5 bg-white border border-slate-200 rounded-[2rem] p-6 shadow-sm flex flex-col justify-between text-left">
               <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-3 border-b border-slate-100 pb-4">
                 <div>
-                  <dt className="text-xs font-black tracking-widest text-slate-400 uppercase">Status &amp; Situação</dt>
+                  <dt className="text-xs font-black tracking-widest text-slate-400 uppercase flex items-center gap-1.5 w-max" title="Mede a correlação do status operacional (concluída, em andamento) com a situação temporal (no prazo, em atraso).">
+                    Status &amp; Situação
+                    <Info size={13} className="text-slate-400 hover:text-indigo-500 cursor-help transition-colors" />
+                  </dt>
                   <h4 className="text-lg font-black text-slate-800 mt-1 font-sans">Cruzamento de Prazos</h4>
                   <p className="text-xs font-medium text-slate-500 mt-0.5 leading-tight">Distribuição conjunta de andamento e criticidade.</p>
                 </div>
@@ -3961,7 +3984,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
             {/* Chart 2: Average progress per Area -> takes 7 cols */}
             <div className="lg:col-span-7 bg-white border border-slate-200 rounded-[2rem] p-6 shadow-sm flex flex-col justify-between text-left">
               <div>
-                <dt className="text-xs font-black tracking-widest text-slate-400 uppercase">Execução por Área</dt>
+                <dt className="text-xs font-black tracking-widest text-slate-400 uppercase flex items-center gap-1.5 w-max" title="Gráfico comparativo que ilustra a densidade de finalização consolidada das atividades por setor da instituição, ponderada com pesos.">
+                  Execução por Área
+                  <Info size={13} className="text-slate-400 hover:text-indigo-500 cursor-help transition-colors" />
+                </dt>
                 <div className="flex items-center justify-between">
                   <h4 className="text-lg font-black text-slate-800 mt-1">Progresso Médio por Área (%)</h4>
                   <span className="text-[10px] bg-slate-100 text-slate-600 font-bold px-2.5 py-1 rounded-full border border-slate-200">
@@ -4011,7 +4037,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
               {/* Priority BarChart -> takes 4 cols */}
               <div className="md:col-span-4 bg-white border border-slate-200 rounded-3xl p-5 shadow-sm flex flex-col justify-between">
                 <div>
-                  <dt className="text-xs font-black tracking-widest text-slate-400 uppercase">Urgência</dt>
+                  <dt className="text-xs font-black tracking-widest text-slate-400 uppercase flex items-center gap-1.5 w-max" title="Níveis de urgência assinalados às demandas, útil para mensurar filas de emergência versus fluxos de rotina.">
+                    Urgência
+                    <Info size={13} className="text-slate-400 hover:text-indigo-500 cursor-help transition-colors" />
+                  </dt>
                   <h4 className="text-sm font-black text-slate-800 mt-1">Atividades por Prioridade</h4>
                   <p className="text-[10px] text-slate-500 font-medium">Contagem por nível estipulado.</p>
                 </div>
@@ -4038,7 +4067,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
               {/* Summary table of Tasks of the Areas -> takes 8 cols */}
               <div className="md:col-span-8 bg-white border border-slate-200 rounded-3xl p-5 shadow-sm flex flex-col justify-between justify-items-stretch">
                 <div>
-                  <dt className="text-xs font-black tracking-widest text-slate-400 uppercase">Consolidação Operacional</dt>
+                  <dt className="text-xs font-black tracking-widest text-slate-400 uppercase flex items-center gap-1.5 w-max" title="Tabela comparativa sintetizando a volumetria de tarefas e sua conversão efetiva por departamento.">
+                    Consolidação Operacional
+                    <Info size={13} className="text-slate-400 hover:text-indigo-500 cursor-help transition-colors" />
+                  </dt>
                   <h4 className="text-sm font-black text-slate-800 mt-1">Sumário Técnico de Metas e Conclusão</h4>
                   <p className="text-[10px] text-slate-500 font-medium">Resumo detalhado por área operacional ativa.</p>
                 </div>
@@ -7183,7 +7215,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
               <form onSubmit={handleFormSubmit} className={taskFormTab === "form" ? "space-y-4" : "hidden"}>
                 {/* Plan of Activities (Exactly One) */}
                 <div className="space-y-1">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Plano de Atividades (Vincular a um)</label>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5" title="Selecione a qual plano estratégico principal esta atividade se vincula">
+                    <CalendarDays size={14} className="text-blue-500 shrink-0" />
+                    Plano de Atividades (Vincular a um)
+                  </label>
                   <select
                     required
                     value={editingTask.planId || ""}
@@ -7205,7 +7240,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
 
                 {/* Title */}
                 <div className="space-y-1">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Título da Tarefa/Etapa</label>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5" title="Nome identificador da tarefa, etapa ou processo">
+                    <Type size={14} className="text-purple-500 shrink-0" />
+                    Título da Tarefa/Etapa
+                  </label>
                   <input
                     type="text"
                     required
@@ -7218,8 +7256,8 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
 
                 {/* Tarefa Pai */}
                 <div className="space-y-1">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                    <Layers size={12} className="text-slate-400" /> Tarefa Pai
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5" title="Define a hierarquia. Se preenchido, esta se tornará uma subtarefa">
+                    <Layers size={14} className="text-emerald-500 shrink-0" /> Tarefa Pai
                   </label>
                   <select
                     value={editingTask.parentId || ""}
@@ -7269,7 +7307,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
 
                 {/* Dependency (Depends On) */}
                 <div className="space-y-1">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Depende de (Pré-requisito)</label>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5" title="Atividade que deve ser concluída antes desta iniciar (vincula as datas automaticamente)">
+                    <Link2 size={14} className="text-orange-500 shrink-0" />
+                    Depende de (Pré-requisito)
+                  </label>
                   <select
                     value={editingTask.dependsOnTaskId || ""}
                     onChange={(e) => {
@@ -7327,8 +7368,9 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                 {/* Calendar Dates (Lock if rollup is enabled) */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                      Data de Início {editingTask.id && hasChildren(editingTask.id) && <Info size={11} className="text-dashed text-indigo-500" />}
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5" title="Data prevista para o início da atividade">
+                      <Calendar size={14} className="text-pink-500 shrink-0" />
+                      Data de Início {editingTask.id && hasChildren(editingTask.id) && <Info size={11} className="text-dashed text-indigo-500 shrink-0" />}
                     </label>
                     <input
                       type="date"
@@ -7345,8 +7387,9 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   </div>
 
                   <div className="space-y-1">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1">
-                      Data de Fim {editingTask.id && hasChildren(editingTask.id) && <Info size={11} className="text-indigo-500" />}
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5" title="Data prevista para o término da atividade">
+                      <CalendarCheck size={14} className="text-indigo-500 shrink-0" />
+                      Data de Fim {editingTask.id && hasChildren(editingTask.id) && <Info size={11} className="text-indigo-500 shrink-0" />}
                     </label>
                     <input
                       type="date"
@@ -7366,7 +7409,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                 {/* Progress (Percentage) */}
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Progresso (%)</label>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5" title="Percentual de evolução da execução">
+                      <Percent size={14} className="text-yellow-500 shrink-0" />
+                      Progresso (%)
+                    </label>
                     <input
                       type="number"
                       min="0"
@@ -7392,7 +7438,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   </div>
 
                   <div className="space-y-1 font-semibold leading-normal">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Status</label>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5" title="Status atual da tarefa (Calculado automaticamente com base no progresso)">
+                      <Activity size={14} className="text-cyan-500 shrink-0" />
+                      Status
+                    </label>
                     <select
                       value={getStatusFromProgress(editingTask.progress ?? 0)}
                       onChange={(e) => setEditingTask(prev => ({ ...prev, status: e.target.value }))}
@@ -7408,7 +7457,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
 
                 {/* Technical Meta Filters */}
                 <div className="space-y-1">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Processo SEI</label>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5" title="Número de referência no Sistema Eletrônico de Informações (SEI)">
+                    <FileText size={14} className="text-red-500 shrink-0" />
+                    Processo SEI
+                  </label>
                   <input
                     type="text"
                     value={editingTask.seiProcess || ""}
@@ -7420,7 +7472,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div className="space-y-1">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Prioridade</label>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5" title="Nível de urgência e importância (Baixa, Média, Alta)">
+                      <AlertTriangle size={14} className="text-rose-500 shrink-0" />
+                      Prioridade
+                    </label>
                     <select
                       value={editingTask.priority || "Média"}
                       onChange={(e) => setEditingTask(prev => ({ ...prev, priority: e.target.value }))}
@@ -7433,7 +7488,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   </div>
                   
                   <div className="space-y-1">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Classificação</label>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5" title="Indica se é uma atividade de rotina (Programada) ou inserida sob demanda (Não programada)">
+                      <Tag size={14} className="text-fuchsia-500 shrink-0" />
+                      Classificação
+                    </label>
                     <select
                       value={editingTask.isProgrammed === false ? "false" : "true"}
                       onChange={(e) => setEditingTask(prev => ({ ...prev, isProgrammed: e.target.value === "true" }))}
@@ -7445,7 +7503,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   </div>
                   
                   <div className="space-y-1">
-                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Peso Relativo</label>
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5" title="Peso de relevância para o cálculo do progresso da tarefa pai ou plano">
+                      <Scale size={14} className="text-violet-500 shrink-0" />
+                      Peso Relativo
+                    </label>
                     <input
                       type="number"
                       min="0"
@@ -7467,7 +7528,8 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
 
                 {/* Areas of Activities (One or More) */}
                 <div className="space-y-1">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5" title="Setores organizacionais responsáveis por esta atividade">
+                    <Briefcase size={14} className="text-lime-500 shrink-0" />
                     Áreas de Vinculação
                     {editingTask.parentId && taskById[editingTask.parentId]?.areaIds?.length ? " (Herdado e bloqueado pela Tarefa Pai)" : ""}
                   </label>
@@ -7505,7 +7567,8 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
 
                 {/* Categories of Activities (One or More) */}
                 <div className="space-y-1">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5" title="Assuntos temáticos aos quais a atividade se relaciona">
+                    <ListTree size={14} className="text-amber-500 shrink-0" />
                     Categorias (Filtradas pelas Áreas selecionadas)
                     {editingTask.parentId && taskById[editingTask.parentId]?.categoryIds?.length ? " (Herdado e bloqueado pela Tarefa Pai)" : ""}
                   </label>
@@ -7544,7 +7607,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
 
                 {/* Designated Responsibles (One or More) */}
                 <div className="space-y-1">
-                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider">Responsáveis Designados (Filtrados por Área)</label>
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5" title="Profissionais ou equipes que atuarão na execução da atividade">
+                    <Users size={14} className="text-sky-500 shrink-0" />
+                    Responsáveis Designados (Filtrados por Área)
+                  </label>
                   <div className="bg-slate-50 border-2 border-slate-200 rounded-xl p-3 max-h-40 overflow-y-auto space-y-1.5 animate-none">
                     {responsibles.filter(r => !editingTask.areaIds || editingTask.areaIds.length === 0 || r.areaIds?.some(aid => editingTask.areaIds?.includes(aid))).length === 0 ? (
                       <span className="block text-xs text-slate-400 italic font-medium">Nenhum responsável encontrado para as áreas selecionadas.</span>
