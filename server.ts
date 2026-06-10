@@ -398,9 +398,13 @@ async function runStartupMigration() {
       // Add updated_at and updated_by to tables
       await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
       await client.query(`ALTER TABLE pl_plans ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
+      await client.query(`ALTER TABLE pl_plans ADD COLUMN IF NOT EXISTS created_at TIMESTAMP, ADD COLUMN IF NOT EXISTS created_by VARCHAR(255);`);
       await client.query(`ALTER TABLE pl_areas ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
+      await client.query(`ALTER TABLE pl_areas ADD COLUMN IF NOT EXISTS created_at TIMESTAMP, ADD COLUMN IF NOT EXISTS created_by VARCHAR(255);`);
       await client.query(`ALTER TABLE pl_responsibles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
+      await client.query(`ALTER TABLE pl_responsibles ADD COLUMN IF NOT EXISTS created_at TIMESTAMP, ADD COLUMN IF NOT EXISTS created_by VARCHAR(255);`);
       await client.query(`ALTER TABLE pl_categories ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
+      await client.query(`ALTER TABLE pl_categories ADD COLUMN IF NOT EXISTS created_at TIMESTAMP, ADD COLUMN IF NOT EXISTS created_by VARCHAR(255);`);
 
       await client.query("COMMIT");
       console.log("Database tables verified successfully on server start!");
@@ -717,7 +721,11 @@ async function startServer() {
             id: Number(p.id),
             name: p.name || p.title || "Plano Sem Nome",
             title: p.title || p.name || "Plano Sem Nome",
-            description: p.description
+            description: p.description,
+            createdAt: p.created_at,
+            createdBy: p.created_by,
+            updatedAt: p.updated_at,
+            updatedBy: p.updated_by
           })),
           areas: dbAreas.rows.map(a => ({
             id: Number(a.id),
@@ -1480,7 +1488,7 @@ async function startServer() {
         );
         if (result.rows.length === 0) {
           const insertRes = await pool.query(
-            "INSERT INTO pl_plans (id, name, title, description) VALUES ($1, $2, $3, $4) RETURNING *",
+            "INSERT INTO pl_plans (id, name, title, description, created_at, created_by, updated_at, updated_by) VALUES ($1, $2, $3, $4, NOW(), 'SGI Pro', NOW(), 'SGI Pro') RETURNING *",
             [parsedId, planName, planTitle, planDesc]
           );
           return res.json({
@@ -1489,7 +1497,11 @@ async function startServer() {
               id: Number(insertRes.rows[0].id),
               name: insertRes.rows[0].name || insertRes.rows[0].title || "Plano Sem Nome",
               title: insertRes.rows[0].title || insertRes.rows[0].name || "Plano Sem Nome",
-              description: insertRes.rows[0].description
+              description: insertRes.rows[0].description,
+              createdAt: insertRes.rows[0].created_at,
+              createdBy: insertRes.rows[0].created_by,
+              updatedAt: insertRes.rows[0].updated_at,
+              updatedBy: insertRes.rows[0].updated_by
             }
           });
         }
@@ -1499,12 +1511,16 @@ async function startServer() {
             id: Number(result.rows[0].id),
             name: result.rows[0].name || result.rows[0].title || "Plano Sem Nome",
             title: result.rows[0].title || result.rows[0].name || "Plano Sem Nome",
-            description: result.rows[0].description
+            description: result.rows[0].description,
+            createdAt: result.rows[0].created_at,
+            createdBy: result.rows[0].created_by,
+            updatedAt: result.rows[0].updated_at,
+            updatedBy: result.rows[0].updated_by
           }
         });
       } else {
         const result = await pool.query(
-          "INSERT INTO pl_plans (name, title, description) VALUES ($1, $2, $3) RETURNING *",
+          "INSERT INTO pl_plans (name, title, description, created_at, created_by, updated_at, updated_by) VALUES ($1, $2, $3, NOW(), 'SGI Pro', NOW(), 'SGI Pro') RETURNING *",
           [planName, planTitle, planDesc]
         );
         return res.json({
@@ -1513,7 +1529,11 @@ async function startServer() {
             id: Number(result.rows[0].id),
             name: result.rows[0].name || result.rows[0].title || "Plano Sem Nome",
             title: result.rows[0].title || result.rows[0].name || "Plano Sem Nome",
-            description: result.rows[0].description
+            description: result.rows[0].description,
+            createdAt: result.rows[0].created_at,
+            createdBy: result.rows[0].created_by,
+            updatedAt: result.rows[0].updated_at,
+            updatedBy: result.rows[0].updated_by
           }
         });
       }
@@ -1526,13 +1546,13 @@ async function startServer() {
   // REST endpoints for plans
   app.post("/api/plans", async (req, res) => {
     try {
-      const { name, description, updatedBy } = req.body;
+      const { name, description, updatedBy, createdBy } = req.body;
       const pool = getDbPool();
       const result = await pool.query(
-        "INSERT INTO pl_plans (name, title, description, updated_at, updated_by) VALUES ($1, $1, $2, NOW(), $3) RETURNING *",
-        [name || "Plano Sem Nome", description || "", updatedBy || "SGI Pro"]
+        "INSERT INTO pl_plans (name, title, description, created_at, created_by, updated_at, updated_by) VALUES ($1, $1, $2, NOW(), $3, NOW(), $4) RETURNING *",
+        [name || "Plano Sem Nome", description || "", createdBy || "SGI Pro", updatedBy || "SGI Pro"]
       );
-      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name || result.rows[0].title || "Plano Sem Nome", description: result.rows[0].description, updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
+      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name || result.rows[0].title || "Plano Sem Nome", description: result.rows[0].description, createdAt: result.rows[0].created_at, createdBy: result.rows[0].created_by, updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
     } catch (error: any) {
       console.error("Erro ao criar plano:", error);
       res.status(500).json({ success: false, error: error.message });
@@ -1573,13 +1593,13 @@ async function startServer() {
   // REST endpoints for areas
   app.post("/api/areas", async (req, res) => {
     try {
-      const { name, abbreviation, updatedBy } = req.body;
+      const { name, abbreviation, updatedBy, createdBy } = req.body;
       const pool = getDbPool();
       const result = await pool.query(
-        "INSERT INTO pl_areas (name, abbreviation, updated_at, updated_by) VALUES ($1, $2, NOW(), $3) RETURNING *",
-        [name || "Área Sem Nome", abbreviation || "", updatedBy || "SGI Pro"]
+        "INSERT INTO pl_areas (name, abbreviation, created_at, created_by, updated_at, updated_by) VALUES ($1, $2, NOW(), $3, NOW(), $4) RETURNING *",
+        [name || "Área Sem Nome", abbreviation || "", createdBy || "SGI Pro", updatedBy || "SGI Pro"]
       );
-      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name, abbreviation: result.rows[0].abbreviation, planId: null, updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
+      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name, abbreviation: result.rows[0].abbreviation, planId: null, createdAt: result.rows[0].created_at, createdBy: result.rows[0].created_by, updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
     } catch (error: any) {
       console.error("Erro ao criar área:", error);
       res.status(500).json({ success: false, error: error.message });
@@ -1598,7 +1618,7 @@ async function startServer() {
       if (result.rows.length === 0) {
         return res.status(404).json({ success: false, error: "Área não encontrada" });
       }
-      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name, abbreviation: result.rows[0].abbreviation, planId: null, updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
+      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name, abbreviation: result.rows[0].abbreviation, planId: null, createdAt: result.rows[0].created_at, createdBy: result.rows[0].created_by, updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
     } catch (error: any) {
       console.error("Erro ao atualizar área:", error);
       res.status(500).json({ success: false, error: error.message });
@@ -1620,15 +1640,15 @@ async function startServer() {
   // REST endpoints for responsibles
   app.post("/api/responsibles", async (req, res) => {
     try {
-      const { name, email, role, areaIds, updatedBy } = req.body;
+      const { name, email, role, areaIds, updatedBy, createdBy } = req.body;
       const pool = getDbPool();
       let createdId;
       let finalResult;
       try {
         await pool.query("BEGIN");
         const result = await pool.query(
-          "INSERT INTO pl_responsibles (name, email, role, updated_at, updated_by) VALUES ($1, $2, $3, NOW(), $4) RETURNING *",
-          [name || "Responsável Sem Nome", email || "", role || "", updatedBy || "SGI Pro"]
+          "INSERT INTO pl_responsibles (name, email, role, created_at, created_by, updated_at, updated_by) VALUES ($1, $2, $3, NOW(), $4, NOW(), $5) RETURNING *",
+          [name || "Responsável Sem Nome", email || "", role || "", createdBy || "SGI Pro", updatedBy || "SGI Pro"]
         );
         createdId = result.rows[0].id;
         finalResult = result;
@@ -1643,7 +1663,7 @@ async function startServer() {
         await pool.query("ROLLBACK");
         throw err;
       }
-      res.json({ success: true, data: { id: Number(createdId), name: finalResult.rows[0].name, email: finalResult.rows[0].email, role: finalResult.rows[0].role, areaIds: areaIds || [], updatedAt: finalResult.rows[0].updated_at, updatedBy: finalResult.rows[0].updated_by } });
+      res.json({ success: true, data: { id: Number(createdId), name: finalResult.rows[0].name, email: finalResult.rows[0].email, role: finalResult.rows[0].role, areaIds: areaIds || [], createdAt: finalResult.rows[0].created_at, createdBy: finalResult.rows[0].created_by, updatedAt: finalResult.rows[0].updated_at, updatedBy: finalResult.rows[0].updated_by } });
     } catch (error: any) {
       console.error("Erro ao criar responsável:", error);
       res.status(500).json({ success: false, error: error.message });
@@ -1678,7 +1698,7 @@ async function startServer() {
         await pool.query("ROLLBACK");
         throw err;
       }
-      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name, email: result.rows[0].email, role: result.rows[0].role, areaIds: areaIds || [], updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
+      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name, email: result.rows[0].email, role: result.rows[0].role, areaIds: areaIds || [], createdAt: result.rows[0].created_at, createdBy: result.rows[0].created_by, updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
     } catch (error: any) {
       console.error("Erro ao atualizar responsável:", error);
       res.status(500).json({ success: false, error: error.message });
@@ -1701,7 +1721,7 @@ async function startServer() {
   app.get("/api/categories", async (req, res) => {
     try {
       const pool = getDbPool();
-      const result = await pool.query("SELECT id, name, updated_at, updated_by FROM pl_categories ORDER BY id ASC");
+      const result = await pool.query("SELECT id, name, created_at, created_by, updated_at, updated_by FROM pl_categories ORDER BY id ASC");
       const mapping = await pool.query("SELECT category_id, area_id FROM pl_category_areas");
       
       const areaMap: Record<number, number[]> = {};
@@ -1716,6 +1736,8 @@ async function startServer() {
         data: result.rows.map(c => ({
           id: Number(c.id),
           name: c.name,
+          createdAt: c.created_at,
+          createdBy: c.created_by,
           updatedAt: c.updated_at,
           updatedBy: c.updated_by,
           areaIds: areaMap[Number(c.id)] || []
@@ -1729,15 +1751,15 @@ async function startServer() {
 
   app.post("/api/categories", async (req, res) => {
     try {
-      const { name, areaIds, updatedBy } = req.body;
+      const { name, areaIds, updatedBy, createdBy } = req.body;
       const pool = getDbPool();
       let createdId;
       let finalResult;
       try {
         await pool.query("BEGIN");
         const result = await pool.query(
-          "INSERT INTO pl_categories (name, updated_at, updated_by) VALUES ($1, NOW(), $2) RETURNING *",
-          [name || "Categoria Sem Nome", updatedBy || "SGI Pro"]
+          "INSERT INTO pl_categories (name, created_at, created_by, updated_at, updated_by) VALUES ($1, NOW(), $2, NOW(), $3) RETURNING *",
+          [name || "Categoria Sem Nome", createdBy || "SGI Pro", updatedBy || "SGI Pro"]
         );
         createdId = result.rows[0].id;
         finalResult = result;
@@ -1759,6 +1781,8 @@ async function startServer() {
           id: Number(createdId),
           name: finalResult.rows[0].name,
           areaIds: areaIds || [],
+          createdAt: finalResult.rows[0].created_at,
+          createdBy: finalResult.rows[0].created_by,
           updatedAt: finalResult.rows[0].updated_at,
           updatedBy: finalResult.rows[0].updated_by
         }
@@ -1804,6 +1828,8 @@ async function startServer() {
           id: Number(result.rows[0].id),
           name: result.rows[0].name,
           areaIds: areaIds || [],
+          createdAt: result.rows[0].created_at,
+          createdBy: result.rows[0].created_by,
           updatedAt: result.rows[0].updated_at,
           updatedBy: result.rows[0].updated_by
         }
@@ -1925,6 +1951,8 @@ async function startServer() {
             name: p.name || p.title || "Plano Sem Nome",
             title: p.title || p.name || "Plano Sem Nome",
             description: p.description,
+            createdAt: p.created_at,
+            createdBy: p.created_by,
             updatedAt: p.updated_at,
             updatedBy: p.updated_by
           })),
@@ -1933,6 +1961,8 @@ async function startServer() {
             name: a.name,
             abbreviation: a.abbreviation,
             planId: null,
+            createdAt: a.created_at,
+            createdBy: a.created_by,
             updatedAt: a.updated_at,
             updatedBy: a.updated_by
           })),
@@ -1942,6 +1972,8 @@ async function startServer() {
             email: r.email,
             role: r.role,
             areaIds: responsibleAreasMap[Number(r.id)] || [],
+            createdAt: r.created_at,
+            createdBy: r.created_by,
             updatedAt: r.updated_at,
             updatedBy: r.updated_by
           })),
@@ -1949,6 +1981,8 @@ async function startServer() {
             id: Number(c.id),
             name: c.name,
             areaIds: categoryAreasMap[Number(c.id)] || [],
+            createdAt: c.created_at,
+            createdBy: c.created_by,
             updatedAt: c.updated_at,
             updatedBy: c.updated_by
           }))
@@ -1978,7 +2012,7 @@ async function startServer() {
         skip_empty_lines: true,
         delimiter: ';',
         trim: true
-      });
+      }) as any[];
 
       const pool = getDbPool();
       const client = await pool.connect();

@@ -158,6 +158,8 @@ export interface Plan {
   id: number;
   name: string;
   description: string;
+  createdAt?: string | null;
+  createdBy?: string | null;
   updatedAt?: string | null;
   updatedBy?: string | null;
 }
@@ -166,6 +168,8 @@ export interface Area {
   id: number;
   name: string;
   abbreviation?: string;
+  createdAt?: string | null;
+  createdBy?: string | null;
   updatedAt?: string | null;
   updatedBy?: string | null;
 }
@@ -174,6 +178,8 @@ export interface Category {
   id: number;
   name: string;
   areaIds: number[];
+  createdAt?: string | null;
+  createdBy?: string | null;
   updatedAt?: string | null;
   updatedBy?: string | null;
 }
@@ -184,6 +190,8 @@ export interface Responsible {
   email?: string;
   role?: string;
   areaIds: number[];
+  createdAt?: string | null;
+  createdBy?: string | null;
   updatedAt?: string | null;
   updatedBy?: string | null;
 }
