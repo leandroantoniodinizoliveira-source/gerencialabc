@@ -210,16 +210,26 @@ export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas, o
         </div>
       </section>
 
-      {/* Module Group 2: Balanço Hídrico */}
+      {/* Module Group 2: Fiscalização */}
       <section className="space-y-4">
-        <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-          <div className="p-1 px-2.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-black uppercase tracking-wider">
-            Módulo 2
+        <div className="flex flex-col gap-1 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-1 px-2.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-black uppercase tracking-wider">
+              Módulo 2
+            </div>
+            <h2 className="text-lg font-black text-slate-800 tracking-tight">Fiscalização</h2>
           </div>
-          <h2 className="text-lg font-black text-slate-800 tracking-tight">Balanço Hídrico dos Sistemas de Abastecimento de Água</h2>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="pt-2">
+          <div className="flex items-center gap-2 mb-4">
+            <div className="p-1 px-2.5 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-black uppercase tracking-widest border border-slate-200">
+              Sub-Módulo 2.1
+            </div>
+            <h3 className="text-xs font-black text-slate-600 uppercase tracking-widest">Balanço Hídrico dos Sistemas de Abastecimento de Água</h3>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           {/* Item 2.1: Gerenciar Balancos */}
           <motion.div 
             whileHover={{ y: -3 }}
@@ -279,6 +289,7 @@ export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas, o
               Ver comparação <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
             </div>
           </motion.div>
+        </div>
         </div>
       </section>
 
