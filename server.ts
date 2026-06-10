@@ -308,11 +308,7 @@ async function runStartupMigration() {
       `);
 
       // Add sei_process column
-      try {
-        await client.query("ALTER TABLE pl_tasks ADD COLUMN sei_process TEXT;");
-      } catch (err: any) {
-        if (err.code !== '42701') console.warn("Could not add sei_process column:", err);
-      }
+      await client.query("ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS sei_process TEXT;");
 
       await client.query("CREATE INDEX IF NOT EXISTS idx_tasks_parent_id ON pl_tasks(parent_id);");
 
@@ -358,14 +354,110 @@ async function runStartupMigration() {
       
       await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS plan_id INTEGER REFERENCES pl_plans(id) ON DELETE SET NULL;`);
       
+      // Auto-migrate pl_users to au_users if it exists and au_users does not
+      try {
+        await client.query(`
+          DO $$
+          BEGIN
+            IF EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'pl_users') AND
+               NOT EXISTS (SELECT FROM pg_tables WHERE schemaname = 'public' AND tablename = 'au_users') THEN
+              ALTER TABLE pl_users RENAME TO au_users;
+            END IF;
+          END
+          $$;
+        `);
+      } catch (e) {
+        console.error("Erro ao migrar tabela pl_users para au_users:", e);
+      }
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS au_users (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          email VARCHAR(255) UNIQUE NOT NULL,
+          password VARCHAR(255) NOT NULL,
+          role_id VARCHAR(100) DEFAULT 'provider',
+          status VARCHAR(50) DEFAULT 'active',
+          agency VARCHAR(255)
+        );
+      `);
+
+      const userCountRes = await client.query("SELECT COUNT(*) FROM au_users");
+      if (parseInt(userCountRes.rows[0].count, 10) === 0) {
+        await client.query(`
+          INSERT INTO au_users (name, email, password, role_id, status, agency) VALUES
+          ('Admin', 'admin@adasa.gov.br', '1234', 'admin', 'active', NULL),
+          ('Joao Regulador', 'joao@adasa.gov.br', '1234', 'regulator', 'active', NULL),
+          ('Maria CAESB', 'maria@caesb.gov.br', '1234', 'provider', 'active', 'CAESB')
+        `);
+      }
+
       await client.query(`
         CREATE TABLE IF NOT EXISTS pl_responsibles (
           id SERIAL PRIMARY KEY,
           name VARCHAR(255) NOT NULL,
           email VARCHAR(255),
-          role VARCHAR(100)
+          role VARCHAR(100),
+          user_id INTEGER REFERENCES au_users(id) ON DELETE SET NULL
         );
       `);
+
+      try {
+        await client.query("ALTER TABLE pl_responsibles ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES au_users(id) ON DELETE SET NULL;");
+      } catch (err) {
+        // ignore if already exists or schema issue
+      }
+
+      // Sync responsibles into users table as requested
+      try {
+        const respsRes = await client.query("SELECT id, name, user_id FROM pl_responsibles");
+        for (const resp of respsRes.rows) {
+          let uId = resp.user_id;
+          if (!uId) {
+            const nameClean = (resp.name || "").trim();
+            if (nameClean) {
+              let firstPart = nameClean.split(/\s+/)[0];
+              let firstNormalized = firstPart.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]/g, "");
+              if (!firstNormalized) {
+                firstNormalized = "responsavel";
+              }
+              let emailAddress = `${firstNormalized}@adasa.df.gov.br`;
+
+              // Check if user already exists with the exact name
+              const checkByName = await client.query("SELECT id FROM au_users WHERE LOWER(name) = LOWER($1)", [nameClean]);
+              if (checkByName.rows.length > 0) {
+                uId = checkByName.rows[0].id;
+                await client.query("UPDATE pl_responsibles SET user_id = $1 WHERE id = $2", [uId, resp.id]);
+                console.log(`[SYNC] Linked existing user for responsible "${nameClean}" via name match`);
+              } else {
+                // Ensure unique email
+                let suffix = 1;
+                let uniqueEmail = emailAddress;
+                while (true) {
+                  const checkExist = await client.query("SELECT id FROM au_users WHERE LOWER(email) = LOWER($1)", [uniqueEmail]);
+                  if (checkExist.rows.length === 0) {
+                    break;
+                  }
+                  suffix++;
+                  uniqueEmail = `${firstNormalized}${suffix}@adasa.df.gov.br`;
+                }
+                emailAddress = uniqueEmail;
+
+                // Register user
+                const insertUserRes = await client.query(
+                  "INSERT INTO au_users (name, email, password, role_id, status, agency) VALUES ($1, $2, $3, 'regulator', 'active', 'Adasa') RETURNING id",
+                  [nameClean, emailAddress, "1234"]
+                );
+                uId = insertUserRes.rows[0].id;
+                await client.query("UPDATE pl_responsibles SET user_id = $1 WHERE id = $2", [uId, resp.id]);
+                console.log(`[SYNC] Registered user for responsible: "${nameClean}" -> "${emailAddress}"`);
+              }
+            }
+          }
+        }
+      } catch (syncErr) {
+        console.error("Error syncing responsibles to users:", syncErr);
+      }
       
       await client.query(`
         CREATE TABLE IF NOT EXISTS pl_responsible_areas (
@@ -399,6 +491,7 @@ async function runStartupMigration() {
       await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
       await client.query(`ALTER TABLE pl_plans ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
       await client.query(`ALTER TABLE pl_plans ADD COLUMN IF NOT EXISTS created_at TIMESTAMP, ADD COLUMN IF NOT EXISTS created_by VARCHAR(255);`);
+      await client.query(`ALTER TABLE pl_plans ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT FALSE;`);
       await client.query(`ALTER TABLE pl_areas ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
       await client.query(`ALTER TABLE pl_areas ADD COLUMN IF NOT EXISTS created_at TIMESTAMP, ADD COLUMN IF NOT EXISTS created_by VARCHAR(255);`);
       await client.query(`ALTER TABLE pl_responsibles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
@@ -722,6 +815,7 @@ async function startServer() {
             name: p.name || p.title || "Plano Sem Nome",
             title: p.title || p.name || "Plano Sem Nome",
             description: p.description,
+            isActive: p.is_active || false,
             createdAt: p.created_at,
             createdBy: p.created_by,
             updatedAt: p.updated_at,
@@ -738,7 +832,8 @@ async function startServer() {
             name: r.name,
             email: r.email,
             role: r.role,
-            areaIds: responsibleAreasMap[Number(r.id)] || []
+            areaIds: responsibleAreasMap[Number(r.id)] || [],
+            userId: r.user_id ? Number(r.user_id) : null
           })),
           tasks: dbTasks.rows.map(t => ({
             id: Number(t.id),
@@ -1546,13 +1641,16 @@ async function startServer() {
   // REST endpoints for plans
   app.post("/api/plans", async (req, res) => {
     try {
-      const { name, description, updatedBy, createdBy } = req.body;
+      const { name, description, updatedBy, createdBy, isActive } = req.body;
       const pool = getDbPool();
+      if (isActive) {
+        await pool.query("UPDATE pl_plans SET is_active = FALSE");
+      }
       const result = await pool.query(
-        "INSERT INTO pl_plans (name, title, description, created_at, created_by, updated_at, updated_by) VALUES ($1, $1, $2, NOW(), $3, NOW(), $4) RETURNING *",
-        [name || "Plano Sem Nome", description || "", createdBy || "SGI Pro", updatedBy || "SGI Pro"]
+        "INSERT INTO pl_plans (name, title, description, is_active, created_at, created_by, updated_at, updated_by) VALUES ($1, $1, $2, $3, NOW(), $4, NOW(), $5) RETURNING *",
+        [name || "Plano Sem Nome", description || "", !!isActive, createdBy || "SGI Pro", updatedBy || "SGI Pro"]
       );
-      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name || result.rows[0].title || "Plano Sem Nome", description: result.rows[0].description, createdAt: result.rows[0].created_at, createdBy: result.rows[0].created_by, updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
+      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name || result.rows[0].title || "Plano Sem Nome", description: result.rows[0].description, isActive: result.rows[0].is_active, createdAt: result.rows[0].created_at, createdBy: result.rows[0].created_by, updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
     } catch (error: any) {
       console.error("Erro ao criar plano:", error);
       res.status(500).json({ success: false, error: error.message });
@@ -1562,16 +1660,19 @@ async function startServer() {
   app.put("/api/plans/:id", async (req, res) => {
     try {
       const planId = parseInt(req.params.id);
-      const { name, description, updatedBy } = req.body;
+      const { name, description, updatedBy, isActive } = req.body;
       const pool = getDbPool();
+      if (isActive) {
+        await pool.query("UPDATE pl_plans SET is_active = FALSE");
+      }
       const result = await pool.query(
-        "UPDATE pl_plans SET name = $1, title = $1, description = $2, updated_at = NOW(), updated_by = $3 WHERE id = $4 RETURNING *",
-        [name || "Plano Sem Nome", description || "", updatedBy || "SGI Pro", planId]
+        "UPDATE pl_plans SET name = $1, title = $1, description = $2, is_active = $3, updated_at = NOW(), updated_by = $4 WHERE id = $5 RETURNING *",
+        [name || "Plano Sem Nome", description || "", !!isActive, updatedBy || "SGI Pro", planId]
       );
       if (result.rows.length === 0) {
         return res.status(404).json({ success: false, error: "Plano não encontrado" });
       }
-      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name || result.rows[0].title || "Plano Sem Nome", description: result.rows[0].description, updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
+      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name || result.rows[0].title || "Plano Sem Nome", description: result.rows[0].description, isActive: result.rows[0].is_active, updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
     } catch (error: any) {
       console.error("Erro ao atualizar plano:", error);
       res.status(500).json({ success: false, error: error.message });
@@ -1644,11 +1745,32 @@ async function startServer() {
       const pool = getDbPool();
       let createdId;
       let finalResult;
+      let generatedPass: string | null = null;
       try {
         await pool.query("BEGIN");
+
+        // Check if user exists for this email
+        let userId: number | null = null;
+        const normalizedEmail = (email || "").trim().toLowerCase();
+        
+        if (normalizedEmail) {
+          const uRes = await pool.query("SELECT id FROM au_users WHERE LOWER(email) = LOWER($1)", [normalizedEmail]);
+          if (uRes.rows.length > 0) {
+            userId = uRes.rows[0].id;
+          } else {
+            // Generate standard 4-digit random password
+            generatedPass = Math.floor(1000 + Math.random() * 9000).toString();
+            const insertUserRes = await pool.query(
+               "INSERT INTO au_users (name, email, password, role_id, status) VALUES ($1, $2, $3, 'provider', 'active') RETURNING id",
+              [name || "Responsável Sem Nome", normalizedEmail, generatedPass]
+            );
+            userId = insertUserRes.rows[0].id;
+          }
+        }
+
         const result = await pool.query(
-          "INSERT INTO pl_responsibles (name, email, role, created_at, created_by, updated_at, updated_by) VALUES ($1, $2, $3, NOW(), $4, NOW(), $5) RETURNING *",
-          [name || "Responsável Sem Nome", email || "", role || "", createdBy || "SGI Pro", updatedBy || "SGI Pro"]
+          "INSERT INTO pl_responsibles (name, email, role, user_id, created_at, created_by, updated_at, updated_by) VALUES ($1, $2, $3, $4, NOW(), $5, NOW(), $6) RETURNING *",
+          [name || "Responsável Sem Nome", email || "", role || "", userId, createdBy || "SGI Pro", updatedBy || "SGI Pro"]
         );
         createdId = result.rows[0].id;
         finalResult = result;
@@ -1663,7 +1785,22 @@ async function startServer() {
         await pool.query("ROLLBACK");
         throw err;
       }
-      res.json({ success: true, data: { id: Number(createdId), name: finalResult.rows[0].name, email: finalResult.rows[0].email, role: finalResult.rows[0].role, areaIds: areaIds || [], createdAt: finalResult.rows[0].created_at, createdBy: finalResult.rows[0].created_by, updatedAt: finalResult.rows[0].updated_at, updatedBy: finalResult.rows[0].updated_by } });
+      res.json({ 
+        success: true, 
+        generatedPassword: generatedPass,
+        data: { 
+          id: Number(createdId), 
+          name: finalResult.rows[0].name, 
+          email: finalResult.rows[0].email, 
+          role: finalResult.rows[0].role, 
+          userId: finalResult.rows[0].user_id,
+          areaIds: areaIds || [], 
+          createdAt: finalResult.rows[0].created_at, 
+          createdBy: finalResult.rows[0].created_by, 
+          updatedAt: finalResult.rows[0].updated_at, 
+          updatedBy: finalResult.rows[0].updated_by 
+        } 
+      });
     } catch (error: any) {
       console.error("Erro ao criar responsável:", error);
       res.status(500).json({ success: false, error: error.message });
@@ -1713,6 +1850,136 @@ async function startServer() {
       res.json({ success: true, deletedId: respId });
     } catch (error: any) {
       console.error("Erro ao deletar responsável:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/auth/login", async (req, res) => {
+    try {
+      const { email, password } = req.body;
+      if (!email || !password) {
+        return res.status(400).json({ success: false, error: "Identificador e senha são necessários" });
+      }
+      const pool = getDbPool();
+      const result = await pool.query(
+        "SELECT id, name, email, password, role_id, status, agency FROM au_users WHERE LOWER(email) = LOWER($1)",
+        [email.trim()]
+      );
+      if (result.rows.length === 0) {
+        return res.status(401).json({ success: false, error: "Usuário não encontrado" });
+      }
+      const user = result.rows[0];
+      if (user.status !== "active") {
+        return res.status(403).json({ success: false, error: "Este usuário está inativo" });
+      }
+      if (user.password !== password) {
+        return res.status(401).json({ success: false, error: "Senha inválida" });
+      }
+      res.json({
+        success: true,
+        user: {
+          id: user.id.toString(),
+          name: user.name,
+          email: user.email,
+          roleId: user.role_id,
+          status: user.status,
+          agency: user.agency
+        }
+      });
+    } catch (error: any) {
+      console.error("Erro ao fazer login:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.get("/api/users", async (req, res) => {
+    try {
+      const pool = getDbPool();
+      const result = await pool.query("SELECT id, name, email, password, role_id, status, agency FROM au_users ORDER BY id ASC");
+      res.json({
+        success: true,
+        data: result.rows.map(user => ({
+          id: user.id.toString(),
+          name: user.name,
+          email: user.email,
+          password: user.password,
+          roleId: user.role_id,
+          status: user.status,
+          agency: user.agency
+        }))
+      });
+    } catch (error: any) {
+      console.error("Erro ao listar usuários:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/users", async (req, res) => {
+    try {
+      const { name, email, password, roleId, status, agency } = req.body;
+      const pool = getDbPool();
+      const result = await pool.query(
+        "INSERT INTO au_users (name, email, password, role_id, status, agency) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+        [name, email, password || "1234", roleId || "provider", status || "active", agency || null]
+      );
+      const user = result.rows[0];
+      res.json({
+        success: true,
+        data: {
+          id: user.id.toString(),
+          name: user.name,
+          email: user.email,
+          password: user.password,
+          roleId: user.role_id,
+          status: user.status,
+          agency: user.agency
+        }
+      });
+    } catch (error: any) {
+      console.error("Erro ao cadastrar usuário:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.put("/api/users/:id", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const { name, email, password, roleId, status, agency } = req.body;
+      const pool = getDbPool();
+      const result = await pool.query(
+        "UPDATE au_users SET name = $1, email = $2, password = $3, role_id = $4, status = $5, agency = $6 WHERE id = $7 RETURNING *",
+        [name, email, password || "1234", roleId || "provider", status || "active", agency || null, userId]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ success: false, error: "Usuário não encontrado" });
+      }
+      const user = result.rows[0];
+      res.json({
+        success: true,
+        data: {
+          id: user.id.toString(),
+          name: user.name,
+          email: user.email,
+          password: user.password,
+          roleId: user.role_id,
+          status: user.status,
+          agency: user.agency
+        }
+      });
+    } catch (error: any) {
+      console.error("Erro ao atualizar usuário:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.delete("/api/users/:id", async (req, res) => {
+    try {
+      const userId = parseInt(req.params.id);
+      const pool = getDbPool();
+      await pool.query("DELETE FROM au_users WHERE id = $1", [userId]);
+      res.json({ success: true, deletedId: userId });
+    } catch (error: any) {
+      console.error("Erro ao deletar usuário:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
@@ -1951,6 +2218,7 @@ async function startServer() {
             name: p.name || p.title || "Plano Sem Nome",
             title: p.title || p.name || "Plano Sem Nome",
             description: p.description,
+            isActive: p.is_active || false,
             createdAt: p.created_at,
             createdBy: p.created_by,
             updatedAt: p.updated_at,
@@ -1975,7 +2243,8 @@ async function startServer() {
             createdAt: r.created_at,
             createdBy: r.created_by,
             updatedAt: r.updated_at,
-            updatedBy: r.updated_by
+            updatedBy: r.updated_by,
+            userId: r.user_id ? Number(r.user_id) : null
           })),
           categories: dbCategories.rows.map(c => ({
             id: Number(c.id),

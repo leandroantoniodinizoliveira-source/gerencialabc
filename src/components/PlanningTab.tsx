@@ -62,6 +62,7 @@ interface PlanningTabProps {
   showToast: (title: string, message: string, type: "success" | "error" | "warning" | "info") => void;
   activeSubTab?: "tasks" | "dashboard" | "plans" | "areas" | "categories" | "responsibles" | "import";
   setConfirmState?: React.Dispatch<React.SetStateAction<{ title?: string; message: string; type?: "confirm" | "alert"; onConfirm?: () => void } | null>>;
+  myTasksFilterTrigger?: number;
 }
  
 const normalizeStatus = (status: string | undefined): "Não iniciada" | "Em andamento" | "Concluída" => {
@@ -70,6 +71,27 @@ const normalizeStatus = (status: string | undefined): "Não iniciada" | "Em anda
   if (s === "concluída" || s === "concluído" || s === "completed") return "Concluída";
   if (s === "em andamento" || s === "in_progress" || s === "in progress") return "Em andamento";
   return "Não iniciada";
+};
+
+const sortByCreatedAt = (a: Plan, b: Plan): number => {
+  const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+  const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+  
+  if (dateA && dateB && dateA !== dateB) {
+    return dateB - dateA;
+  }
+  
+  const bkA = (a as any).created_at ? new Date((a as any).created_at).getTime() : 0;
+  const bkB = (b as any).created_at ? new Date((b as any).created_at).getTime() : 0;
+  if (bkA && bkB && bkA !== bkB) {
+    return bkB - bkA;
+  }
+
+  const yearA = parseInt((a.name || "").match(/\d{4}/)?.[0] || "0", 10);
+  const yearB = parseInt((b.name || "").match(/\d{4}/)?.[0] || "0", 10);
+  if (yearA !== yearB) return yearB - yearA;
+
+  return b.id - a.id;
 };
 
 const getDeadlineStatus = (endDate: string | null | undefined, status: string | undefined): "Atrasada" | "Crítica" | "No Prazo" => {
@@ -125,6 +147,39 @@ const CustomStatusTooltip = ({ active, payload }: any) => {
           <span className="text-slate-400 text-[10px] font-medium uppercase tracking-wider">Percentual</span>
           <span className="text-slate-300 font-bold text-xs">{(data.percent * 100).toFixed(1).replace('.0', '')}%</span>
         </div>
+      </div>
+    );
+  }
+  return null;
+};
+
+const CustomNestedStatusTooltip = ({ active, payload, totalTasks }: any) => {
+  if (active && payload && payload.length) {
+    const data = payload[0].payload;
+    const isInner = !!data.parentName;
+    const pct = totalTasks > 0 ? ((data.value / totalTasks) * 100).toFixed(1).replace('.0', '') : '0';
+    return (
+      <div className="bg-slate-900 border border-slate-700 p-3.5 rounded-2xl shadow-2xl flex flex-col gap-2 min-w-[200px] z-50 animate-in fade-in zoom-in-95 duration-150">
+        <p className="text-slate-100 font-black text-xs uppercase tracking-wide border-b border-slate-700/50 pb-2 mb-1 flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: data.color }}></span>
+          {isInner ? `${data.parentName} (${data.situation})` : data.name}
+        </p>
+        <div className="flex justify-between items-center gap-6">
+          <span className="text-slate-400 text-[10px] font-medium uppercase tracking-wider">Quantidade</span>
+          <span className="text-white font-black text-sm">{data.value}</span>
+        </div>
+        <div className="flex justify-between items-center gap-6">
+          <span className="text-slate-400 text-[10px] font-medium uppercase tracking-wider">Do Total Geral</span>
+          <span className="text-slate-300 font-bold text-xs">{pct}%</span>
+        </div>
+        {isInner && (
+          <div className="flex justify-between items-center gap-6">
+            <span className="text-slate-400 text-[10px] font-medium uppercase tracking-wider">Da Categoria</span>
+            <span className="text-slate-300 font-bold text-xs">
+              {data.parentValue ? `${((data.value / data.parentValue) * 100).toFixed(1).replace('.0', '')}%` : ''}
+            </span>
+          </div>
+        )}
       </div>
     );
   }
@@ -338,9 +393,10 @@ const ImportPanel = ({ areas, showToast, onSuccess }: { areas: any[], showToast:
   );
 };
 
-export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks", setConfirmState = () => {} }: PlanningTabProps) {
+export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks", setConfirmState = () => {}, myTasksFilterTrigger }: PlanningTabProps) {
   const { currentUser } = useAuth();
   const previousSubTabRef = useRef<string | undefined>(undefined);
+  const hasInitiallySelectedPlanRef = useRef<boolean>(false);
   // Navigation, search & filter state
   const [isDashboardFiltersExpanded, setIsDashboardFiltersExpanded] = useState(false);
   const [isTasksFiltersExpanded, setIsTasksFiltersExpanded] = useState(true);
@@ -392,10 +448,53 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
   const [categories, setCategories] = useState<Category[]>([]);
   const [responsibles, setResponsibles] = useState<Responsible[]>([]);
 
+  React.useEffect(() => {
+    if (myTasksFilterTrigger && myTasksFilterTrigger > 0) {
+      // 1. Filter by the active tasks plan (plano ativo)
+      const activeProj = plans.find(p => p.isActive);
+      if (activeProj) {
+        setPlanFilter(activeProj.id.toString());
+      } else {
+        const sortedPlans = [...plans].sort(sortByCreatedAt);
+        if (sortedPlans.length > 0) {
+          setPlanFilter(sortedPlans[0].id.toString());
+        }
+      }
+
+      // 2. Filter by the responsible matching the logged-in user
+      if (currentUser) {
+        const userResp = responsibles.find(r => 
+          (r.userId && Number(r.userId) === Number(currentUser.id)) ||
+          (r.email && currentUser.email && r.email.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) ||
+          (r.name && currentUser.name && r.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim())
+        );
+        if (userResp) {
+          setSelectedResponsibleIds([userResp.id]);
+        } else {
+          showToast("Aviso", "Seu usuário não está vinculado a nenhum responsável técnico cadastrado. Filtro exibindo todas as tarefas.", "warning");
+          setSelectedResponsibleIds([]);
+        }
+      }
+
+      // Reset other filters for clarity
+      setStatusFilter("all");
+      setSituationFilter("all");
+      setPriorityFilter("all");
+      setCategoryFilter("all");
+      setIsProgrammedFilter("all");
+      setSearchTerm("");
+      setSelectedAreaIds([]);
+
+      // Expand filters panel for clarity
+      setIsTasksFiltersExpanded(true);
+    }
+  }, [myTasksFilterTrigger, plans, responsibles, currentUser]);
+
   // Form state for registries
   const [regName, setRegName] = useState("");
   const [regAbbreviation, setRegAbbreviation] = useState("");
   const [regDesc, setRegDesc] = useState("");
+  const [regIsActive, setRegIsActive] = useState(false);
   const [regEmail, setRegEmail] = useState("");
   const [regRole, setRegRole] = useState("");
   const [regUpdatedBy, setRegUpdatedBy] = useState("");
@@ -414,6 +513,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
   const [areaTableSort, setAreaTableSort] = useState<{ field: string, dir: "asc" | "desc" } | null>({ field: "end", dir: "asc" });
   const [collapsedTableCategories, setCollapsedTableCategories] = useState<Record<string, boolean>>({});
   const [quarterChartType, setQuarterChartType] = useState<"small-multiples" | "heatmap">("small-multiples");
+  const [statusSituationChartType, setStatusSituationChartType] = useState<"nested-donut" | "heatmap">("heatmap");
 
   // Modal/Form State for adding/editing tasks
   const [timelineTaskId, setTimelineTaskId] = useState<number | null>(null);
@@ -627,6 +727,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
         body: JSON.stringify({ 
           name: regName, 
           description: regDesc, 
+          isActive: regIsActive,
           updatedBy: regUpdatedBy || currentUser?.name || currentUser?.email || "SGI Pro",
           createdBy: currentUser?.name || currentUser?.email || "SGI Pro"
         })
@@ -636,6 +737,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
         showToast("Sucesso", isEdit ? "Plano atualizado com sucesso." : "Plano cadastrado com sucesso.", "success");
         setRegName("");
         setRegDesc("");
+        setRegIsActive(false);
         setEditingRegId(null);
         setIsRegModalOpen(false);
         await loadRegistriesOnly();
@@ -863,7 +965,16 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
       });
       const data = await res.json();
       if (data.success) {
-        showToast("Sucesso", isEdit ? "Responsável atualizado." : "Responsável criado com sucesso.", "success");
+        if (!isEdit && data.generatedPassword) {
+          setConfirmState({
+            title: "Usuário Criado para o Responsável",
+            message: `O responsável foi cadastrado e integrado com sucesso!\n\nFoi criado um usuário vinculado:\n• Usuário/E-mail: ${regEmail}\n• Senha Padrão de Acesso: ${data.generatedPassword}\n\nPor favor, anote a senha acima para que o responsável consiga realizar o login no sistema.`,
+            type: "alert"
+          });
+          showToast("Sucesso", `Responsável criado! Senha gerada: ${data.generatedPassword}`, "success");
+        } else {
+          showToast("Sucesso", isEdit ? "Responsável atualizado." : "Responsável criado com sucesso.", "success");
+        }
         setRegName("");
         setRegEmail("");
         setRegRole("");
@@ -951,42 +1062,44 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
     fetchInit();
   }, []);
 
-  // Pre-select most recent plan on mount / if plans are updated
+  // Pre-select active plan or most recent plan on mount / if plans are updated
   React.useEffect(() => {
     if (plans && plans.length > 0) {
-      if (planFilter === "all" && isInitializing) {
-        const sortedPlans = [...plans].sort((a, b) => {
-          const yearA = parseInt(a.name.match(/\d{4}/)?.[0] || "0", 10);
-          const yearB = parseInt(b.name.match(/\d{4}/)?.[0] || "0", 10);
-          if (yearA !== yearB) return yearB - yearA;
-          return b.id - a.id;
-        });
-        if (sortedPlans.length > 0) {
-          setPlanFilter(sortedPlans[0].id.toString());
+      if (!hasInitiallySelectedPlanRef.current) {
+        const activeProj = plans.find(p => p.isActive);
+        if (activeProj) {
+          setPlanFilter(activeProj.id.toString());
+          hasInitiallySelectedPlanRef.current = true;
+        } else {
+          const sortedPlans = [...plans].sort(sortByCreatedAt);
+          if (sortedPlans.length > 0) {
+            setPlanFilter(sortedPlans[0].id.toString());
+            hasInitiallySelectedPlanRef.current = true;
+          }
         }
       }
       if (isInitializing && !isSyncing) {
          // Data is loaded and (if needed) plan filter is set. Complete init.
-         setTimeout(() => setIsInitializing(false), 50);
+         setIsInitializing(false);
       }
-    } else if (isInitializing && !isSyncing) {
-         setTimeout(() => setIsInitializing(false), 50);
+    } else if (plans && plans.length === 0 && !isSyncing && isInitializing) {
+         setIsInitializing(false);
     }
-  }, [plans, planFilter, isInitializing, isSyncing]);
+  }, [plans, isInitializing, isSyncing]);
 
   // Ao abrir as abas "tasks" (cadastro de atividades) ou "dashboard" (painel de atividades),
-  // define automaticamente o filtro para o plano de atividades mais recente cadastrado.
+  // define automaticamente o filtro para o plano ativo ou o plano de atividades mais recente cadastrado.
   React.useEffect(() => {
     if (plans && plans.length > 0 && (activeSubTab === "tasks" || activeSubTab === "dashboard")) {
-      if (previousSubTabRef.current !== activeSubTab) {
-        const sortedPlans = [...plans].sort((a, b) => {
-          const yearA = parseInt(a.name.match(/\d{4}/)?.[0] || "0", 10);
-          const yearB = parseInt(b.name.match(/\d{4}/)?.[0] || "0", 10);
-          if (yearA !== yearB) return yearB - yearA;
-          return b.id - a.id;
-        });
-        if (sortedPlans.length > 0) {
-          setPlanFilter(sortedPlans[0].id.toString());
+      if (previousSubTabRef.current === undefined || previousSubTabRef.current !== activeSubTab) {
+        const activeProj = plans.find(p => p.isActive);
+        if (activeProj) {
+          setPlanFilter(activeProj.id.toString());
+        } else {
+          const sortedPlans = [...plans].sort(sortByCreatedAt);
+          if (sortedPlans.length > 0) {
+            setPlanFilter(sortedPlans[0].id.toString());
+          }
         }
       }
     }
@@ -1402,6 +1515,131 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
       { name: "Concluída", value: dashboardStats.completed, color: "#10b981" } // emerald-500
     ].filter(item => item.value > 0);
   }, [dashboardStats]);
+
+  const nestedDonutData = useMemo(() => {
+    const groups: Record<string, { noPrazo: number; critica: number; atrasada: number; color: string }> = {
+      "Não iniciada": { noPrazo: 0, critica: 0, atrasada: 0, color: "#94a3b8" },
+      "Em andamento": { noPrazo: 0, critica: 0, atrasada: 0, color: "#3b82f6" },
+      "Concluída": { noPrazo: 0, critica: 0, atrasada: 0, color: "#10b981" },
+    };
+
+    filteredTasks.forEach(t => {
+      const norm = normalizeStatus(t.status);
+      const dl = getDeadlineStatus(t.endDate, t.status);
+      const target = groups[norm];
+      if (target) {
+        if (dl === "No Prazo") target.noPrazo++;
+        else if (dl === "Crítica") target.critica++;
+        else if (dl === "Atrasada") target.atrasada++;
+      }
+    });
+
+    const outerRing: Array<{ name: string; value: number; color: string; status: string }> = [];
+    const innerRing: Array<{ name: string; parentName: string; parentValue: number; value: number; color: string; status: string; situation: string }> = [];
+
+    const sequence: Array<{
+      status: "Não iniciada" | "Em andamento" | "Concluída";
+      displayName: string;
+      color: string;
+      sub: Array<{ key: "noPrazo" | "critica" | "atrasada"; name: string; color: string }>;
+    }> = [
+      {
+        status: "Não iniciada",
+        displayName: "Não Iniciada",
+        color: "#94a3b8",
+        sub: [
+          { key: "noPrazo", name: "Não Inic. - No Prazo", color: "#cbd5e1" },
+          { key: "critica", name: "Não Inic. - Crítica", color: "#fca5a5" },
+          { key: "atrasada", name: "Não Inic. - Atrasada", color: "#f87171" },
+        ],
+      },
+      {
+        status: "Em andamento",
+        displayName: "Em Andamento",
+        color: "#3b82f6",
+        sub: [
+          { key: "noPrazo", name: "Andamento - No Prazo", color: "#93c5fd" },
+          { key: "critica", name: "Andamento - Crítica", color: "#fca5a5" },
+          { key: "atrasada", name: "Andamento - Atrasada", color: "#ef4444" },
+        ],
+      },
+      {
+        status: "Concluída",
+        displayName: "Concluída",
+        color: "#10b981",
+        sub: [
+          { key: "noPrazo", name: "Concluída - No Prazo", color: "#6ee7b7" },
+        ],
+      },
+    ];
+
+    sequence.forEach(group => {
+      const dataGroup = groups[group.status];
+      const outerVal = dataGroup.noPrazo + dataGroup.critica + dataGroup.atrasada;
+      if (outerVal > 0) {
+        outerRing.push({
+          name: group.displayName,
+          value: outerVal,
+          color: group.color,
+          status: group.status,
+        });
+
+        group.sub.forEach(subItem => {
+          const val = dataGroup[subItem.key];
+          if (val > 0) {
+            innerRing.push({
+              name: subItem.name,
+              parentName: group.displayName,
+              parentValue: outerVal,
+              value: val,
+              color: subItem.color,
+              status: group.status,
+              situation: subItem.key === "noPrazo" ? "No Prazo" : subItem.key === "critica" ? "Crítica" : "Atrasada",
+            });
+          }
+        });
+      }
+    });
+
+    return { outerRing, innerRing };
+  }, [filteredTasks]);
+
+  const heatmapData = useMemo(() => {
+    const rows = [
+      { key: "Não iniciada", label: "Não Iniciada" },
+      { key: "Em andamento", label: "Em Andamento" },
+      { key: "Concluída", label: "Concluída" }
+    ];
+    const cols = [
+      { key: "No Prazo", label: "No Prazo" },
+      { key: "Crítica", label: "Crítica" },
+      { key: "Atrasada", label: "Atrasada" }
+    ];
+
+    const matrix: Record<string, Record<string, number>> = {
+      "Não iniciada": { "No Prazo": 0, "Crítica": 0, "Atrasada": 0 },
+      "Em andamento": { "No Prazo": 0, "Crítica": 0, "Atrasada": 0 },
+      "Concluída": { "No Prazo": 0, "Crítica": 0, "Atrasada": 0 }
+    };
+
+    filteredTasks.forEach(t => {
+      const norm = normalizeStatus(t.status);
+      const dl = getDeadlineStatus(t.endDate, t.status);
+      if (matrix[norm] && matrix[norm][dl] !== undefined) {
+        matrix[norm][dl]++;
+      }
+    });
+
+    let maxCount = 0;
+    rows.forEach(r => {
+      cols.forEach(c => {
+        const val = matrix[r.key][c.key];
+        if (val > maxCount) maxCount = val;
+      });
+    });
+
+    return { rows, cols, matrix, maxCount };
+  }, [filteredTasks]);
 
   // Chart data 2: Average Progress and Task Count per Area
   const areaChartData = useMemo(() => {
@@ -2723,6 +2961,14 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
           </div>
           <button
             onClick={() => {
+              setRegName("");
+              setRegAbbreviation("");
+              setRegDesc("");
+              setRegIsActive(false);
+              setRegEmail("");
+              setRegRole("");
+              setRegAreaIds([]);
+              setEditingRegId(null);
               setIsRegModalOpen(true);
               setRegUpdatedBy(currentUser?.name || currentUser?.email || "");
             }}
@@ -2743,6 +2989,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                   setRegName(""); 
                   setRegAbbreviation("");
                   setRegDesc(""); 
+                  setRegIsActive(false);
                   setRegAreaIds([]); 
                   setRegEmail(""); 
                   setRegRole(""); 
@@ -2767,7 +3014,19 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest block font-medium">Descrição (Opcional)</label>
                     <textarea rows={4} value={regDesc} onChange={(e) => setRegDesc(e.target.value)} placeholder="Objetivos, metas..." className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-xs font-medium text-slate-700 focus:border-adasa-mid outline-none transition-all placeholder:text-slate-400"></textarea>
                   </div>
-                  <button type="submit" className="w-full py-3.5 mt-2 font-black text-xs text-white bg-adasa-mid hover:bg-adasa-dark rounded-xl transition shadow-md">{editingRegId !== null ? "Salvar Alterações" : "Cadastrar Plano"}</button>
+                  <div className="flex items-center gap-2.5 py-1">
+                    <input 
+                      type="checkbox" 
+                      id="regIsActive" 
+                      checked={regIsActive} 
+                      onChange={(e) => setRegIsActive(e.target.checked)} 
+                      className="w-4 h-4 rounded text-indigo-600 focus:ring-indigo-500 border-slate-300 cursor-pointer transition-all" 
+                    />
+                    <label htmlFor="regIsActive" className="text-xs font-semibold text-slate-700 select-none cursor-pointer">
+                      Marcar como plano ativo atual
+                    </label>
+                  </div>
+                  <button type="submit" className="w-full py-3.5 mt-1 font-black text-xs text-white bg-adasa-mid hover:bg-adasa-dark rounded-xl transition shadow-md">{editingRegId !== null ? "Salvar Alterações" : "Cadastrar Plano"}</button>
                 </form>
               )}
 
@@ -2878,7 +3137,14 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                               <LayoutGrid size={14} />
                             </div>
                             <div className="flex flex-col">
-                              <span className="font-extrabold text-slate-700">{p.name}</span>
+                              <span className="font-extrabold text-slate-700 flex items-center gap-1.5">
+                                {p.name}
+                                {p.isActive && (
+                                  <span className="px-1.5 py-0.5 text-[9px] font-black text-white bg-indigo-600 rounded-md shadow-sm">
+                                    ATIVO
+                                  </span>
+                                )}
+                              </span>
                               {p.description && <span className="text-xs text-slate-400 mt-0.5 line-clamp-1 font-medium">{p.description}</span>}
                             </div>
                           </div>
@@ -2909,7 +3175,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                         </td>
                         <td className="px-5 py-3 align-middle text-right">
                           <div className="flex gap-1 justify-end">
-                             <button onClick={() => { setEditingRegId(p.id); setRegName(p.name); setRegDesc(p.description || ""); setRegUpdatedBy(p.updatedBy || currentUser?.name || currentUser?.email || ""); setIsRegModalOpen(true); }} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Editar"><Edit2 size={16} /></button>
+                             <button onClick={() => { setEditingRegId(p.id); setRegName(p.name); setRegDesc(p.description || ""); setRegIsActive(!!p.isActive); setRegUpdatedBy(p.updatedBy || currentUser?.name || currentUser?.email || ""); setIsRegModalOpen(true); }} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Editar"><Edit2 size={16} /></button>
                              <button onClick={() => handlePlanDelete(p.id)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Excluir"><Trash2 size={16} /></button>
                           </div>
                         </td>
@@ -3205,12 +3471,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
               >
                 <option value="all">Todos os Planos</option>
                 {[...plans]
-                  .sort((a, b) => {
-                    const yearA = parseInt(a.name.match(/\d{4}/)?.[0] || "0", 10);
-                    const yearB = parseInt(b.name.match(/\d{4}/)?.[0] || "0", 10);
-                    if (yearA !== yearB) return yearB - yearA;
-                    return b.id - a.id;
-                  })
+                  .sort(sortByCreatedAt)
                   .map((p) => (
                     <option key={p.id} value={p.id.toString()}>
                       {p.name}
@@ -3580,55 +3841,191 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 pb-12">
-            {/* Chart 1: Status distribution -> takes 5 cols */}
+            {/* Chart 1: Status & Situation distribution -> takes 5 cols */}
             <div className="lg:col-span-5 bg-white border border-slate-200 rounded-[2rem] p-6 shadow-sm flex flex-col justify-between text-left">
-              <div>
-                <dt className="text-xs font-black tracking-widest text-slate-400 uppercase">Visão por Status</dt>
-                <h4 className="text-lg font-black text-slate-800 mt-1">Distribuição de Status</h4>
-                <p className="text-xs font-medium text-slate-500 mt-0.5 leading-snug">Relação percentual das atividades filtradas.</p>
-              </div>
-              <div className="h-64 relative mt-4">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={statusData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={60}
-                      outerRadius={80}
-                      paddingAngle={5}
-                      dataKey="value"
-                    >
-                      {statusData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip content={<CustomStatusTooltip />} cursor={{ fill: 'rgba(2f, 41, 58, 0.04)' }} />
-                  </PieChart>
-                </ResponsiveContainer>
-                {/* Embedded centered label */}
-                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-4 text-center">
-                  <span className="text-3xl font-black text-slate-800 leading-none">{dashboardStats.total}</span>
-                  <span className="text-[9px] font-black tracking-wider text-slate-400 uppercase mt-0.5">Total</span>
+              <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-3 border-b border-slate-100 pb-4">
+                <div>
+                  <dt className="text-xs font-black tracking-widest text-slate-400 uppercase">Status &amp; Situação</dt>
+                  <h4 className="text-lg font-black text-slate-800 mt-1 font-sans">Cruzamento de Prazos</h4>
+                  <p className="text-xs font-medium text-slate-500 mt-0.5 leading-tight">Distribuição conjunta de andamento e criticidade.</p>
+                </div>
+                <div className="flex bg-slate-100 p-1 rounded-xl shrink-0 self-start">
+                  <button
+                    onClick={() => setStatusSituationChartType("nested-donut")}
+                    className={cn(
+                      "px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all",
+                      statusSituationChartType === "nested-donut" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                    )}
+                  >
+                    Rosca Dupla
+                  </button>
+                  <button
+                    onClick={() => setStatusSituationChartType("heatmap")}
+                    className={cn(
+                      "px-2.5 py-1 text-[10px] font-bold rounded-lg transition-all",
+                      statusSituationChartType === "heatmap" ? "bg-white text-indigo-700 shadow-sm" : "text-slate-500 hover:text-slate-700"
+                    )}
+                  >
+                    Mapa Calor
+                  </button>
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-2 mt-4 pt-4 border-t border-slate-100">
-                <div className="text-center">
-                  <div className="inline-block w-2.5 h-2.5 bg-slate-400 rounded-full mb-1"></div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Não Inic.</p>
-                  <p className="text-sm font-black text-slate-700 leading-none mt-0.5">{dashboardStats.pending}</p>
+
+              {statusSituationChartType === "nested-donut" ? (
+                <>
+                  <div className="h-64 relative mt-4">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        {/* Outer Ring: Status */}
+                        <Pie
+                          data={nestedDonutData.outerRing}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={64}
+                          outerRadius={82}
+                          paddingAngle={3}
+                          dataKey="value"
+                        >
+                          {nestedDonutData.outerRing.map((entry, index) => (
+                            <Cell key={`cell-outer-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        {/* Inner Ring: Status & Situation */}
+                        <Pie
+                          data={nestedDonutData.innerRing}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={40}
+                          outerRadius={58}
+                          paddingAngle={2}
+                          dataKey="value"
+                        >
+                          {nestedDonutData.innerRing.map((entry, index) => (
+                            <Cell key={`cell-inner-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip content={<CustomNestedStatusTooltip totalTasks={dashboardStats.total} />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    {/* Embedded centered label */}
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none pb-4 text-center">
+                      <span className="text-3xl font-black text-slate-800 leading-none">{dashboardStats.total}</span>
+                      <span className="text-[9px] font-black tracking-wider text-slate-400 uppercase mt-0.5">Total</span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 mt-4 pt-4 border-t border-slate-100 text-[10px] text-slate-500 font-medium">
+                    <div className="flex justify-between items-center bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+                        <strong className="text-slate-600 font-extrabold">Externa (Status):</strong>
+                        <span>Categorização principal de andamento das tarefas.</span>
+                      </div>
+                    </div>
+                    <div className="flex justify-between items-center bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full bg-red-400"></span>
+                        <strong className="text-slate-600 font-extrabold">Interna (Situação):</strong>
+                        <span>Status cruzado com prazo (No Prazo, Crítica, Atrasada).</span>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <div className="flex flex-col justify-between h-full pt-2">
+                  <div className="overflow-x-auto">
+                    <div className="min-w-[280px] mt-4">
+                      {/* Grid 4 columns: 1 header row, 3 value rows */}
+                      <div className="grid grid-cols-4 gap-1.5 text-center">
+                        {/* Header corner */}
+                        <div className="text-[9px] font-black text-slate-400 uppercase tracking-wider text-left flex items-center pl-1 font-sans">
+                          Status / Prazo
+                        </div>
+                        {heatmapData.cols.map(c => (
+                          <div key={c.key} className="text-[9px] font-black text-slate-500 uppercase tracking-wider py-1 font-sans">
+                            {c.label}
+                          </div>
+                        ))}
+
+                        {/* Rows */}
+                        {heatmapData.rows.map(r => {
+                          let rowColor = "text-slate-700";
+                          if (r.key === "Em andamento") rowColor = "text-blue-700";
+                          else if (r.key === "Concluída") rowColor = "text-emerald-700";
+
+                          return (
+                            <React.Fragment key={r.key}>
+                              <div className={cn("text-[9px] font-bold text-left flex items-center pl-1 font-sans leading-tight", rowColor)}>
+                                {r.label}
+                              </div>
+
+                              {heatmapData.cols.map(c => {
+                                const count = heatmapData.matrix[r.key][c.key];
+                                const hasValue = count > 0;
+                                
+                                let cellStyle = {};
+                                let cellClass = "border border-slate-100 rounded-xl transition-all duration-300 flex flex-col items-center justify-center py-4 relative group cursor-pointer hover:shadow-xs";
+                                
+                                if (hasValue) {
+                                  let rColor = 99, gColor = 102, bColor = 241;
+                                  if (r.key === "Concluída") {
+                                    rColor = 16; gColor = 185; bColor = 129;
+                                  } else if (r.key === "Em andamento") {
+                                    rColor = 59; gColor = 130; bColor = 246;
+                                  } else {
+                                    rColor = 148; gColor = 163; bColor = 184;
+                                  }
+
+                                  if (c.key === "Crítica") {
+                                    rColor = 244; gColor = 63; bColor = 94;
+                                  } else if (c.key === "Atrasada") {
+                                    rColor = 239; gColor = 68; bColor = 68;
+                                  }
+
+                                  const ratio = heatmapData.maxCount > 0 ? count / heatmapData.maxCount : 1;
+                                  const alpha = 0.12 + ratio * 0.78;
+                                  
+                                  cellStyle = {
+                                    backgroundColor: `rgba(${rColor}, ${gColor}, ${bColor}, ${alpha})`,
+                                    color: alpha > 0.45 ? '#ffffff' : `rgba(${Math.max(0, rColor-80)}, ${Math.max(0, gColor-80)}, ${Math.max(0, bColor-80)}, 1)`
+                                  };
+                                  cellClass += " font-black shadow-2xs border-transparent";
+                                } else {
+                                  cellClass += " bg-slate-50 border-dashed text-slate-300 border-slate-200 select-none";
+                                }
+
+                                const percentFromTotal = dashboardStats.total > 0 
+                                  ? ((count / dashboardStats.total) * 100).toFixed(1).replace('.0', '')
+                                  : '0';
+
+                                return (
+                                  <div
+                                    key={`${r.key}-${c.key}`}
+                                    className={cellClass}
+                                    style={cellStyle}
+                                    title={`${r.label} / ${c.label}: ${count} tarefas (${percentFromTotal}% do total)`}
+                                  >
+                                    <span className="text-sm md:text-base leading-none font-extrabold">{count}</span>
+                                    {hasValue && (
+                                      <span className="text-[8px] opacity-80 font-bold mt-0.5 uppercase tracking-tighter">
+                                        {percentFromTotal}%
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </React.Fragment>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="text-[10px] text-slate-400 font-medium leading-normal border-t border-slate-100 pt-3 mt-4 text-center select-none bg-slate-50/50 p-2 rounded-xl">
+                    <strong>Dica:</strong> Tons mais vibrantes mostram maior volume. Prazos <em>Críticos</em> ou <em>Atrasados</em> demandam suporte da equipe.
+                  </div>
                 </div>
-                <div className="text-center">
-                  <div className="inline-block w-2.5 h-2.5 bg-blue-500 rounded-full mb-1"></div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Andamento</p>
-                  <p className="text-sm font-black text-slate-700 leading-none mt-0.5">{dashboardStats.inProgress}</p>
-                </div>
-                <div className="text-center">
-                  <div className="inline-block w-2.5 h-2.5 bg-emerald-500 rounded-full mb-1"></div>
-                  <p className="text-[10px] font-bold text-slate-400 uppercase">Concluído</p>
-                  <p className="text-sm font-black text-slate-700 leading-none mt-0.5">{dashboardStats.completed}</p>
-                </div>
-              </div>
+              )}
             </div>
 
             {/* Chart 2: Average progress per Area -> takes 7 cols */}
@@ -5286,12 +5683,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
               >
                 <option value="all">Todos os Planos</option>
                 {[...plans]
-                  .sort((a, b) => {
-                    const yearA = parseInt(a.name.match(/\d{4}/)?.[0] || "0", 10);
-                    const yearB = parseInt(b.name.match(/\d{4}/)?.[0] || "0", 10);
-                    if (yearA !== yearB) return yearB - yearA;
-                    return b.id - a.id;
-                  })
+                  .sort(sortByCreatedAt)
                   .map((p) => (
                     <option key={p.id} value={p.id.toString()}>
                       {p.name}

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { AppUser, UserRole, ModuleId, ActionType } from '../types';
 
 export const DEFAULT_ROLES: UserRole[] = [
@@ -55,6 +55,7 @@ interface AuthContextType {
   users: AppUser[];
   roles: UserRole[];
   login: (email: string) => void;
+  loginWithCredentials: (email: string, password?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   checkPermission: (moduleId: ModuleId, action: ActionType) => boolean;
   hasRole: (roleId: string) => boolean;
@@ -68,17 +69,66 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [currentUser, setCurrentUser] = useState<AppUser | null>(DEFAULT_USERS[0]); // Auto-login admin for demo
+  const [currentUser, setCurrentUser] = useState<AppUser | null>(() => {
+    const saved = localStorage.getItem("adasa-sgi-user");
+    return saved ? JSON.parse(saved) : null; // Start as null to show login screen
+  });
   const [users, setUsers] = useState<AppUser[]>(DEFAULT_USERS);
   const [roles, setRoles] = useState<UserRole[]>(DEFAULT_ROLES);
 
-  const login = (email: string) => {
-    const user = users.find(u => u.email === email && u.status === 'active');
-    if (user) setCurrentUser(user);
-    else alert('Usuário não encontrado ou inativo.');
+  const fetchUsers = async () => {
+    try {
+      const response = await fetch("/api/users");
+      const resData = await response.json();
+      if (resData.success && Array.isArray(resData.data)) {
+        setUsers(resData.data);
+      }
+    } catch (err) {
+      console.warn("Could not fetch users from database, using client defaults:", err);
+    }
   };
 
-  const logout = () => setCurrentUser(null);
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const loginWithCredentials = async (email: string, password?: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password: password || "1234" })
+      });
+      const data = await response.json();
+      if (data.success && data.user) {
+        setCurrentUser(data.user);
+        localStorage.setItem("adasa-sgi-user", JSON.stringify(data.user));
+        await fetchUsers(); // Refresh users list
+        return { success: true };
+      } else {
+        return { success: false, error: data.error || "Erro na autenticação" };
+      }
+    } catch (err: any) {
+      console.error("Login verification error:", err);
+      // Fallback local authentication for when DB is offline
+      const user = users.find(u => u.email.toLowerCase().trim() === email.toLowerCase().trim() && u.status === 'active');
+      if (user) {
+        setCurrentUser(user);
+        localStorage.setItem("adasa-sgi-user", JSON.stringify(user));
+        return { success: true };
+      }
+      return { success: false, error: "Serviço indisponível e usuário não encontrado localmente." };
+    }
+  };
+
+  const login = (email: string) => {
+    loginWithCredentials(email, "1234");
+  };
+
+  const logout = () => {
+    setCurrentUser(null);
+    localStorage.removeItem("adasa-sgi-user");
+  };
 
   const checkPermission = (moduleId: ModuleId, action: ActionType): boolean => {
     if (!currentUser) return false;
@@ -98,32 +148,85 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return currentUser?.roleId === roleId;
   };
 
-  const addUser = (userData: Omit<AppUser, 'id'>) => {
-    const newUser = { ...userData, id: Date.now().toString() };
-    setUsers(prev => [...prev, newUser]);
+  const addUser = async (userData: Omit<AppUser, 'id'>) => {
+    try {
+      const response = await fetch("/api/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(userData)
+      });
+      const data = await response.json();
+      if (data.success && data.data) {
+        await fetchUsers();
+      } else {
+        // Fallback local
+        const newUser = { ...userData, id: Date.now().toString() };
+        setUsers(prev => [...prev, newUser]);
+      }
+    } catch (err) {
+      console.error("Error creating database user, falling back:", err);
+      const newUser = { ...userData, id: Date.now().toString() };
+      setUsers(prev => [...prev, newUser]);
+    }
   };
 
-  const updateUser = (id: string, updates: Partial<AppUser>) => {
-    setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
+  const updateUser = async (id: string, updates: Partial<AppUser>) => {
+    try {
+      const response = await fetch(`/api/users/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updates)
+      });
+      const data = await response.json();
+      if (data.success) {
+        await fetchUsers();
+        // If updating currently logged in user, apply updates
+        if (currentUser && currentUser.id === id) {
+          const updatedUser = { ...currentUser, ...updates };
+          setCurrentUser(updatedUser);
+          localStorage.setItem("adasa-sgi-user", JSON.stringify(updatedUser));
+        }
+      } else {
+        // Fallback local
+        setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
+      }
+    } catch (err) {
+      console.error("Error updating database user, falling back:", err);
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, ...updates } : u));
+    }
   };
 
-  const deleteUser = (id: string) => {
-    setUsers(prev => prev.filter(u => u.id !== id));
+  const deleteUser = async (id: string) => {
+    try {
+      const response = await fetch(`/api/users/${id}`, {
+        method: "DELETE"
+      });
+      const data = await response.json();
+      if (data.success) {
+        await fetchUsers();
+      } else {
+        // Fallback local
+        setUsers(prev => prev.filter(u => u.id !== id));
+      }
+    } catch (err) {
+      console.error("Error deleting database user, falling back:", err);
+      setUsers(prev => prev.filter(u => u.id !== id));
+    }
   };
 
   const addRole = (roleData: Omit<UserRole, 'id'>) => {
-      const newRole = { ...roleData, id: Date.now().toString() };
-      setRoles(prev => [...prev, newRole]);
-  }
+    const newRole = { ...roleData, id: Date.now().toString() };
+    setRoles(prev => [...prev, newRole]);
+  };
 
   const updateRole = (id: string, updates: Partial<UserRole>) => {
-      setRoles(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
-  }
+    setRoles(prev => prev.map(r => r.id === id ? { ...r, ...updates } : r));
+  };
 
   return (
     <AuthContext.Provider value={{ 
         currentUser, users, roles, 
-        login, logout, checkPermission, hasRole,
+        login, loginWithCredentials, logout, checkPermission, hasRole,
         addUser, updateUser, deleteUser,
         addRole, updateRole
     }}>

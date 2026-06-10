@@ -29,6 +29,7 @@ import {
   AlertTriangle,
   X,
   Droplets,
+  CalendarCheck,
   Save,
   FileText,
   Menu,
@@ -50,7 +51,8 @@ import {
   Users,
   FilePlus,
   BarChart2,
-  GitCompare
+  GitCompare,
+  LogOut
 } from "lucide-react";
 import {
   LineChart,
@@ -89,6 +91,7 @@ import {
 
 import { calculateDemand, formatNumber, formatInteger, cn } from "./lib/utils";
 import { RequirePermission, useAuth } from "./lib/auth";
+import { LoginPage } from "./components/LoginPage";
 import { MapTab } from "./components/MapTab";
 import { PlanningTab } from "./components/PlanningTab";
 import { UserManagementTab } from "./components/UserManagementTab";
@@ -312,7 +315,9 @@ const isSameWb = (itemWbId: number | string | null | undefined, filterWbId: numb
 };
 
 export default function App() {
-  const { currentUser, roles, checkPermission } = useAuth();
+  const { currentUser, roles, checkPermission, logout } = useAuth();
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+
   const [systems, setSystems] = useState<System[]>(() => {
     const saved = localStorage.getItem("adasa-systems");
     return saved ? JSON.parse(saved) : SYSTEMS;
@@ -338,6 +343,8 @@ export default function App() {
     "home",
   );
   const [activePlanningSubTab, setActivePlanningSubTab] = useState<"tasks" | "dashboard" | "plans" | "areas" | "categories" | "responsibles" | "import">("dashboard");
+  const [isMyTasksSelected, setIsMyTasksSelected] = useState(false);
+  const [myTasksFilterTrigger, setMyTasksFilterTrigger] = useState(0);
   const [tasks, setTasks] = useState<Task[]>([]);
   const [plans, setPlans] = useState<any[]>([]);
   const [areas, setAreas] = useState<any[]>([]);
@@ -624,7 +631,16 @@ export default function App() {
       });
       const data = await res.json();
       if (data.success) {
-        showToast("Éxito", isEdit ? "Responsável atualizado com sucesso." : "Responsável cadastrado com sucesso.", "success");
+        if (!isEdit && data.generatedPassword) {
+          setConfirmState({
+            title: "Usuário Criado para o Responsável",
+            message: `O responsável foi cadastrado e integrado com sucesso!\n\nFoi criado um usuário vinculado:\n• Usuário/E-mail: ${editingResponsibleData.email}\n• Senha Padrão de Acesso: ${data.generatedPassword}\n\nPor favor, anote a senha acima para que o responsável consiga realizar o login no sistema.`,
+            type: "alert"
+          });
+          showToast("Sucesso", `Responsável criado! Senha gerada: ${data.generatedPassword}`, "success");
+        } else {
+          showToast("Sucesso", isEdit ? "Responsável atualizado com sucesso." : "Responsável cadastrado com sucesso.", "success");
+        }
         setResponsibleFormOpen(false);
         fetchCloudData();
       } else {
@@ -651,8 +667,10 @@ export default function App() {
   };
 
   useEffect(() => {
-    fetchCloudData();
-  }, []);
+    if (currentUser) {
+      fetchCloudData();
+    }
+  }, [currentUser]);
 
   useEffect(() => {
     if (isDataLoaded && lastSavedStateStr === null) {
@@ -3172,6 +3190,10 @@ const renderSupplyTable = () => {
     setWaterBalances(prev => prev.map(b => isSameWb(b.id, selectedWaterBalanceId) ? { ...b, ...updates } : b));
   };
 
+  if (!currentUser) {
+    return <LoginPage />;
+  }
+
   return (
     <div className="flex flex-col md:flex-row min-h-screen bg-slate-50 text-slate-900 font-sans selection:bg-adasa-light selection:text-adasa-dark">
       {toastMessage && (
@@ -3243,49 +3265,89 @@ const renderSupplyTable = () => {
                 </h4>
                 <div className="space-y-1">
                   <button
-                    onClick={() => { setActivePlanningSubTab("tasks"); handleTabChange("planning"); }}
-                    className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "planning" && activePlanningSubTab === "tasks" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                    onClick={() => {
+                      setIsMyTasksSelected(true);
+                      setMyTasksFilterTrigger(prev => prev + 1);
+                      setActivePlanningSubTab("tasks");
+                      handleTabChange("planning");
+                    }}
+                    className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "planning" && activePlanningSubTab === "tasks" && isMyTasksSelected ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
                   >
-                    <ListTodo size={20} className={activeTab === "planning" && activePlanningSubTab === "tasks" ? "text-adasa-mid" : "text-white/60"} />
+                    <CalendarCheck size={20} className={activeTab === "planning" && activePlanningSubTab === "tasks" && isMyTasksSelected ? "text-adasa-mid" : "text-white/60"} />
+                    Minhas Tarefas
+                  </button>
+                  <button
+                    onClick={() => {
+                      setIsMyTasksSelected(false);
+                      setActivePlanningSubTab("tasks");
+                      handleTabChange("planning");
+                    }}
+                    className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "planning" && activePlanningSubTab === "tasks" && !isMyTasksSelected ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                  >
+                    <ListTodo size={20} className={activeTab === "planning" && activePlanningSubTab === "tasks" && !isMyTasksSelected ? "text-adasa-mid" : "text-white/60"} />
                     Cadastrar Atividades
                   </button>
                   <button
-                    onClick={() => { setActivePlanningSubTab("dashboard"); handleTabChange("planning"); }}
+                    onClick={() => {
+                      setIsMyTasksSelected(false);
+                      setActivePlanningSubTab("dashboard");
+                      handleTabChange("planning");
+                    }}
                     className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "planning" && activePlanningSubTab === "dashboard" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
                   >
                     <LayoutDashboard size={20} className={activeTab === "planning" && activePlanningSubTab === "dashboard" ? "text-adasa-mid" : "text-white/60"} />
                     Painel de Atividades
                   </button>
                   <button
-                    onClick={() => { setActivePlanningSubTab("plans"); handleTabChange("planning"); }}
+                    onClick={() => {
+                      setIsMyTasksSelected(false);
+                      setActivePlanningSubTab("plans");
+                      handleTabChange("planning");
+                    }}
                     className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "planning" && activePlanningSubTab === "plans" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
                   >
                     <MapIcon size={20} className={activeTab === "planning" && activePlanningSubTab === "plans" ? "text-adasa-mid" : "text-white/60"} />
                     Cadastrar Planos
                   </button>
                   <button
-                    onClick={() => { setActivePlanningSubTab("areas"); handleTabChange("planning"); }}
+                    onClick={() => {
+                      setIsMyTasksSelected(false);
+                      setActivePlanningSubTab("areas");
+                      handleTabChange("planning");
+                    }}
                     className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "planning" && activePlanningSubTab === "areas" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
                   >
                     <Layers size={20} className={activeTab === "planning" && activePlanningSubTab === "areas" ? "text-adasa-mid" : "text-white/60"} />
                     Cadastrar Áreas Temáticas
                   </button>
                   <button
-                    onClick={() => { setActivePlanningSubTab("categories"); handleTabChange("planning"); }}
+                    onClick={() => {
+                      setIsMyTasksSelected(false);
+                      setActivePlanningSubTab("categories");
+                      handleTabChange("planning");
+                    }}
                     className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "planning" && activePlanningSubTab === "categories" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
                   >
                     <Tags size={20} className={activeTab === "planning" && activePlanningSubTab === "categories" ? "text-adasa-mid" : "text-white/60"} />
                     Cadastrar Categorias
                   </button>
                   <button
-                    onClick={() => { setActivePlanningSubTab("responsibles"); handleTabChange("planning"); }}
+                    onClick={() => {
+                      setIsMyTasksSelected(false);
+                      setActivePlanningSubTab("responsibles");
+                      handleTabChange("planning");
+                    }}
                     className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "planning" && activePlanningSubTab === "responsibles" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
                   >
                     <Users size={20} className={activeTab === "planning" && activePlanningSubTab === "responsibles" ? "text-adasa-mid" : "text-white/60"} />
                     Cadastrar Responsáveis
                   </button>
                   <button
-                    onClick={() => { setActivePlanningSubTab("import"); handleTabChange("planning"); }}
+                    onClick={() => {
+                      setIsMyTasksSelected(false);
+                      setActivePlanningSubTab("import");
+                      handleTabChange("planning");
+                    }}
                     className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "planning" && activePlanningSubTab === "import" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
                   >
                     <Upload size={20} className={activeTab === "planning" && activePlanningSubTab === "import" ? "text-adasa-mid" : "text-white/60"} />
@@ -3351,6 +3413,19 @@ const renderSupplyTable = () => {
                   </div>
                 </div>
               </RequirePermission>
+
+              <div className="border-t border-white/10 pt-4 mt-4 shrink-0">
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    logout();
+                  }}
+                  className="w-full px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-bold text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                >
+                  <LogOut size={20} className="text-rose-400" />
+                  Sair do sistema
+                </button>
+              </div>
             </nav>
           </motion.div>
         )}
@@ -3418,11 +3493,39 @@ const renderSupplyTable = () => {
             )}
             <div className="space-y-1">
               <button
-                title={isSidebarCollapsed ? "Cadastrar Atividades" : undefined}
-                onClick={() => { setActivePlanningSubTab("tasks"); handleTabChange("planning"); }}
+                title={isSidebarCollapsed ? "Minhas Tarefas" : undefined}
+                onClick={() => {
+                  setIsMyTasksSelected(true);
+                  setMyTasksFilterTrigger(prev => prev + 1);
+                  setActivePlanningSubTab("tasks");
+                  handleTabChange("planning");
+                }}
                 className={cn(
                   "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
-                  activeTab === "planning" && activePlanningSubTab === "tasks"
+                  activeTab === "planning" && activePlanningSubTab === "tasks" && isMyTasksSelected
+                    ? "bg-white/10 text-white shadow-sm border border-white/10"
+                    : "text-white/60 hover:text-white hover:bg-white/5",
+                )}
+              >
+                <CalendarCheck
+                  size={16}
+                  className={cn(
+                    "flex-shrink-0 transition-colors",
+                    activeTab === "planning" && activePlanningSubTab === "tasks" && isMyTasksSelected ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                  )}
+                />
+                {!isSidebarCollapsed && <span className="hidden md:inline">Minhas Tarefas</span>}
+              </button>
+              <button
+                title={isSidebarCollapsed ? "Cadastrar Atividades" : undefined}
+                onClick={() => {
+                  setIsMyTasksSelected(false);
+                  setActivePlanningSubTab("tasks");
+                  handleTabChange("planning");
+                }}
+                className={cn(
+                  "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                  activeTab === "planning" && activePlanningSubTab === "tasks" && !isMyTasksSelected
                     ? "bg-white/10 text-white shadow-sm border border-white/10"
                     : "text-white/60 hover:text-white hover:bg-white/5",
                 )}
@@ -3431,14 +3534,18 @@ const renderSupplyTable = () => {
                   size={16}
                   className={cn(
                     "flex-shrink-0 transition-colors",
-                    activeTab === "planning" && activePlanningSubTab === "tasks" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    activeTab === "planning" && activePlanningSubTab === "tasks" && !isMyTasksSelected ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
                   )}
                 />
                 {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Atividades</span>}
               </button>
               <button
                 title={isSidebarCollapsed ? "Painel de Atividades" : undefined}
-                onClick={() => { setActivePlanningSubTab("dashboard"); handleTabChange("planning"); }}
+                onClick={() => {
+                  setIsMyTasksSelected(false);
+                  setActivePlanningSubTab("dashboard");
+                  handleTabChange("planning");
+                }}
                 className={cn(
                   "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
                   activeTab === "planning" && activePlanningSubTab === "dashboard"
@@ -3457,7 +3564,11 @@ const renderSupplyTable = () => {
               </button>
               <button
                 title={isSidebarCollapsed ? "Cadastrar Planos" : undefined}
-                onClick={() => { setActivePlanningSubTab("plans"); handleTabChange("planning"); }}
+                onClick={() => {
+                  setIsMyTasksSelected(false);
+                  setActivePlanningSubTab("plans");
+                  handleTabChange("planning");
+                }}
                 className={cn(
                   "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
                   activeTab === "planning" && activePlanningSubTab === "plans"
@@ -3476,7 +3587,11 @@ const renderSupplyTable = () => {
               </button>
               <button
                 title={isSidebarCollapsed ? "Cadastrar Áreas Temáticas" : undefined}
-                onClick={() => { setActivePlanningSubTab("areas"); handleTabChange("planning"); }}
+                onClick={() => {
+                  setIsMyTasksSelected(false);
+                  setActivePlanningSubTab("areas");
+                  handleTabChange("planning");
+                }}
                 className={cn(
                   "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
                   activeTab === "planning" && activePlanningSubTab === "areas"
@@ -3495,7 +3610,11 @@ const renderSupplyTable = () => {
               </button>
               <button
                 title={isSidebarCollapsed ? "Cadastrar Categorias" : undefined}
-                onClick={() => { setActivePlanningSubTab("categories"); handleTabChange("planning"); }}
+                onClick={() => {
+                  setIsMyTasksSelected(false);
+                  setActivePlanningSubTab("categories");
+                  handleTabChange("planning");
+                }}
                 className={cn(
                   "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
                   activeTab === "planning" && activePlanningSubTab === "categories"
@@ -3514,7 +3633,11 @@ const renderSupplyTable = () => {
               </button>
               <button
                 title={isSidebarCollapsed ? "Cadastrar Responsáveis" : undefined}
-                onClick={() => { setActivePlanningSubTab("responsibles"); handleTabChange("planning"); }}
+                onClick={() => {
+                  setIsMyTasksSelected(false);
+                  setActivePlanningSubTab("responsibles");
+                  handleTabChange("planning");
+                }}
                 className={cn(
                   "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
                   activeTab === "planning" && activePlanningSubTab === "responsibles"
@@ -3533,7 +3656,11 @@ const renderSupplyTable = () => {
               </button>
               <button
                 title={isSidebarCollapsed ? "Importar Tarefas" : undefined}
-                onClick={() => { setActivePlanningSubTab("import"); handleTabChange("planning"); }}
+                onClick={() => {
+                  setIsMyTasksSelected(false);
+                  setActivePlanningSubTab("import");
+                  handleTabChange("planning");
+                }}
                 className={cn(
                   "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
                   activeTab === "planning" && activePlanningSubTab === "import"
@@ -3691,11 +3818,12 @@ const renderSupplyTable = () => {
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col p-4 md:p-8 gap-6 overflow-y-auto w-full max-w-full">
-        {activeTab !== "home" && (
-          <header className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-2">
-            <div>
-              <h1 className="text-3xl font-black text-slate-900 tracking-tighter leading-none mb-2">
-                {activeTab === "compare"
+        <header className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-2">
+          <div>
+            <h1 className="text-3xl font-black text-slate-900 tracking-tighter leading-none mb-2">
+              {activeTab === "home"
+                ? "Página Inicial"
+                : activeTab === "compare"
                 ? "Comparar Balanços"
                 : activeTab === "analyze"
                   ? "Análise de Balanço Hídrico"
@@ -3710,39 +3838,78 @@ const renderSupplyTable = () => {
                          activePlanningSubTab === "areas" ? "Cadastrar Áreas Temáticas" : 
                          activePlanningSubTab === "categories" ? "Cadastrar Categorias" :
                          activePlanningSubTab === "responsibles" ? "Cadastrar Responsáveis" : "Importar Tarefas")
-                      : "Cadastrar Balanço"}
+                       : "Cadastrar Balanço"}
             </h1>
             <p className="text-slate-500 text-sm font-medium">
-              {activeTab === "compare"
-                ? "Compare e analise a evolução da demanda e balanço."
-                : activeTab === "analyze"
-                  ? "Visualize de forma isolada as projeções de oferta e demanda ao longo do tempo."
-                  : activeTab === "templates"
-                    ? "Gerencie e baixe os arquivos modelo para importação no sistema."
-                    : activeTab === "users"
-                      ? "Gerencie as contas de usuários, papéis e níveis de acesso (RBAC)."
-                    : activeTab === "planning"
-                      ? "Gerencie o cronograma consolidado, planos, áreas e status de execução."
-                      : "Gerencie os balanços hídricos e cadastre novas informações."}
+              {activeTab === "home"
+                ? "Selecione um módulo abaixo para iniciar o trabalho ou visualizar relatórios."
+                : activeTab === "compare"
+                  ? "Compare e analise a evolução da demanda e balanço."
+                  : activeTab === "analyze"
+                    ? "Visualize de forma isolada as projeções de oferta e demanda ao longo do tempo."
+                    : activeTab === "templates"
+                      ? "Gerencie e baixe os arquivos modelo para importação no sistema."
+                      : activeTab === "users"
+                        ? "Gerencie as contas de usuários, papéis e níveis de acesso (RBAC)."
+                      : activeTab === "planning"
+                        ? "Gerencie o cronograma consolidado, planos, áreas e status de execução."
+                        : "Gerencie os balanços hídricos e cadastre novas informações."}
             </p>
           </div>
           <div className="flex flex-col md:flex-row items-center gap-3">
-            <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-2xl border border-slate-200 shadow-sm transition-all hover:border-adasa-mid hidden md:flex">
-              <div className="text-right">
-                <p className="text-xs font-black text-adasa-dark leading-none">
-                  {currentUser?.name || "Usuário não logado"}
-                </p>
-                <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-wider font-bold">
-                  {currentUser?.agency ? `${roles.find(r => r.id === currentUser.roleId)?.name || 'N/A'} - ${currentUser.agency}` : roles.find(r => r.id === currentUser?.roleId)?.name || 'N/A'}
-                </p>
-              </div>
-              <div className="w-10 h-10 bg-adasa-light/10 rounded-xl flex items-center justify-center text-adasa-dark font-black text-sm shadow-inner">
-                {currentUser?.name ? currentUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : '?'}
-              </div>
+            <div className="relative z-50 hidden md:block">
+              <button 
+                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                className="flex items-center gap-3 bg-white px-4 py-2 rounded-2xl border border-slate-200 shadow-sm transition-all hover:border-adasa-mid hover:bg-slate-50 cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-adasa-mid/20"
+              >
+                <div className="text-right">
+                  <p className="text-xs font-black text-adasa-dark leading-none">
+                    {currentUser?.name || "Usuário não logado"}
+                  </p>
+                  <p className="text-[10px] text-slate-500 mt-1 uppercase tracking-wider font-semibold">
+                    {currentUser?.agency ? `${roles.find(r => r.id === currentUser.roleId)?.name || 'N/A'} - ${currentUser.agency}` : roles.find(r => r.id === currentUser?.roleId)?.name || 'N/A'}
+                  </p>
+                </div>
+                <div className="w-10 h-10 bg-adasa-light/10 rounded-xl flex items-center justify-center text-adasa-dark font-black text-sm shadow-inner shrink-0 leading-none">
+                  {currentUser?.name ? currentUser.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : '?'}
+                </div>
+                <ChevronDown size={14} className={cn("text-slate-400 transition-transform duration-200", userMenuOpen && "transform rotate-180")} />
+              </button>
+
+              <AnimatePresence>
+                {userMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setUserMenuOpen(false)} />
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 mt-2 w-56 bg-white rounded-2xl border border-slate-200 shadow-xl py-2 z-50"
+                    >
+                      <div className="px-4 py-2 border-b border-slate-100">
+                        <p className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Logado como</p>
+                        <p className="text-xs font-bold text-slate-800 truncate mt-0.5">{currentUser?.email}</p>
+                      </div>
+                      <div className="p-1">
+                        <button
+                          onClick={() => {
+                            setUserMenuOpen(false);
+                            logout();
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 text-rose-600 hover:bg-rose-50 rounded-xl text-xs font-bold transition-colors text-left"
+                        >
+                          <LogOut size={14} className="text-rose-500" />
+                          Sair do sistema
+                        </button>
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
             </div>
           </div>
         </header>
-        )}
 
         <AnimatePresence mode="wait">
           {activeTab === "home" ? (
@@ -7042,6 +7209,7 @@ const renderSupplyTable = () => {
                 showToast={showToast}
                 activeSubTab={activePlanningSubTab}
                 setConfirmState={setConfirmState}
+                myTasksFilterTrigger={myTasksFilterTrigger}
               />
             </motion.div>
           ) : null}

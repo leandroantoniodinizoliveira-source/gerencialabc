@@ -11,7 +11,8 @@ import {
   Users, 
   Tags, 
   ClipboardList,
-  BarChart3
+  BarChart3,
+  CalendarCheck
 } from "lucide-react";
 import { motion } from "motion/react";
 import { Task, Area } from "../types";
@@ -21,6 +22,7 @@ interface HomeTabProps {
   setActivePlanningSubTab: (subTab: "tasks" | "dashboard" | "plans" | "areas" | "categories" | "responsibles") => void;
   tasks: Task[];
   areas: Area[];
+  onMyTasksSelect?: () => void;
 }
 
 const normalizeStatus = (status: string | undefined): "Não iniciada" | "Em andamento" | "Concluída" => {
@@ -31,7 +33,7 @@ const normalizeStatus = (status: string | undefined): "Não iniciada" | "Em anda
   return "Não iniciada";
 };
 
-export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas }: HomeTabProps) {
+export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas, onMyTasksSelect }: HomeTabProps) {
   
   // Quick navigation helper to switch tab + subtab
   const navigateToPlanning = (subTab: "tasks" | "dashboard" | "plans" | "areas" | "categories" | "responsibles") => {
@@ -65,7 +67,7 @@ export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas }:
       </div>
 
       {/* Module Group 1: Planejamento e Plano de Trabalho */}
-      <section className="space-y-4">
+      <section className="space-y-6">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
             <div className="p-1 px-2.5 bg-amber-50 text-amber-700 rounded-lg text-xs font-black uppercase tracking-wider">
@@ -75,14 +77,33 @@ export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas }:
           </div>
         </div>
 
-        {/* Master Card & Direct Fast Shortcuts Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          
-          {/* Main Workplan Card - taking 5 cols */}
+        {/* Master Row with two major cards: Minhas Tarefas on the left, Painel de Monitoramento on the right */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Minhas Tarefas Card */}
+          <motion.div 
+            whileHover={{ y: -2 }}
+            onClick={onMyTasksSelect}
+            className="p-6 rounded-2xl border border-amber-200 bg-gradient-to-br from-white to-amber-50/20 shadow-sm cursor-pointer hover:shadow-md transition-all duration-300 flex flex-col justify-between group"
+          >
+            <div>
+              <div className="mb-4 p-3 rounded-xl bg-amber-50 text-amber-600 w-max border border-amber-100 group-hover:bg-amber-100 transition-colors">
+                <CalendarCheck size={24} />
+              </div>
+              <h3 className="text-lg font-black text-slate-800 leading-tight mb-2">Minhas Tarefas</h3>
+              <p className="text-slate-600 text-xs font-medium leading-relaxed mb-6">
+                Veja as atividades atribuídas diretamente a você no plano ativo de tarefas. Monitore seus prazos, entregas pendentes e atualize seus progressos de forma simplificada.
+              </p>
+            </div>
+            <div className="mt-auto flex items-center gap-2 text-xs font-bold text-amber-700">
+              Ir para Minhas Tarefas <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
+            </div>
+          </motion.div>
+
+          {/* Painel de Monitoramento Card */}
           <motion.div 
             whileHover={{ y: -2 }}
             onClick={() => navigateToPlanning("dashboard")}
-            className="lg:col-span-5 p-6 rounded-2xl border border-amber-200 bg-gradient-to-br from-white to-amber-50/20 shadow-sm cursor-pointer hover:shadow-md transition-all duration-300 flex flex-col justify-between group"
+            className="p-6 rounded-2xl border border-amber-200 bg-gradient-to-br from-white to-amber-50/20 shadow-sm cursor-pointer hover:shadow-md transition-all duration-300 flex flex-col justify-between group"
           >
             <div>
               <div className="mb-4 p-3 rounded-xl bg-amber-50 text-amber-600 w-max border border-amber-100 group-hover:bg-amber-100 transition-colors">
@@ -97,95 +118,95 @@ export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas }:
               Abrir Painel de Atividades <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
             </div>
           </motion.div>
+        </div>
 
-          {/* Quick Shortcuts Sub-grid list - taking 7 cols */}
-          <div className="lg:col-span-7 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            
-            {/* Shortcut A: Painel de Atividades */}
-            <div 
-              onClick={() => navigateToPlanning("dashboard")}
-              className="p-4 bg-white border border-slate-200 hover:border-amber-300 rounded-xl cursor-pointer group transition-all duration-200 flex items-start gap-3"
-            >
-              <div className="p-2 bg-slate-50 text-slate-600 rounded-lg group-hover:bg-amber-50 group-hover:text-amber-600 transition-colors mt-0.5">
-                <BarChart3 size={18} />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-800 group-hover:text-amber-800 transition-colors">Painel de Atividades</h4>
-                <p className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">Gráficos de progresso, relatórios sintéticos e métricas unificadas.</p>
-              </div>
+        {/* Shortcuts Sub-grid list: remaining 6 elements positioned in 2 columns of 3 items */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
+          {/* Shortcut A: Painel de Atividades */}
+          <div 
+            onClick={() => navigateToPlanning("dashboard")}
+            className="p-4 bg-white border border-slate-200 hover:border-amber-300 rounded-xl cursor-pointer group transition-all duration-200 flex items-start gap-3"
+          >
+            <div className="p-2 bg-slate-50 text-slate-600 rounded-lg group-hover:bg-amber-50 group-hover:text-amber-600 transition-colors mt-0.5">
+              <BarChart3 size={18} />
             </div>
-
-            {/* Shortcut B: Atividades e Tarefas */}
-            <div 
-              onClick={() => navigateToPlanning("tasks")}
-              className="p-4 bg-white border border-slate-200 hover:border-amber-300 rounded-xl cursor-pointer group transition-all duration-200 flex items-start gap-3"
-            >
-              <div className="p-2 bg-slate-50 text-slate-600 rounded-lg group-hover:bg-amber-50 group-hover:text-amber-600 transition-colors mt-0.5">
-                <ListTodo size={18} />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-800 group-hover:text-amber-800 transition-colors">Atividades & Tarefas</h4>
-                <p className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">Cadastrar, gerenciar e editar tarefas e cronogramas detalhados.</p>
-              </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-800 group-hover:text-amber-800 transition-colors">Painel de Atividades</h4>
+              <p className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">Gráficos de progresso, relatórios sintéticos e métricas unificadas.</p>
             </div>
-
-            {/* Shortcut C: Planos de Trabalho */}
-            <div 
-              onClick={() => navigateToPlanning("plans")}
-              className="p-4 bg-white border border-slate-200 hover:border-amber-300 rounded-xl cursor-pointer group transition-all duration-200 flex items-start gap-3"
-            >
-              <div className="p-2 bg-slate-50 text-slate-600 rounded-lg group-hover:bg-amber-50 group-hover:text-amber-600 transition-colors mt-0.5">
-                <ClipboardList size={18} />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-800 group-hover:text-amber-800 transition-colors">Planos de Trabalho</h4>
-                <p className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">Configurar macrometas e planos estratégicos estruturados.</p>
-              </div>
-            </div>
-
-            {/* Shortcut D: Areas Tematicas */}
-            <div 
-              onClick={() => navigateToPlanning("areas")}
-              className="p-4 bg-white border border-slate-200 hover:border-amber-300 rounded-xl cursor-pointer group transition-all duration-200 flex items-start gap-3"
-            >
-              <div className="p-2 bg-slate-50 text-slate-600 rounded-lg group-hover:bg-amber-50 group-hover:text-amber-600 transition-colors mt-0.5">
-                <BookmarkCheck size={18} />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-800 group-hover:text-amber-800 transition-colors">Áreas Temáticas</h4>
-                <p className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">Gerenciar áreas de atuação, siglas e descrições temáticas.</p>
-              </div>
-            </div>
-
-            {/* Shortcut E: Categorias */}
-            <div 
-              onClick={() => navigateToPlanning("categories")}
-              className="p-4 bg-white border border-slate-200 hover:border-amber-300 rounded-xl cursor-pointer group transition-all duration-200 flex items-start gap-3"
-            >
-              <div className="p-2 bg-slate-50 text-slate-600 rounded-lg group-hover:bg-amber-50 group-hover:text-amber-600 transition-colors mt-0.5">
-                <Tags size={18} />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-800 group-hover:text-amber-800 transition-colors">Categorias de Tarefas</h4>
-                <p className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">Categorizar as atividades para rotular e analisar relatórios.</p>
-              </div>
-            </div>
-
-            {/* Shortcut F: Responsáveis */}
-            <div 
-              onClick={() => navigateToPlanning("responsibles")}
-              className="p-4 bg-white border border-slate-200 hover:border-amber-300 rounded-xl cursor-pointer group transition-all duration-200 flex items-start gap-3"
-            >
-              <div className="p-2 bg-slate-50 text-slate-600 rounded-lg group-hover:bg-amber-50 group-hover:text-amber-600 transition-colors mt-0.5">
-                <Users size={18} />
-              </div>
-              <div>
-                <h4 className="text-xs font-bold text-slate-800 group-hover:text-amber-800 transition-colors">Atribuição de Responsáveis</h4>
-                <p className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">Cadastrar membros da equipe, cargos e e-mails de acompanhamento.</p>
-              </div>
-            </div>
-
           </div>
+
+          {/* Shortcut B: Atividades e Tarefas */}
+          <div 
+            onClick={() => navigateToPlanning("tasks")}
+            className="p-4 bg-white border border-slate-200 hover:border-amber-300 rounded-xl cursor-pointer group transition-all duration-200 flex items-start gap-3"
+          >
+            <div className="p-2 bg-slate-50 text-slate-600 rounded-lg group-hover:bg-amber-50 group-hover:text-amber-600 transition-colors mt-0.5">
+              <ListTodo size={18} />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-800 group-hover:text-amber-800 transition-colors">Atividades & Tarefas</h4>
+              <p className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">Cadastrar, gerenciar e editar tarefas e cronogramas detalhados.</p>
+            </div>
+          </div>
+
+          {/* Shortcut C: Planos de Trabalho */}
+          <div 
+            onClick={() => navigateToPlanning("plans")}
+            className="p-4 bg-white border border-slate-200 hover:border-amber-300 rounded-xl cursor-pointer group transition-all duration-200 flex items-start gap-3"
+          >
+            <div className="p-2 bg-slate-50 text-slate-600 rounded-lg group-hover:bg-amber-50 group-hover:text-amber-600 transition-colors mt-0.5">
+              <ClipboardList size={18} />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-800 group-hover:text-amber-800 transition-colors">Planos de Trabalho</h4>
+              <p className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">Configurar macrometas e planos estratégicos estruturados.</p>
+            </div>
+          </div>
+
+          {/* Shortcut D: Areas Tematicas */}
+          <div 
+            onClick={() => navigateToPlanning("areas")}
+            className="p-4 bg-white border border-slate-200 hover:border-amber-300 rounded-xl cursor-pointer group transition-all duration-200 flex items-start gap-3"
+          >
+            <div className="p-2 bg-slate-50 text-slate-600 rounded-lg group-hover:bg-amber-50 group-hover:text-amber-600 transition-colors mt-0.5">
+              <BookmarkCheck size={18} />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-800 group-hover:text-amber-800 transition-colors">Áreas Temáticas</h4>
+              <p className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">Gerenciar áreas de atuação, siglas e descrições temáticas.</p>
+            </div>
+          </div>
+
+          {/* Shortcut E: Categorias */}
+          <div 
+            onClick={() => navigateToPlanning("categories")}
+            className="p-4 bg-white border border-slate-200 hover:border-amber-300 rounded-xl cursor-pointer group transition-all duration-200 flex items-start gap-3"
+          >
+            <div className="p-2 bg-slate-50 text-slate-600 rounded-lg group-hover:bg-amber-50 group-hover:text-amber-600 transition-colors mt-0.5">
+              <Tags size={18} />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-800 group-hover:text-amber-800 transition-colors">Categorias de Tarefas</h4>
+              <p className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">Categorizar as atividades para rotular e analisar relatórios.</p>
+            </div>
+          </div>
+
+          {/* Shortcut F: Responsáveis */}
+          <div 
+            onClick={() => navigateToPlanning("responsibles")}
+            className="p-4 bg-white border border-slate-200 hover:border-amber-300 rounded-xl cursor-pointer group transition-all duration-200 flex items-start gap-3"
+          >
+            <div className="p-2 bg-slate-50 text-slate-600 rounded-lg group-hover:bg-amber-50 group-hover:text-amber-600 transition-colors mt-0.5">
+              <Users size={18} />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-800 group-hover:text-amber-800 transition-colors">Atribuição de Responsáveis</h4>
+              <p className="text-[11px] text-slate-500 font-medium leading-tight mt-0.5">Cadastrar membros da equipe, cargos e e-mails de acompanhamento.</p>
+            </div>
+          </div>
+
         </div>
       </section>
 

@@ -158,6 +158,7 @@ export interface Plan {
   id: number;
   name: string;
   description: string;
+  isActive?: boolean;
   createdAt?: string | null;
   createdBy?: string | null;
   updatedAt?: string | null;
@@ -194,5 +195,6 @@ export interface Responsible {
   createdBy?: string | null;
   updatedAt?: string | null;
   updatedBy?: string | null;
+  userId?: number | null;
 }
 
