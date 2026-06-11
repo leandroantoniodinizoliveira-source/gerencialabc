@@ -25,14 +25,6 @@ interface HomeTabProps {
   onMyTasksSelect?: () => void;
 }
 
-const normalizeStatus = (status: string | undefined): "Não iniciada" | "Em andamento" | "Concluída" => {
-  if (!status) return "Não iniciada";
-  const s = status.toLowerCase().trim();
-  if (s === "concluída" || s === "concluído" || s === "completed") return "Concluída";
-  if (s === "em andamento" || s === "in_progress" || s === "in progress") return "Em andamento";
-  return "Não iniciada";
-};
-
 export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas, onMyTasksSelect }: HomeTabProps) {
   
   // Quick navigation helper to switch tab + subtab
@@ -40,10 +32,6 @@ export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas, o
     setActivePlanningSubTab(subTab);
     setActiveTab("planning");
   };
-
-  // Count highlights for metadata badges next to headings
-  const totalTasks = tasks.length;
-  const completedTasks = tasks.filter(t => normalizeStatus(t.status) === "Concluída").length;
 
   return (
     <div className="space-y-10 max-w-5xl mx-auto pb-16">

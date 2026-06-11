@@ -1,9 +1,7 @@
 import React from "react";
 import { 
-  Droplets, 
   ArrowRight, 
   FolderKanban, 
-  BarChart2, 
   TrendingUp,
   FileText
 } from "lucide-react";

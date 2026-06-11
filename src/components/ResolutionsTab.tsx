@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useState, useEffect } from "react";
-import { Plus, Edit2, Trash2, ArrowUpRight, Search, Filter, X, Upload, CheckCircle2, ChevronDown, ChevronUp, AlertCircle, FileSpreadsheet } from "lucide-react";
+import { Plus, Edit2, Trash2, ArrowUpRight, Search, X, Upload, CheckCircle2, ChevronDown, ChevronUp, FileSpreadsheet } from "lucide-react";
 
 interface Resolution {
   id: number;
@@ -157,7 +157,7 @@ export function ResolutionsTab({ showToast, currentUser }: ResolutionsTabProps) 
       } else {
         showToast(json.error || "Ocorreu um erro ao salvar.", "error");
       }
-    } catch (error: any) {
+    } catch {
       showToast("Não foi possível salvar o registro.", "error");
     }
   };
@@ -173,7 +173,7 @@ export function ResolutionsTab({ showToast, currentUser }: ResolutionsTabProps) 
       } else {
         showToast(json.error || "Erro ao excluir resolução.", "error");
       }
-    } catch (error: any) {
+    } catch {
       showToast("Não foi possível excluir a resolução.", "error");
     }
   };
@@ -202,7 +202,7 @@ export function ResolutionsTab({ showToast, currentUser }: ResolutionsTabProps) 
       } else {
         showToast(json.error || "Erro ao importar registros.", "error");
       }
-    } catch (error: any) {
+    } catch {
       showToast("Falha na importação dos dados.", "error");
     } finally {
       setIsImporting(false);

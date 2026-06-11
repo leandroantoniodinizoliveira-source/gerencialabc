@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { ResponsiveContainer, ComposedChart, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, CartesianGrid, Legend, LineChart, Line, LabelList } from "recharts";
-import { FileText, CheckCircle2, AlertTriangle, HelpCircle, Activity, BookmarkCheck, LayoutGrid, Calendar, Clock, History, Search, ArrowUpDown, Filter, ExternalLink, Share2 } from "lucide-react";
+import { ResponsiveContainer, ComposedChart, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, CartesianGrid, Line, LabelList } from "recharts";
+import { FileText, CheckCircle2, AlertTriangle, HelpCircle, Activity, BookmarkCheck, Calendar, History, Search, ArrowUpDown, Filter, ExternalLink, Share2 } from "lucide-react";
 
 interface Resolution {
   id: number;
@@ -43,7 +43,7 @@ export function ResolutionsDashboard({ showToast }: ResolutionsDashboardProps) {
         } else {
           showToast(json.error || "Erro ao carregar dados do painel.", "error");
         }
-      } catch (err: any) {
+      } catch {
         showToast("Erro ao estabelecer conexão para carregar dados do painel.", "error");
       } finally {
         setIsLoading(false);
@@ -70,10 +70,6 @@ export function ResolutionsDashboard({ showToast }: ResolutionsDashboardProps) {
       yearMap[r.ano] = (yearMap[r.ano] || 0) + 1;
     }
   });
-  const yearData = Object.keys(yearMap)
-    .map(yr => ({ year: yr, count: yearMap[parseInt(yr)] }))
-    .sort((a, b) => parseInt(a.year) - parseInt(b.year));
-
   // 1a. Data by Year with Accumulated Quantity
   const sortedYearsForAccum = Object.keys(yearMap)
     .map(Number)
@@ -155,18 +151,6 @@ export function ResolutionsDashboard({ showToast }: ResolutionsDashboardProps) {
     .map(seg => ({ name: seg, count: segmentMap[seg] }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 10); // top 10
-
-  // 4. Data by Type (Pie chart)
-  const typeMap: { [key: string]: number } = {};
-  resolutions.forEach(r => {
-    const tp = r.tipo || "Principal";
-    typeMap[tp] = (typeMap[tp] || 0) + 1;
-  });
-  const typeData = Object.keys(typeMap).map(tp => ({
-    name: tp,
-    value: typeMap[tp],
-    color: tp === "Principal" ? "#6366f1" : "#a855f7"
-  }));
 
   // Timeline calculations
   const filteredResolutions = resolutions.filter(res => {

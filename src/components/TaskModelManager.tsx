@@ -3,20 +3,12 @@ import {
   Plus, 
   Trash2, 
   Edit, 
-  Calendar, 
-  Layers, 
-  Tags, 
-  Users, 
   Check, 
   X, 
-  Briefcase, 
-  Copy, 
-  TrendingUp, 
-  Clock,
-  ArrowUpDown
+  Copy
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
-import { Task, Plan, Area, Category, Responsible } from "../types";
+import { Task, Plan } from "../types";
 
 interface TaskModelItem {
   id?: number;
@@ -49,9 +41,6 @@ export const TaskModelManager: React.FC<TaskModelManagerProps> = ({
 }) => {
   const [models, setModels] = useState<TaskModel[]>([]);
   const [selectedModel, setSelectedModel] = useState<TaskModel | null>(null);
-  const [areas, setAreas] = useState<Area[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [responsibles, setResponsibles] = useState<Responsible[]>([]);
   
   // Loading state
   const [loading, setLoading] = useState(false);
@@ -91,21 +80,6 @@ export const TaskModelManager: React.FC<TaskModelManagerProps> = ({
     }
   };
 
-  // Fetch meta info
-  const fetchMetadata = async () => {
-    try {
-      const res = await fetch("/api/tasks");
-      const resData = await res.json();
-      if (resData.success) {
-        setAreas(resData.areas || []);
-        setCategories(resData.categories || []);
-        setResponsibles(resData.responsibles || []);
-      }
-    } catch (err) {
-      console.error("Erro ao carregar metadados na aba de modelos:", err);
-    }
-  };
-
   // Fetch templates (models)
   const fetchModels = async () => {
     setLoading(true);
@@ -122,7 +96,7 @@ export const TaskModelManager: React.FC<TaskModelManagerProps> = ({
       } else {
         showToast("Erro", "Falha ao carregar modelos de processos", "error");
       }
-    } catch (err: any) {
+    } catch {
       showToast("Erro", "Erro ao comunicar com o servidor", "error");
     } finally {
       setLoading(false);
@@ -131,7 +105,6 @@ export const TaskModelManager: React.FC<TaskModelManagerProps> = ({
 
   useEffect(() => {
     fetchModels();
-    fetchMetadata();
   }, []);
 
   const openCreateModal = () => {
@@ -270,7 +243,7 @@ export const TaskModelManager: React.FC<TaskModelManagerProps> = ({
       } else {
         showToast("Erro", resData.error || "Erro ao salvar modelo.", "error");
       }
-    } catch (err: any) {
+    } catch {
       showToast("Erro", "Falha de comunicação ao salvar modelo.", "error");
     }
   };
@@ -292,7 +265,7 @@ export const TaskModelManager: React.FC<TaskModelManagerProps> = ({
       } else {
         showToast("Erro", resData.error || "Erro ao excluir modelo.", "error");
       }
-    } catch (err: any) {
+    } catch {
       showToast("Erro", "Falha ao se comunicar com o sistema.", "error");
     }
   };
