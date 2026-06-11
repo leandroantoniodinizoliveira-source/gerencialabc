@@ -58,12 +58,13 @@ import { Task, Plan, Area, Category, Responsible } from "../types";
 import { cn } from "../lib/utils";
 import { useAuth } from "../lib/auth";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, CartesianGrid, LabelList } from "recharts";
+import { TaskModelManager } from "./TaskModelManager";
  
 interface PlanningTabProps {
   tasks: Task[];
   setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
   showToast: (title: string, message: string, type: "success" | "error" | "warning" | "info") => void;
-  activeSubTab?: "tasks" | "dashboard" | "plans" | "areas" | "categories" | "responsibles" | "import";
+  activeSubTab?: "tasks" | "dashboard" | "plans" | "areas" | "categories" | "responsibles" | "import" | "models";
   setConfirmState?: React.Dispatch<React.SetStateAction<{ title?: string; message: string; type?: "confirm" | "alert"; onConfirm?: () => void } | null>>;
   myTasksFilterTrigger?: number;
 }
@@ -429,6 +430,203 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
   const [categories, setCategories] = useState<Category[]>([]);
   const [responsibles, setResponsibles] = useState<Responsible[]>([]);
 
+  // States for generating tasks from a model
+  const [isModelGenModalOpen, setIsModelGenModalOpen] = useState(false);
+  const [taskModels, setTaskModels] = useState<any[]>([]);
+  const [selectedModelId, setSelectedModelId] = useState<string>("");
+  const [genStartDate, setGenStartDate] = useState(new Date().toISOString().substring(0, 10));
+  const [genPlanId, setGenPlanId] = useState<string>("");
+  const [genParentId, setGenParentId] = useState<string>("");
+  const [parentTaskSearch, setParentTaskSearch] = useState("");
+  const [genSequential, setGenSequential] = useState(true);
+  const [genPriority, setGenPriority] = useState("Média");
+  const [genIsProgrammed, setGenIsProgrammed] = useState(true);
+  const [genAreaIds, setGenAreaIds] = useState<number[]>([]);
+  const [genCategoryIds, setGenCategoryIds] = useState<number[]>([]);
+  const [genResponsibleIds, setGenResponsibleIds] = useState<number[]>([]);
+  const [genSubmitting, setGenSubmitting] = useState(false);
+
+  const toggleGenAreaId = (aid: number) => {
+    if (genAreaIds.includes(aid)) {
+      setGenAreaIds(genAreaIds.filter(id => id !== aid));
+    } else {
+      setGenAreaIds([...genAreaIds, aid]);
+    }
+  };
+
+  const toggleGenCategoryId = (cid: number) => {
+    if (genCategoryIds.includes(cid)) {
+      setGenCategoryIds(genCategoryIds.filter(id => id !== cid));
+    } else {
+      setGenCategoryIds([...genCategoryIds, cid]);
+    }
+  };
+
+  const toggleGenResponsibleId = (rid: number) => {
+    if (genResponsibleIds.includes(rid)) {
+      setGenResponsibleIds(genResponsibleIds.filter(id => id !== rid));
+    } else {
+      setGenResponsibleIds([...genResponsibleIds, rid]);
+    }
+  };
+
+  useEffect(() => {
+    // Synchronize Categories for Model Gen: keep checked only those that belong to one of the selected areas
+    setGenCategoryIds(prev => 
+      prev.filter(cid => {
+        const cat = categories.find(c => c.id === cid);
+        return cat && cat.areaIds?.some(aid => genAreaIds.includes(aid));
+      })
+    );
+
+    // Synchronize Responsibles for Model Gen: keep checked only those that belong to one of the selected areas (if genAreaIds is not empty)
+    setGenResponsibleIds(prev => 
+      prev.filter(rid => {
+        const resp = responsibles.find(r => r.id === rid);
+        if (!resp) return false;
+        if (genAreaIds.length === 0) return true; // if no area is selected, keep all as none are filtered out
+        return resp.areaIds?.some(aid => genAreaIds.includes(aid));
+      })
+    );
+  }, [genAreaIds, categories, responsibles]);
+
+  const renderTaskOptionsForGen = () => {
+    const options: React.ReactNode[] = [];
+    options.push(<option key="root" value="">[Nível Raiz do Plano]</option>);
+
+    if (parentTaskSearch.trim() !== "") {
+      const searchLower = parentTaskSearch.toLowerCase();
+      const matchingTasks = tasks.filter(t => t.title.toLowerCase().includes(searchLower));
+      matchingTasks.forEach(t => {
+        options.push(
+          <option key={t.id} value={t.id}>
+            {t.title} (ID: {t.id})
+          </option>
+        );
+      });
+    } else {
+      const rootTasks = tasks.filter(t => !t.parentId);
+      const traverse = (t: Task, depth: number) => {
+        const prefix = "— ".repeat(depth);
+        options.push(
+          <option key={t.id} value={t.id}>
+            {prefix}{t.title}
+          </option>
+        );
+        const kids = tasks.filter(child => child.parentId === t.id);
+        kids.forEach(k => traverse(k, depth + 1));
+      };
+      rootTasks.forEach(r => traverse(r, 0));
+    }
+    return options;
+  };
+
+  const handleParentTaskChangeForGen = (parentIdStr: string) => {
+    setGenParentId(parentIdStr);
+    if (parentIdStr) {
+      const parentTask = tasks.find(t => t.id === Number(parentIdStr));
+      if (parentTask) {
+        setGenAreaIds(parentTask.areaIds || []);
+        setGenCategoryIds(parentTask.categoryIds || []);
+        setGenResponsibleIds(parentTask.responsibleIds || []);
+      }
+    }
+  };
+
+  const openModelGenModal = async () => {
+    setIsModelGenModalOpen(true);
+    // Default values
+    setGenStartDate(new Date().toISOString().substring(0, 10));
+    setGenParentId("");
+    setParentTaskSearch("");
+    setGenSequential(true);
+    setGenPriority("Média");
+    setGenIsProgrammed(true);
+    setGenAreaIds([]);
+    setGenCategoryIds([]);
+    setGenResponsibleIds([]);
+    
+    // Default plan selection
+    if (planFilter && planFilter !== "all" && planFilter !== "") {
+      setGenPlanId(planFilter);
+    } else if (plans && plans.length > 0) {
+      const activePlan = plans.find(p => p.isActive);
+      setGenPlanId(activePlan ? String(activePlan.id) : String(plans[0].id));
+    } else {
+      setGenPlanId("");
+    }
+
+    try {
+      const res = await fetch("/api/task-models");
+      const resData = await res.json();
+      if (resData.success) {
+        setTaskModels(resData.data || []);
+        if (resData.data && resData.data.length > 0) {
+          setSelectedModelId(String(resData.data[0].id));
+        } else {
+          setSelectedModelId("");
+        }
+      }
+    } catch (err) {
+      console.error("Erro ao carregar modelos na criação via modelo:", err);
+    }
+  };
+
+  const handleGenerateFromModel = async () => {
+    if (!selectedModelId) {
+      showToast("Validação", "Selecione um modelo de tarefa.", "warning");
+      return;
+    }
+    if (!genStartDate) {
+      showToast("Validação", "A Data de Início é obrigatória.", "warning");
+      return;
+    }
+    if (!genPlanId) {
+      showToast("Validação", "Selecione o plano de trabalho para receber as atividades.", "warning");
+      return;
+    }
+
+    setGenSubmitting(true);
+    try {
+      const payload = {
+        modelId: Number(selectedModelId),
+        planId: Number(genPlanId),
+        startDate: genStartDate,
+        parentId: genParentId ? Number(genParentId) : null,
+        sequential: genSequential,
+        priority: genPriority,
+        isProgrammed: genIsProgrammed,
+        areaIds: genAreaIds,
+        categoryIds: genCategoryIds,
+        responsibleIds: genResponsibleIds,
+        createdBy: "Gerado por Modelo"
+      };
+
+      const res = await fetch("/api/task-models/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const resData = await res.json();
+
+      if (resData.success) {
+        showToast(
+          "Sucesso",
+          `Foram geradas com sucesso ${resData.count} atividades a partir do modelo!`,
+          "success"
+        );
+        setIsModelGenModalOpen(false);
+        await reloadTasks();
+      } else {
+        showToast("Erro", resData.error || "Não foi possível gerar as tarefas.", "error");
+      }
+    } catch (err: any) {
+      showToast("Erro", "Erro ao processar criação por modelo.", "error");
+    } finally {
+      setGenSubmitting(false);
+    }
+  };
+
   React.useEffect(() => {
     if (myTasksFilterTrigger && myTasksFilterTrigger > 0) {
       // 1. Filter by the active tasks plan (plano ativo)
@@ -510,6 +708,34 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
   const [isRegModalOpen, setIsRegModalOpen] = useState(false);
   const [formMode, setFormMode] = useState<"create" | "edit">("create");
   const [editingTask, setEditingTask] = useState<Partial<Task>>({});
+
+  useEffect(() => {
+    // Synchronize Categories for editingTask
+    if (editingTask && editingTask.categoryIds) {
+      const activeAreaIds = editingTask.areaIds || [];
+      const updatedCategoryIds = editingTask.categoryIds.filter(cid => {
+        const cat = categories.find(c => c.id === cid);
+        return cat && cat.areaIds?.some(aid => activeAreaIds.includes(aid));
+      });
+      if (JSON.stringify(updatedCategoryIds) !== JSON.stringify(editingTask.categoryIds)) {
+        setEditingTask(prev => ({ ...prev, categoryIds: updatedCategoryIds }));
+      }
+    }
+
+    // Synchronize Responsibles for editingTask
+    if (editingTask && editingTask.responsibleIds) {
+      const activeAreaIds = editingTask.areaIds || [];
+      const updatedResponsibleIds = editingTask.responsibleIds.filter(rid => {
+        const resp = responsibles.find(r => r.id === rid);
+        if (!resp) return false;
+        if (activeAreaIds.length === 0) return true;
+        return resp.areaIds?.some(aid => activeAreaIds.includes(aid));
+      });
+      if (JSON.stringify(updatedResponsibleIds) !== JSON.stringify(editingTask.responsibleIds)) {
+        setEditingTask(prev => ({ ...prev, responsibleIds: updatedResponsibleIds }));
+      }
+    }
+  }, [editingTask.areaIds, categories, responsibles]);
   const [isInitializing, setIsInitializing] = useState(true);
   
   // Quick status sync loader
@@ -786,7 +1012,7 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           name: regName, 
-          abbreviation: regAbbreviation.substring(0, 2).toUpperCase(), 
+          abbreviation: regAbbreviation.substring(0, 4).toUpperCase(), 
           createdBy: userSignature,
           updatedBy: userSignature 
         })
@@ -2882,6 +3108,10 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
 
   if (activeSubTab === "import") {
     return <ImportPanel areas={areas} showToast={showToast} onSuccess={reloadTasks} />;
+  }
+
+  if (activeSubTab === "models") {
+    return <TaskModelManager tasks={tasks} plans={plans} showToast={showToast} reloadTasks={reloadTasks} />;
   }
 
   if (activeSubTab !== "tasks" && activeSubTab !== "dashboard") {
@@ -5910,8 +6140,8 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
               </div>
             </div>
 
-            </div>
-          )}
+              </div>
+            )}
           </div>
 
           <div className="bg-white border border-slate-200/80 rounded-[2rem] p-6 shadow-sm space-y-6">
@@ -5921,72 +6151,65 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
               </h3>
             </div>
 
-            {/* View Toggle & Adicionar Tarefa Actions */}
-            <div className="flex flex-col xl:flex-row justify-center items-center bg-slate-50 border border-slate-200 rounded-2xl p-3 w-full gap-4">
-            <div className="flex flex-wrap items-center justify-center gap-2 overflow-x-auto pb-1 xl:pb-0 w-full xl:w-auto">
-              <button
-                onClick={() => { setViewMode("category"); setTimelineTaskId(null); }}
-                className={`flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl transition-all whitespace-nowrap shadow-sm ${viewMode === "category" && timelineTaskId === null ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"}`}
-              >
-                <Tag size={16} /> Categorias
-              </button>
-              <button
-                onClick={() => { setViewMode("board"); setTimelineTaskId(null); }}
-                className={`flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl transition-all whitespace-nowrap shadow-sm ${viewMode === "board" && timelineTaskId === null ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"}`}
-              >
-                <LayoutGrid size={16} /> Quadro
-              </button>
-              <button
-                onClick={() => { setViewMode("status"); setTimelineTaskId(null); }}
-                className={`flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl transition-all whitespace-nowrap shadow-sm ${viewMode === "status" && timelineTaskId === null ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"}`}
-              >
-                <CheckCircle2 size={16} /> Status
-              </button>
-              <button
-                onClick={() => { setViewMode("area"); setTimelineTaskId(null); }}
-                className={`flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl transition-all whitespace-nowrap shadow-sm ${viewMode === "area" && timelineTaskId === null ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"}`}
-              >
-                <Briefcase size={16} /> Áreas
-              </button>
-              <button
-                onClick={() => { setViewMode("responsible"); setTimelineTaskId(null); }}
-                className={`flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl transition-all whitespace-nowrap shadow-sm ${viewMode === "responsible" && timelineTaskId === null ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"}`}
-              >
-                <Users size={16} /> Responsáveis
-              </button>
-              <button
-                onClick={() => { setViewMode("tree"); setTimelineTaskId(null); }}
-                className={`flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl transition-all whitespace-nowrap shadow-sm ${viewMode === "tree" && timelineTaskId === null ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"}`}
-              >
-                <FolderKanban size={16} /> Lista
-              </button>
-              <button
-                onClick={() => { setViewMode("table"); setTimelineTaskId(null); }}
-                className={`flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl transition-all whitespace-nowrap shadow-sm ${viewMode === "table" && timelineTaskId === null ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"}`}
-              >
-                <Table size={16} /> Tabela
-              </button>
-              {timelineTaskId !== null && (
+            {/* View Toggle */}
+            <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 w-full flex items-center justify-center">
+              <div className="flex flex-wrap items-center justify-center gap-2 overflow-x-auto pb-1 xl:pb-0 w-full">
                 <button
-                  onClick={() => setTimelineTaskId(null)}
-                  className="flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-black uppercase tracking-wider rounded-xl transition-all duration-200 bg-white text-adasa-mid shadow-sm border border-slate-200 hover:text-slate-800 hover:bg-slate-50 whitespace-nowrap xl:ml-4"
+                  onClick={() => { setViewMode("category"); setTimelineTaskId(null); }}
+                  className={`flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl transition-all whitespace-nowrap shadow-sm ${viewMode === "category" && timelineTaskId === null ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"}`}
                 >
-                  <List size={16} /> Voltar para Filtros
+                  <Tag size={16} /> Categorias
                 </button>
-              )}
+                <button
+                  onClick={() => { setViewMode("board"); setTimelineTaskId(null); }}
+                  className={`flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl transition-all whitespace-nowrap shadow-sm ${viewMode === "board" && timelineTaskId === null ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"}`}
+                >
+                  <LayoutGrid size={16} /> Quadro
+                </button>
+                <button
+                  onClick={() => { setViewMode("status"); setTimelineTaskId(null); }}
+                  className={`flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl transition-all whitespace-nowrap shadow-sm ${viewMode === "status" && timelineTaskId === null ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"}`}
+                >
+                  <CheckCircle2 size={16} /> Status
+                </button>
+                <button
+                  onClick={() => { setViewMode("area"); setTimelineTaskId(null); }}
+                  className={`flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl transition-all whitespace-nowrap shadow-sm ${viewMode === "area" && timelineTaskId === null ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"}`}
+                >
+                  <Briefcase size={16} /> Áreas
+                </button>
+                <button
+                  onClick={() => { setViewMode("responsible"); setTimelineTaskId(null); }}
+                  className={`flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl transition-all whitespace-nowrap shadow-sm ${viewMode === "responsible" && timelineTaskId === null ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"}`}
+                >
+                  <Users size={16} /> Responsáveis
+                </button>
+                <button
+                  onClick={() => { setViewMode("tree"); setTimelineTaskId(null); }}
+                  className={`flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl transition-all whitespace-nowrap shadow-sm ${viewMode === "tree" && timelineTaskId === null ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"}`}
+                >
+                  <FolderKanban size={16} /> Lista
+                </button>
+                <button
+                  onClick={() => { setViewMode("table"); setTimelineTaskId(null); }}
+                  className={`flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl transition-all whitespace-nowrap shadow-sm ${viewMode === "table" && timelineTaskId === null ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"}`}
+                >
+                  <Table size={16} /> Tabela
+                </button>
+                {timelineTaskId !== null && (
+                  <button
+                    onClick={() => setTimelineTaskId(null)}
+                    className="flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-black uppercase tracking-wider rounded-xl transition-all duration-200 bg-white text-adasa-mid shadow-sm border border-slate-200 hover:text-slate-800 hover:bg-slate-50 whitespace-nowrap xl:ml-4"
+                  >
+                    <List size={16} /> Voltar para Filtros
+                  </button>
+                )}
+              </div>
             </div>
-            
-            <button
-              onClick={() => handleAddNewTask(null)}
-              className="flex items-center justify-center gap-2 px-6 py-2.5 whitespace-nowrap bg-adasa-mid text-white text-xs sm:text-sm font-black uppercase tracking-wider rounded-xl hover:bg-adasa-dark transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 cursor-pointer w-full xl:w-auto ml-auto"
-            >
-              <Plus size={18} /> Nova Tarefa
-            </button>
-          </div>
-
+ 
           {/* Main Container */}
           <div className="space-y-4">
-              <div className="flex bg-white border border-slate-200 rounded-2xl p-3 px-5 shadow-sm items-center justify-between">
+              <div className="flex flex-col md:flex-row bg-white border border-slate-200 rounded-2xl p-4 px-5 shadow-sm items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
                     <div className="bg-indigo-100 text-indigo-600 p-2 rounded-xl border border-indigo-200 shadow-sm">
                       <ListTodo size={20} />
@@ -5995,6 +6218,23 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                        <span className="text-[10px] uppercase font-black tracking-widest text-slate-400 leading-none mb-1">Tarefas Listadas / Filtradas</span>
                        <span className="text-lg font-extrabold text-slate-800 leading-none">{enhancedTasks.filter(t => matchesFilters(t)).length} <span className="text-xs font-semibold text-slate-400">tarefas</span></span>
                     </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center gap-2.5 w-full md:w-auto">
+                  <button
+                    onClick={openModelGenModal}
+                    className="flex items-center justify-center gap-2 px-5 py-2.5 whitespace-nowrap bg-adasa-mid text-white text-xs sm:text-sm font-black uppercase tracking-wider rounded-xl hover:bg-adasa-dark transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 cursor-pointer w-full sm:w-auto"
+                    title="Criar fluxo estruturado de atividades a partir de um modelo de processo"
+                  >
+                    <Copy size={16} /> Criar via Modelo
+                  </button>
+
+                  <button
+                    onClick={() => handleAddNewTask(null)}
+                    className="flex items-center justify-center gap-2 px-6 py-2.5 whitespace-nowrap bg-adasa-mid text-white text-xs sm:text-sm font-black uppercase tracking-wider rounded-xl hover:bg-adasa-dark transition-all duration-200 shadow-sm hover:shadow-md hover:-translate-y-0.5 cursor-pointer w-full sm:w-auto"
+                  >
+                    <Plus size={18} /> Nova Tarefa
+                  </button>
                 </div>
               </div>
 
@@ -7149,6 +7389,311 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
       )}
         </div>
       </div>
+
+      {/* MODAL: Generate from Model Dialog */}
+      <AnimatePresence>
+        {isModelGenModalOpen && (
+          <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsModelGenModalOpen(false)}
+              className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            />
+            <motion.div
+              initial={{ scale: 0.95, y: 15, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.95, y: 15, opacity: 0 }}
+              className="bg-white rounded-3xl max-w-4xl w-full border border-slate-200 shadow-2xl relative z-10 flex flex-col overflow-hidden max-h-[92vh]"
+            >
+              {/* Header */}
+              <div className="flex justify-between items-center p-6 pb-3 border-b border-slate-100">
+                <h3 className="text-base font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
+                  <FolderKanban size={18} className="text-adasa-mid" /> Nova Atividade a partir de Modelo
+                </h3>
+                <button
+                  onClick={() => setIsModelGenModalOpen(false)}
+                  className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* Body */}
+              <div className="p-5 md:p-7 overflow-y-auto space-y-5 text-xs font-semibold text-slate-800 custom-scrollbar text-left">
+                {/* Select Task Model */}
+                <div className="space-y-1">
+                  <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5" title="Selecione o modelo cadastrado para gerar as tarefas">
+                    <FolderKanban size={14} className="text-emerald-500 shrink-0" />
+                    Selecione o Modelo de Processo
+                  </label>
+                  <select
+                    value={selectedModelId}
+                    onChange={(e) => setSelectedModelId(e.target.value)}
+                    className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white focus:border-adasa-mid outline-none bg-slate-50/10 focus:bg-white"
+                  >
+                    <option value="">[Selecione um Modelo]</option>
+                    {taskModels.map(m => (
+                      <option key={m.id} value={m.id}>{m.name} ({m.items?.length || 0} etapas)</option>
+                    ))}
+                  </select>
+                  {taskModels.length === 0 && (
+                    <p className="text-[10px] text-amber-600 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-100 mt-1">
+                      Nenhum modelo de tarefa encontrado. Cadastre um modelo primeiro na aba "Modelos de Tarefas".
+                    </p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-5 leading-relaxed">
+                  {/* Left Column: Dates, parent, plan, options */}
+                  <div className="space-y-4">
+                    <span className="text-[10px] font-black text-adasa-mid uppercase tracking-widest block leading-none border-b border-slate-100 pb-2">1. Configurações de Escopo e Prazos</span>
+
+                    {/* Start Date */}
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5" title="Data prevista para o início da primeira atividade do modelo">
+                        <Calendar size={14} className="text-pink-500 shrink-0" />
+                        Data de Início da Primeira Atividade
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="date"
+                          value={genStartDate}
+                          onChange={(e) => setGenStartDate(e.target.value)}
+                          className="w-full pl-10 pr-4 py-2 text-xs font-semibold text-slate-700 border-2 border-slate-200 rounded-xl outline-none focus:border-adasa-mid bg-slate-50/10 focus:bg-white"
+                        />
+                        <Calendar size={14} className="absolute left-3.5 top-2.5 text-slate-400 font-normal" />
+                      </div>
+                      <p className="text-[9px] text-slate-400 font-medium leading-normal">As datas das próximas etapas serão geradas proporcionalmente usando os dias de cada tarefa modelo.</p>
+                    </div>
+
+                    {/* Plan selection */}
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5" title="Selecione o plano de atividades para vincular">
+                        <CalendarDays size={14} className="text-blue-500 shrink-0" />
+                        Vincular ao Plano de Trabalho
+                      </label>
+                      <select
+                        value={genPlanId}
+                        onChange={(e) => setGenPlanId(e.target.value)}
+                        className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white focus:border-adasa-mid outline-none bg-slate-50/10 focus:bg-white"
+                      >
+                        <option value="">[Selecione um Plano]</option>
+                        {plans.map(p => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Parent task option for nested workflows */}
+                    <div className="space-y-1.5 mt-2">
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5" title="Indique uma atividade mãe caso queira que o modelo seja aninhado como tarefas filhas de outra tarefa">
+                        <Layers size={14} className="text-emerald-500 shrink-0" />
+                        Gerar como subatividades de (Opcional)
+                      </label>
+                      
+                      {/* Search box for filtering parent tasks */}
+                      <div className="relative">
+                        <input
+                          type="text"
+                          placeholder="Buscar atividade pai pelo nome..."
+                          value={parentTaskSearch}
+                          onChange={(e) => setParentTaskSearch(e.target.value)}
+                          className="w-full pl-8 pr-14 py-1.5 text-xs font-semibold text-slate-700 border-2 border-slate-200 rounded-xl outline-none focus:border-adasa-mid bg-slate-50/10 focus:bg-white"
+                        />
+                        <Search size={12} className="absolute left-3 top-2.5 text-slate-400" />
+                        {parentTaskSearch && (
+                          <button
+                            type="button"
+                            onClick={() => setParentTaskSearch("")}
+                            className="absolute right-2 top-1.5 text-[9px] font-black bg-slate-100 hover:bg-slate-200 text-slate-500 px-1.5 py-0.5 rounded uppercase"
+                          >
+                            Limpar
+                          </button>
+                        )}
+                      </div>
+
+                      <select
+                        value={genParentId}
+                        onChange={(e) => handleParentTaskChangeForGen(e.target.value)}
+                        className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white focus:border-adasa-mid outline-none bg-slate-50/10 focus:bg-white max-w-full truncate"
+                      >
+                        {renderTaskOptionsForGen()}
+                      </select>
+                      <p className="text-[9px] text-slate-400 font-medium leading-normal">Selecione uma atividade para aninhar as tarefas como subatividades do processo. {parentTaskSearch ? "Lista filtrada pela busca." : ""}</p>
+                    </div>
+
+                    {/* Dependence checkboxes */}
+                    <div className="p-4 bg-slate-50/65 border border-slate-200 rounded-xl space-y-3 mt-4">
+                      <div className="flex items-start gap-2.5">
+                        <input
+                          type="checkbox"
+                          id="genSequential"
+                          checked={genSequential}
+                          onChange={(e) => setGenSequential(e.target.checked)}
+                          className="mt-0.5 rounded border-slate-300 text-adasa-mid focus:ring-adasa-mid h-4 w-4 shrink-0"
+                        />
+                        <label htmlFor="genSequential" className="font-bold text-slate-700 block cursor-pointer select-none text-[11px] leading-snug">
+                          <span className="flex items-center gap-1 font-black text-slate-800 text-xs mb-0.5">
+                            <Link2 size={13} className="text-orange-500 shrink-0" />
+                            Fluxo Sequencial Automático
+                          </span>
+                          Quando ativado, a Tarefa N só inicia quando a Tarefa N-1 é concluída, gerando dependência formal (`depends_on_task_id`) e escalonando as datas.
+                        </label>
+                      </div>
+
+                      <div className="flex items-start gap-2.5 border-t border-slate-200 pt-2.5 mt-2.5">
+                        <input
+                          type="checkbox"
+                          id="genIsProgrammed"
+                          checked={genIsProgrammed}
+                          onChange={(e) => setGenIsProgrammed(e.target.checked)}
+                          className="mt-0.5 rounded border-slate-300 text-adasa-mid focus:ring-adasa-mid h-4 w-4 shrink-0"
+                        />
+                        <label htmlFor="genIsProgrammed" className="font-bold text-slate-700 block cursor-pointer select-none text-[11px] leading-snug">
+                          <span className="flex items-center gap-1 font-black text-slate-800 text-xs mb-0.5">
+                            <Tag size={13} className="text-fuchsia-500 shrink-0" />
+                            Atividade Programada
+                          </span>
+                          Marcar as atividades como programadas para acompanhamento.
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: areas, responsibles, categories tags */}
+                  <div className="space-y-4">
+                    <span className="text-[10px] font-black text-adasa-mid uppercase tracking-widest block leading-none border-b border-slate-100 pb-2">2. Vinculação de Atributos Compartilhados</span>
+
+                    {/* Priority select */}
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5" title="Prioridade para todas as tarefas geradas">
+                        <AlertTriangle size={14} className="text-rose-500 shrink-0" />
+                        Prioridade Coletiva
+                      </label>
+                      <select
+                        value={genPriority}
+                        onChange={(e) => setGenPriority(e.target.value)}
+                        className="w-full border-2 border-slate-200 rounded-xl px-3.5 py-2 text-xs font-semibold text-slate-700 bg-white focus:border-adasa-mid outline-none bg-slate-50/10 focus:bg-white"
+                      >
+                        <option value="Baixa">Baixa</option>
+                        <option value="Média">Média</option>
+                        <option value="Alta">Alta</option>
+                        <option value="Crítica">Crítica</option>
+                      </select>
+                    </div>
+
+                    {/* Multiple Areas */}
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5" title="Vincule as áreas temáticas do processo">
+                        <Briefcase size={14} className="text-lime-500 shrink-0" /> 
+                        Áreas Temáticas ADASA
+                      </label>
+                      <div className="bg-slate-50/50 border-2 border-slate-200 rounded-xl p-3 max-h-[110px] overflow-y-auto space-y-1.5 custom-scrollbar">
+                        {[...areas].sort((a,b) => a.name.localeCompare(b.name)).map(a => (
+                          <label key={a.id} className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-600 hover:text-slate-800 select-none justify-between pr-2">
+                            <span className="truncate pr-2">{a.name} ({a.abbreviation})</span>
+                            <input
+                              type="checkbox"
+                              id={`gen-area-${a.id}`}
+                              checked={genAreaIds.includes(a.id)}
+                              onChange={() => toggleGenAreaId(a.id)}
+                              className="rounded border-slate-300 text-adasa-mid focus:ring-adasa-mid h-4 w-4 shrink-0 cursor-pointer"
+                            />
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Multiple Categories */}
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5" title="Associe categorias temáticas para facilitar relatórios de acompanhamento">
+                        <ListTree size={14} className="text-amber-500 shrink-0" /> 
+                        Categorias (Filtradas pelas Áreas selecionadas)
+                      </label>
+                      <div className="bg-slate-50/50 border-2 border-slate-200 rounded-xl p-3 max-h-[110px] overflow-y-auto space-y-1.5 custom-scrollbar">
+                        {categories.filter(c => c.areaIds?.some(aid => genAreaIds.includes(aid))).length === 0 ? (
+                          <span className="block text-xs text-slate-400 italic">Nenhuma categoria encontrada para as áreas selecionadas.</span>
+                        ) : (
+                          categories.filter(c => c.areaIds?.some(aid => genAreaIds.includes(aid))).sort((a,b) => a.name.localeCompare(b.name)).map(c => (
+                            <label key={c.id} className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-600 hover:text-slate-800 select-none justify-between pr-2">
+                              <span className="truncate pr-2">{c.name} <span className="opacity-50 font-normal text-[10px]">({c.areaIds?.map(aid => areas.find(a => a.id === aid)?.name).filter(Boolean).join(", ")})</span></span>
+                              <input
+                                type="checkbox"
+                                id={`gen-cat-${c.id}`}
+                                checked={genCategoryIds.includes(c.id)}
+                                onChange={() => toggleGenCategoryId(c.id)}
+                                className="rounded border-slate-300 text-adasa-mid focus:ring-adasa-mid h-4 w-4 shrink-0 cursor-pointer"
+                              />
+                            </label>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Multiple Responsibles */}
+                    <div className="space-y-1">
+                      <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5" title="Designar responsáveis técnicos que receberão a atribuição original das tarefas">
+                        <Users size={14} className="text-sky-500 shrink-0" /> 
+                        Responsáveis Designados (Filtrados por Área)
+                      </label>
+                      <div className="bg-slate-50/50 border-2 border-slate-200 rounded-xl p-3 max-h-[110px] overflow-y-auto space-y-1.5 custom-scrollbar">
+                        {responsibles.filter(r => !genAreaIds || genAreaIds.length === 0 || r.areaIds?.some(aid => genAreaIds.includes(aid))).length === 0 ? (
+                          <span className="block text-xs text-slate-400 italic font-medium">Nenhum responsável encontrado para as áreas selecionadas.</span>
+                        ) : (
+                          responsibles.filter(r => !genAreaIds || genAreaIds.length === 0 || r.areaIds?.some(aid => genAreaIds.includes(aid))).sort((a,b) => a.name.localeCompare(b.name)).map(r => (
+                            <label key={r.id} className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-600 hover:text-slate-800 select-none justify-between pr-2">
+                              <div>
+                                <span className="truncate pr-2 font-bold text-slate-700">{r.name}</span>
+                                {r.role && <span className="text-[9px] text-slate-500 font-black ml-1.5 uppercase bg-slate-200 px-1.5 py-0.5 rounded">{r.role}</span>}
+                              </div>
+                              <input
+                                type="checkbox"
+                                id={`gen-resp-${r.id}`}
+                                checked={genResponsibleIds.includes(r.id)}
+                                onChange={() => toggleGenResponsibleId(r.id)}
+                                className="rounded border-slate-300 text-adasa-mid focus:ring-adasa-mid h-4 w-4 shrink-0 cursor-pointer"
+                              />
+                            </label>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer */}
+              <div className="p-5 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 flex-shrink-0 font-bold">
+                <button
+                  type="button"
+                  onClick={() => setIsModelGenModalOpen(false)}
+                  disabled={genSubmitting}
+                  className="px-5 py-2 rounded-xl text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition-colors shadow-sm cursor-pointer disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGenerateFromModel}
+                  disabled={genSubmitting}
+                  className="px-5 py-2 rounded-xl text-xs font-bold text-white bg-adasa-mid hover:bg-adasa-dark transition-all shadow-sm cursor-pointer disabled:opacity-50 flex items-center gap-2"
+                >
+                  {genSubmitting ? (
+                    <>
+                      <span className="animate-spin inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full" />
+                      Processando...
+                    </>
+                  ) : (
+                    "Gerar Cronograma"
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* MODAL: Creative Task Dialog */}
       <AnimatePresence>

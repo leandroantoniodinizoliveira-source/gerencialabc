@@ -44,7 +44,8 @@ import {
   FilePlus,
   BarChart2,
   GitCompare,
-  LogOut
+  LogOut,
+  Copy
 } from "lucide-react";
 import {
   LineChart,
@@ -331,7 +332,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<"home" | "edit" | "compare" | "manage" | "analyze" | "templates" | "planning" | "users">(
     "home",
   );
-  const [activePlanningSubTab, setActivePlanningSubTab] = useState<"tasks" | "dashboard" | "plans" | "areas" | "categories" | "responsibles" | "import">("dashboard");
+  const [activePlanningSubTab, setActivePlanningSubTab] = useState<"tasks" | "dashboard" | "plans" | "areas" | "categories" | "responsibles" | "import" | "models">("dashboard");
   const [isMyTasksSelected, setIsMyTasksSelected] = useState(false);
   const [myTasksFilterTrigger, setMyTasksFilterTrigger] = useState(0);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -3333,6 +3334,17 @@ const renderSupplyTable = () => {
                     <Upload size={20} className={activeTab === "planning" && activePlanningSubTab === "import" ? "text-adasa-mid" : "text-white/60"} />
                     Importar Tarefas
                   </button>
+                  <button
+                    onClick={() => {
+                      setIsMyTasksSelected(false);
+                      setActivePlanningSubTab("models");
+                      handleTabChange("planning");
+                    }}
+                    className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "planning" && activePlanningSubTab === "models" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                  >
+                    <Copy size={20} className={activeTab === "planning" && activePlanningSubTab === "models" ? "text-adasa-mid" : "text-white/60"} />
+                    Cadastrar Modelo de Tarefas
+                  </button>
                 </div>
               </div>
 
@@ -3657,6 +3669,29 @@ const renderSupplyTable = () => {
                 />
                 {!isSidebarCollapsed && <span className="hidden md:inline">Importar Tarefas</span>}
               </button>
+              <button
+                title={isSidebarCollapsed ? "Cadastrar Modelo de Tarefas" : undefined}
+                onClick={() => {
+                  setIsMyTasksSelected(false);
+                  setActivePlanningSubTab("models");
+                  handleTabChange("planning");
+                }}
+                className={cn(
+                  "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                  activeTab === "planning" && activePlanningSubTab === "models"
+                    ? "bg-white/10 text-white shadow-sm border border-white/10"
+                    : "text-white/60 hover:text-white hover:bg-white/5",
+                )}
+              >
+                <Copy
+                  size={16}
+                  className={cn(
+                    "flex-shrink-0 transition-colors",
+                    activeTab === "planning" && activePlanningSubTab === "models" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                  )}
+                />
+                {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Modelo de Tarefas</span>}
+              </button>
             </div>
           </div>
 
@@ -3807,7 +3842,8 @@ const renderSupplyTable = () => {
                          activePlanningSubTab === "plans" ? "Cadastrar Planos" : 
                          activePlanningSubTab === "areas" ? "Cadastrar Áreas Temáticas" : 
                          activePlanningSubTab === "categories" ? "Cadastrar Categorias" :
-                         activePlanningSubTab === "responsibles" ? "Cadastrar Responsáveis" : "Importar Tarefas")
+                         activePlanningSubTab === "responsibles" ? "Cadastrar Responsáveis" :
+                         activePlanningSubTab === "models" ? "Cadastrar Modelo de Tarefas" : "Importar Tarefas")
                        : "Cadastrar Balanço"}
             </h1>
             <p className="text-slate-500 text-sm font-medium">

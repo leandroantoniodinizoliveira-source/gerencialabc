@@ -519,6 +519,7 @@ async function runStartupMigration() {
       await client.query(`ALTER TABLE pl_categories ADD COLUMN IF NOT EXISTS created_at TIMESTAMP;`);
       await client.query(`ALTER TABLE pl_categories ADD COLUMN IF NOT EXISTS created_by VARCHAR(255);`);
       await client.query(`ALTER TABLE pl_areas ALTER COLUMN abbreviation TYPE VARCHAR(4);`);
+      await client.query("UPDATE pl_areas SET abbreviation = 'CORA' WHERE abbreviation = 'CO';");
 
       await client.query("COMMIT");
       console.log("Database tables verified successfully on server start!");

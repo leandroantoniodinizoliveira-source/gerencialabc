@@ -499,6 +499,33 @@ async function runStartupMigration() {
       await client.query(`ALTER TABLE pl_categories ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
       await client.query(`ALTER TABLE pl_categories ADD COLUMN IF NOT EXISTS created_at TIMESTAMP, ADD COLUMN IF NOT EXISTS created_by VARCHAR(255);`);
       await client.query(`ALTER TABLE pl_areas ALTER COLUMN abbreviation TYPE VARCHAR(4);`);
+      await client.query("UPDATE pl_areas SET abbreviation = 'CORA' WHERE abbreviation = 'CO';");
+
+      // Ensure pl_tasks has weight column
+      await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS weight REAL DEFAULT 1.0;`);
+
+      // Ensure pl_task_models and pl_model_tasks tables exist for task templates
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS pl_task_models (
+          id SERIAL PRIMARY KEY,
+          name VARCHAR(255) NOT NULL,
+          created_at TIMESTAMP DEFAULT NOW(),
+          created_by VARCHAR(255)
+        );
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS pl_model_tasks (
+          id SERIAL PRIMARY KEY,
+          model_id INTEGER REFERENCES pl_task_models(id) ON DELETE CASCADE,
+          name VARCHAR(255) NOT NULL,
+          duration_days INTEGER DEFAULT 0,
+          weight REAL DEFAULT 1.0,
+          sequence_order INTEGER DEFAULT 0,
+          created_at TIMESTAMP DEFAULT NOW(),
+          created_by VARCHAR(255)
+        );
+      `);
 
       await client.query("COMMIT");
       console.log("Database tables verified successfully on server start!");
@@ -2127,11 +2154,11 @@ async function startServer() {
       try {
         const result = await client.query(`
           WITH RECURSIVE task_tree AS (
-            SELECT id, title, description, start_date, end_date, status, parent_id, progress, priority, category, assigned_to, created_by, notes, plan_id, depends_on_task_id, updated_at, updated_by, sei_process, 1 AS depth
+            SELECT id, title, description, start_date, end_date, status, parent_id, progress, priority, category, assigned_to, created_by, notes, plan_id, depends_on_task_id, updated_at, updated_by, sei_process, weight, 1 AS depth
             FROM pl_tasks
             WHERE parent_id IS NULL
             UNION ALL
-            SELECT t.id, t.title, t.description, t.start_date, t.end_date, t.status, t.parent_id, t.progress, t.priority, t.category, t.assigned_to, t.created_by, t.notes, t.plan_id, t.depends_on_task_id, t.updated_at, t.updated_by, t.sei_process, tt.depth + 1
+            SELECT t.id, t.title, t.description, t.start_date, t.end_date, t.status, t.parent_id, t.progress, t.priority, t.category, t.assigned_to, t.created_by, t.notes, t.plan_id, t.depends_on_task_id, t.updated_at, t.updated_by, t.sei_process, t.weight, tt.depth + 1
             FROM pl_tasks t
             INNER JOIN task_tree tt ON t.parent_id = tt.id
           )
@@ -2206,6 +2233,7 @@ async function startServer() {
           dependsOnTaskId: t.depends_on_task_id ? Number(t.depends_on_task_id) : null,
           updatedAt: t.updated_at,
           updatedBy: t.updated_by,
+          weight: t.weight !== undefined && t.weight !== null ? Number(t.weight) : 1,
           areaIds: taskAreasMap[Number(t.id)] || [],
           responsibleIds: taskResponsiblesMap[Number(t.id)] || [],
           categoryIds: taskCategoriesMap[Number(t.id)] || []
@@ -2453,9 +2481,10 @@ async function startServer() {
             }
         }
         
+        const finalWeight = parseFloat(req.body.weight as any);
         const result = await client.query(
-          `INSERT INTO pl_tasks (title, description, start_date, end_date, status, parent_id, progress, priority, category, assigned_to, notes, plan_id, depends_on_task_id, updated_at, updated_by, sei_process)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), $14, $15)
+          `INSERT INTO pl_tasks (title, description, start_date, end_date, status, parent_id, progress, priority, category, assigned_to, notes, plan_id, depends_on_task_id, updated_at, updated_by, sei_process, weight)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), $14, $15, $16)
            RETURNING *`,
           [
             title || "Sem título",
@@ -2472,7 +2501,8 @@ async function startServer() {
             planId ? parseInt(planId) : null,
             dependsOnTaskId ? parseInt(dependsOnTaskId) : null,
             req.body.updatedBy || "SGI Pro",
-            req.body.seiProcess || null
+            req.body.seiProcess || null,
+            isNaN(finalWeight) ? 1.0 : finalWeight
           ]
         );
         
@@ -2594,9 +2624,10 @@ async function startServer() {
             }
         }
 
+        const finalWeight = parseFloat(req.body.weight as any);
         const result = await client.query(
           `UPDATE pl_tasks 
-           SET title = $1, description = $2, start_date = $3, end_date = $4, status = $5, progress = $6, priority = $7, category = $8, assigned_to = $9, notes = $10, parent_id = $11, plan_id = $12, depends_on_task_id = $13, updated_at = NOW(), updated_by = $14, sei_process = $16
+           SET title = $1, description = $2, start_date = $3, end_date = $4, status = $5, progress = $6, priority = $7, category = $8, assigned_to = $9, notes = $10, parent_id = $11, plan_id = $12, depends_on_task_id = $13, updated_at = NOW(), updated_by = $14, sei_process = $16, weight = $17
            WHERE id = $15
            RETURNING *`,
           [
@@ -2615,7 +2646,8 @@ async function startServer() {
             dependsOnTaskId ? parseInt(dependsOnTaskId) : null,
             req.body.updatedBy || "SGI Pro",
             taskId,
-            seiProcess || null
+            seiProcess || null,
+            isNaN(finalWeight) ? 1.0 : finalWeight
           ]
         );
 
@@ -2764,6 +2796,308 @@ async function startServer() {
     } catch (error: any) {
       console.error("Erro ao excluir todas as tarefas:", error);
       res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // REST endpoints for task templates (models)
+  app.get("/api/task-models", async (req, res) => {
+    try {
+      const pool = getDbPool();
+      const modelsRes = await pool.query("SELECT id, name, created_at, created_by FROM pl_task_models ORDER BY id ASC");
+      const itemsRes = await pool.query("SELECT id, model_id, name, duration_days, weight, sequence_order FROM pl_model_tasks ORDER BY model_id ASC, sequence_order ASC, id ASC");
+      
+      const itemsMap: Record<number, any[]> = {};
+      itemsRes.rows.forEach(item => {
+        const mId = Number(item.model_id);
+        if (!itemsMap[mId]) itemsMap[mId] = [];
+        itemsMap[mId].push({
+          id: Number(item.id),
+          modelId: mId,
+          name: item.name,
+          durationDays: Number(item.duration_days) || 0,
+          weight: Number(item.weight) || 1
+        });
+      });
+
+      res.json({
+        success: true,
+        data: modelsRes.rows.map(m => ({
+          id: Number(m.id),
+          name: m.name,
+          createdAt: m.created_at,
+          createdBy: m.created_by,
+          items: itemsMap[Number(m.id)] || []
+        }))
+      });
+    } catch (err: any) {
+      console.error("Erro ao carregar modelos:", err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post("/api/task-models", async (req, res) => {
+    try {
+      const { name, createdBy, items } = req.body;
+      const pool = getDbPool();
+      const client = await pool.connect();
+      try {
+         await client.query("BEGIN");
+         const modelRes = await client.query(
+           "INSERT INTO pl_task_models (name, created_at, created_by) VALUES ($1, NOW(), $2) RETURNING id, name, created_at, created_by",
+           [name || "Modelo Sem Nome", createdBy || "SGI Pro"]
+         );
+         const modelId = modelRes.rows[0].id;
+
+         const createdItems: any[] = [];
+         if (Array.isArray(items)) {
+           for (let i = 0; i < items.length; i++) {
+             const it = items[i];
+             const itemRes = await client.query(
+               "INSERT INTO pl_model_tasks (model_id, name, duration_days, weight, sequence_order, created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, duration_days, weight",
+               [modelId, it.name || "Tarefa Modelo", Number(it.durationDays) || 0, Number(it.weight) || 1, i, createdBy || "SGI Pro"]
+             );
+             createdItems.push({
+               id: Number(itemRes.rows[0].id),
+               modelId,
+               name: itemRes.rows[0].name,
+               durationDays: Number(itemRes.rows[0].duration_days) || 0,
+               weight: Number(itemRes.rows[0].weight) || 1
+             });
+           }
+         }
+
+         await client.query("COMMIT");
+         res.json({
+           success: true,
+           data: {
+             id: Number(modelId),
+             name: modelRes.rows[0].name,
+             createdAt: modelRes.rows[0].created_at,
+             createdBy: modelRes.rows[0].created_by,
+             items: createdItems
+           }
+         });
+      } catch (err) {
+         await client.query("ROLLBACK");
+         throw err;
+      } finally {
+         client.release();
+      }
+    } catch (err: any) {
+      console.error("Erro ao criar modelo:", err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.put("/api/task-models/:id", async (req, res) => {
+    try {
+      const modelId = parseInt(req.params.id);
+      const { name, items, updatedBy } = req.body;
+      const pool = getDbPool();
+      const client = await pool.connect();
+      try {
+         await client.query("BEGIN");
+         const modelRes = await client.query(
+           "UPDATE pl_task_models SET name = $1 WHERE id = $2 RETURNING id, name, created_at, created_by",
+           [name, modelId]
+         );
+         if (modelRes.rows.length === 0) {
+           await client.query("ROLLBACK");
+           return res.status(404).json({ success: false, error: "Modelo não encontrado" });
+         }
+
+         // Re-sync items:
+         await client.query("DELETE FROM pl_model_tasks WHERE model_id = $1", [modelId]);
+         const createdItems: any[] = [];
+         if (Array.isArray(items)) {
+           for (let i = 0; i < items.length; i++) {
+             const it = items[i];
+             const itemRes = await client.query(
+               "INSERT INTO pl_model_tasks (model_id, name, duration_days, weight, sequence_order, created_by) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, duration_days, weight",
+               [modelId, it.name || "Tarefa Modelo", Number(it.durationDays) || 0, Number(it.weight) || 1, i, updatedBy || "SGI Pro"]
+             );
+             createdItems.push({
+               id: Number(itemRes.rows[0].id),
+               modelId,
+               name: itemRes.rows[0].name,
+               durationDays: Number(itemRes.rows[0].duration_days) || 0,
+               weight: Number(itemRes.rows[0].weight) || 1
+             });
+           }
+         }
+
+         await client.query("COMMIT");
+         res.json({
+           success: true,
+           data: {
+             id: Number(modelId),
+             name: modelRes.rows[0].name,
+             createdAt: modelRes.rows[0].created_at,
+             createdBy: modelRes.rows[0].created_by,
+             items: createdItems
+           }
+         });
+      } catch (err) {
+         await client.query("ROLLBACK");
+         throw err;
+      } finally {
+         client.release();
+      }
+    } catch (err: any) {
+      console.error("Erro ao atualizar modelo:", err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.delete("/api/task-models/:id", async (req, res) => {
+    try {
+      const modelId = parseInt(req.params.id);
+      const pool = getDbPool();
+      await pool.query("DELETE FROM pl_task_models WHERE id = $1", [modelId]);
+      res.json({ success: true, deletedId: modelId });
+    } catch (err: any) {
+      console.error("Erro ao deletar modelo:", err);
+      res.status(500).json({ success: false, error: err.message });
+    }
+  });
+
+  app.post("/api/task-models/generate", async (req, res) => {
+    try {
+      const {
+        modelId,
+        planId,
+        startDate,
+        parentId,
+        sequential,
+        priority,
+        isProgrammed,
+        areaIds,
+        categoryIds,
+        responsibleIds,
+        createdBy
+      } = req.body;
+
+      if (!modelId || !startDate) {
+        return res.status(400).json({ success: false, error: "Modelo e Data de Início são obrigatórios." });
+      }
+
+      const pool = getDbPool();
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+
+        // Get model tasks sorted by order/id
+        const itemsRes = await client.query(
+          "SELECT name, duration_days, weight FROM pl_model_tasks WHERE model_id = $1 ORDER BY sequence_order ASC, id ASC",
+          [parseInt(modelId)]
+        );
+
+        if (itemsRes.rows.length === 0) {
+          await client.query("ROLLBACK");
+          return res.status(400).json({ success: false, error: "Este modelo não possui nenhuma tarefa cadastrada." });
+        }
+
+        let pivotDate = new Date(startDate);
+        let previousTaskId: number | null = null;
+        const createdTaskIds: number[] = [];
+
+        for (const item of itemsRes.rows) {
+          const duration = Number(item.duration_days) || 0;
+          const taskWeight = Number(item.weight) || 1;
+
+          let tStart: Date;
+          let tEnd: Date;
+
+          if (sequential && previousTaskId !== null) {
+            // Sequential: starts 1 day after previous task ends to prevent starting on same day
+            tStart = new Date(pivotDate.getTime() + 24 * 60 * 60 * 1000);
+            tEnd = new Date(tStart.getTime() + duration * 24 * 60 * 60 * 1000);
+            pivotDate = new Date(tEnd);
+          } else {
+            // Independent, or first item in sequence
+            tStart = new Date(startDate);
+            tEnd = new Date(tStart.getTime() + duration * 24 * 60 * 60 * 1000);
+            if (sequential) {
+              pivotDate = new Date(tEnd);
+            }
+          }
+
+          // Insert task
+          const taskInsertRes = await client.query(
+            `INSERT INTO pl_tasks (
+               title, description, start_date, end_date, status, parent_id, progress,
+               priority, notes, plan_id, depends_on_task_id, created_at, created_by,
+               is_programmed, weight, updated_at, updated_by
+             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW(), $12, $13, $14, NOW(), $12)
+             RETURNING id`,
+            [
+              item.name,
+              "", // description
+              tStart,
+              tEnd,
+              "Não iniciada",
+              parentId ? parseInt(parentId) : null,
+              0, // progress
+              priority || "Média",
+              `Gerada a partir do Modelo ID: ${modelId}`,
+              planId ? parseInt(planId) : null,
+              (sequential && previousTaskId) ? previousTaskId : null,
+              createdBy || "SGI Pro",
+              isProgrammed !== false,
+              taskWeight
+            ]
+          );
+
+          const newTaskId = Number(taskInsertRes.rows[0].id);
+          createdTaskIds.push(newTaskId);
+          previousTaskId = newTaskId;
+
+          // Insert areas
+          if (Array.isArray(areaIds) && areaIds.length > 0) {
+            for (const aId of areaIds) {
+              await client.query(
+                "INSERT INTO pl_task_areas (task_id, area_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+                [newTaskId, Number(aId)]
+              );
+            }
+          }
+
+          // Insert categories
+          if (Array.isArray(categoryIds) && categoryIds.length > 0) {
+            for (const cId of categoryIds) {
+              await client.query(
+                "INSERT INTO pl_task_categories (task_id, category_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+                [newTaskId, Number(cId)]
+              );
+            }
+          }
+
+          // Insert responsibles
+          if (Array.isArray(responsibleIds) && responsibleIds.length > 0) {
+            for (const rId of responsibleIds) {
+              await client.query(
+                "INSERT INTO pl_task_responsibles (task_id, responsible_id) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+                [newTaskId, Number(rId)]
+              );
+            }
+          }
+        }
+
+        if (parentId) {
+          await rollUpTask(client, parseInt(parentId));
+        }
+
+        await client.query("COMMIT");
+        res.json({ success: true, count: createdTaskIds.length, taskIds: createdTaskIds });
+      } catch (err: any) {
+        await client.query("ROLLBACK");
+        throw err;
+      } finally {
+        client.release();
+      }
+    } catch (err: any) {
+      console.error("Erro ao gerar tarefas do modelo:", err);
+      res.status(500).json({ success: false, error: err.message });
     }
   });
 
