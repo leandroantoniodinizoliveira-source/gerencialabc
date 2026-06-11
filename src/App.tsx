@@ -3236,7 +3236,7 @@ const renderSupplyTable = () => {
     } else if (publicTabName === "planning" || publicTabName === "planejamento") {
       publicTabTitle = "Painel de Atividades • ADASA";
     } else {
-      publicTabTitle = "Painéis Gerenciais • ADASA";
+      publicTabTitle = "Painéis Públicos • ADASA";
     }
 
     return (
@@ -3302,13 +3302,13 @@ const renderSupplyTable = () => {
                 <div className="space-y-6">
                   <div className="flex items-center gap-2 mb-4">
                     <button 
-                      onClick={() => {
-                        window.location.hash = "#public-gerencial";
-                        setPublicTabName("gerencial");
-                      }}
+                       onClick={() => {
+                         window.location.hash = "#public-gerencial";
+                         setPublicTabName("gerencial");
+                       }}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-xs font-bold text-slate-700 shadow-sm transition-all"
                     >
-                      ← Voltar para Painéis Gerenciais
+                      ← Voltar para Painéis Públicos
                     </button>
                   </div>
                   <PlanningTab 
@@ -3322,13 +3322,13 @@ const renderSupplyTable = () => {
                 <div className="space-y-6">
                   <div className="flex items-center gap-2 mb-4">
                     <button 
-                      onClick={() => {
-                        window.location.hash = "#public-gerencial";
-                        setPublicTabName("gerencial");
-                      }}
+                       onClick={() => {
+                         window.location.hash = "#public-gerencial";
+                         setPublicTabName("gerencial");
+                       }}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-xs font-bold text-slate-700 shadow-sm transition-all"
                     >
-                      ← Voltar para Painéis Gerenciais
+                      ← Voltar para Painéis Públicos
                     </button>
                   </div>
                   <ResolutionsDashboard showToast={showToast} />
@@ -3426,7 +3426,7 @@ const renderSupplyTable = () => {
                     className={cn("w-full px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "gerencial" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
                   >
                     <BarChart2 size={20} className={activeTab === "gerencial" ? "text-adasa-mid" : "text-white/60"} />
-                    Painéis Gerenciais
+                    Painéis Públicos
                   </button>
                 </div>
               </div>
@@ -3590,7 +3590,7 @@ const renderSupplyTable = () => {
                       className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "analyze" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
                     >
                       <BarChart2 size={20} className={activeTab === "analyze" ? "text-adasa-mid" : "text-white/60"} />
-                      Analisar Balanço
+                      Painel do Balanço Hídrico
                     </button>
                     <button
                       onClick={() => handleTabChange("compare")}
@@ -3697,7 +3697,7 @@ const renderSupplyTable = () => {
               </button>
 
               <button
-                title={isSidebarCollapsed ? "Painéis Gerenciais" : undefined}
+                title={isSidebarCollapsed ? "Painéis Públicos" : undefined}
                 onClick={() => handleTabChange("gerencial")}
                 className={cn(
                   "w-full px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
@@ -3713,7 +3713,7 @@ const renderSupplyTable = () => {
                     activeTab === "gerencial" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
                   )}
                 />
-                {!isSidebarCollapsed && <span className="hidden md:inline">Painéis Gerenciais</span>}
+                {!isSidebarCollapsed && <span className="hidden md:inline">Painéis Públicos</span>}
               </button>
             </div>
           </div>
@@ -4023,7 +4023,7 @@ const renderSupplyTable = () => {
                   {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Balanço</span>}
                 </button>
                 <button
-                  title={isSidebarCollapsed ? "Analisar Balanço" : undefined}
+                  title={isSidebarCollapsed ? "Painel do Balanço Hídrico" : undefined}
                   onClick={() => handleTabChange("analyze")}
                   className={cn(
                     "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
@@ -4039,7 +4039,7 @@ const renderSupplyTable = () => {
                       activeTab === "analyze" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
                     )}
                   />
-                  {!isSidebarCollapsed && <span className="hidden md:inline">Analisar Balanço</span>}
+                  {!isSidebarCollapsed && <span className="hidden md:inline">Painel do Balanço Hídrico</span>}
                 </button>
                 <button
                   title={isSidebarCollapsed ? "Comparar Balanços" : undefined}
@@ -4124,11 +4124,11 @@ const renderSupplyTable = () => {
               {activeTab === "home"
                 ? "Página Inicial"
                 : activeTab === "gerencial"
-                ? "Painéis Gerenciais"
+                ? "Painéis Públicos"
                 : activeTab === "compare"
                 ? "Comparar Balanços"
                 : activeTab === "analyze"
-                  ? "Análise de Balanço Hídrico"
+                  ? "Painel de Análise do Balanço Hídrico"
                   : activeTab === "templates"
                     ? "Arquivos Modelo"
                     : activeTab === "users"
@@ -4240,7 +4240,21 @@ const renderSupplyTable = () => {
               exit={{ opacity: 0, scale: 0.98 }}
               className="flex flex-col gap-6"
             >
-              
+              {/* Box seguindo o modelo solicitado */}
+              <div className="bg-gradient-to-r from-blue-900 to-blue-800 rounded-3xl p-8 sm:p-10 text-white shadow-xl relative overflow-hidden border border-slate-700/30">
+                <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-white/5 blur-3xl"></div>
+                <div className="absolute bottom-0 left-0 -ml-20 -mb-20 w-80 h-80 rounded-full bg-blue-400/10 blur-3xl"></div>
+                
+                <div className="relative z-10 space-y-4">
+                  <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/10 rounded-full border border-white/15 text-[10px] font-bold uppercase tracking-widest text-[#93c5fd]">
+                    MAPEAMENTO & MONITORAMENTO ESTRATÉGICO
+                  </div>
+                  <h1 className="text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight leading-tight text-white">
+                    Painel de Análise do Balanço Hídrico
+                  </h1>
+                </div>
+              </div>
+
              <div className="flex bg-slate-100 p-1 w-full md:w-fit rounded-xl border border-slate-200 overflow-x-auto no-scrollbar snap-x">
                 <button
                   onClick={() => setAnalyzeSubTab("balance")}

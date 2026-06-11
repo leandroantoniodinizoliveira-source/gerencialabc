@@ -41,8 +41,8 @@ export function ManagerialHub({ onOpenPlanning, onOpenResolutions, isPublic = fa
       <section className="space-y-6">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
-            <div className="p-2 px-4 bg-amber-50 text-amber-700 rounded-xl text-sm sm:text-lg font-black uppercase tracking-wider border border-amber-150">
-              Painéis Gerenciais
+            <div className="p-2 px-4 bg-blue-50 text-blue-700 rounded-xl text-sm sm:text-lg font-black uppercase tracking-wider border border-blue-150">
+              Painéis Públicos
             </div>
           </div>
         </div>
@@ -53,18 +53,18 @@ export function ManagerialHub({ onOpenPlanning, onOpenResolutions, isPublic = fa
           <motion.div 
             whileHover={{ y: -2 }}
             onClick={onOpenPlanning}
-            className="p-8 rounded-3xl border border-amber-200 bg-gradient-to-br from-white to-amber-50/20 shadow-sm cursor-pointer hover:shadow-md transition-all duration-300 flex flex-col justify-between group h-full"
+            className="p-8 rounded-3xl border border-blue-200 bg-gradient-to-br from-white to-blue-50/20 shadow-sm cursor-pointer hover:shadow-md transition-all duration-300 flex flex-col justify-between group h-full"
           >
             <div>
-              <div className="mb-4 p-3 rounded-xl bg-amber-50 text-amber-600 w-max border border-amber-100 group-hover:bg-amber-100 transition-colors">
+              <div className="mb-4 p-3 rounded-xl bg-blue-50 text-blue-600 w-max border border-blue-100 group-hover:bg-blue-100 transition-colors">
                 <FolderKanban size={24} />
               </div>
               <h3 className="text-lg font-black text-slate-800 leading-tight mb-2">Painel de Atividades</h3>
               <p className="text-slate-600 text-xs font-medium leading-relaxed mb-6">
-                Acompanhe o andamento geral das tarefas e metas. Visualize status, progressos acumulados e índices gerenciais por área operacional em gráficos de tempo real.
+                Acompanhe o andamento geral das tarefas e metas. Visualize status, progressos acumulados e índices gerenciais por área operational em gráficos de tempo real.
               </p>
             </div>
-            <div className="mt-8 flex items-center gap-2 text-xs font-bold text-amber-700">
+            <div className="mt-8 flex items-center gap-2 text-xs font-bold text-blue-700">
               Abrir Painel de Atividades <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
             </div>
           </motion.div>
@@ -73,10 +73,10 @@ export function ManagerialHub({ onOpenPlanning, onOpenResolutions, isPublic = fa
           <motion.div 
             whileHover={{ y: -2 }}
             onClick={onOpenResolutions}
-            className="p-8 rounded-3xl border border-amber-200 bg-gradient-to-br from-white to-amber-50/20 shadow-sm cursor-pointer hover:shadow-md transition-all duration-300 flex flex-col justify-between group h-full"
+            className="p-8 rounded-3xl border border-blue-200 bg-gradient-to-br from-white to-blue-50/20 shadow-sm cursor-pointer hover:shadow-md transition-all duration-300 flex flex-col justify-between group h-full"
           >
             <div>
-              <div className="mb-4 p-3 rounded-xl bg-amber-50 text-amber-600 w-max border border-amber-100 group-hover:bg-amber-100 transition-colors">
+              <div className="mb-4 p-3 rounded-xl bg-blue-50 text-blue-600 w-max border border-blue-100 group-hover:bg-blue-100 transition-colors">
                 <FileText size={24} />
               </div>
               <h3 className="text-lg font-black text-slate-800 leading-tight mb-2">Painel de Resoluções</h3>
@@ -84,7 +84,7 @@ export function ManagerialHub({ onOpenPlanning, onOpenResolutions, isPublic = fa
                 Acompanhe as resoluções vigentes, atas de audiência, estoque regulatório normas organizadas e monitoramentos das obrigações legais em formato agregador dinâmico.
               </p>
             </div>
-            <div className="mt-8 flex items-center gap-2 text-xs font-bold text-amber-700">
+            <div className="mt-8 flex items-center gap-2 text-xs font-bold text-blue-700">
               Abrir Painel de Resoluções <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
             </div>
           </motion.div>
