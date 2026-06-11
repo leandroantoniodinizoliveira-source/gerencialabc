@@ -3236,7 +3236,7 @@ const renderSupplyTable = () => {
     } else if (publicTabName === "planning" || publicTabName === "planejamento") {
       publicTabTitle = "Painel de Atividades • ADASA";
     } else {
-      publicTabTitle = "Painéis Públicos • ADASA";
+      publicTabTitle = "Painéis Gerenciais • ADASA";
     }
 
     return (
@@ -3308,7 +3308,7 @@ const renderSupplyTable = () => {
                        }}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-xs font-bold text-slate-700 shadow-sm transition-all"
                     >
-                      ← Voltar para Painéis Públicos
+                      ← Voltar para Painéis Gerenciais
                     </button>
                   </div>
                   <PlanningTab 
@@ -3328,7 +3328,7 @@ const renderSupplyTable = () => {
                        }}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-xs font-bold text-slate-700 shadow-sm transition-all"
                     >
-                      ← Voltar para Painéis Públicos
+                      ← Voltar para Painéis Gerenciais
                     </button>
                   </div>
                   <ResolutionsDashboard showToast={showToast} />
@@ -3426,7 +3426,7 @@ const renderSupplyTable = () => {
                     className={cn("w-full px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "gerencial" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
                   >
                     <BarChart2 size={20} className={activeTab === "gerencial" ? "text-adasa-mid" : "text-white/60"} />
-                    Painéis Públicos
+                    Painéis Gerenciais
                   </button>
                 </div>
               </div>
@@ -3697,7 +3697,7 @@ const renderSupplyTable = () => {
               </button>
 
               <button
-                title={isSidebarCollapsed ? "Painéis Públicos" : undefined}
+                title={isSidebarCollapsed ? "Painéis Gerenciais" : undefined}
                 onClick={() => handleTabChange("gerencial")}
                 className={cn(
                   "w-full px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
@@ -3713,7 +3713,7 @@ const renderSupplyTable = () => {
                     activeTab === "gerencial" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
                   )}
                 />
-                {!isSidebarCollapsed && <span className="hidden md:inline">Painéis Públicos</span>}
+                {!isSidebarCollapsed && <span className="hidden md:inline">Painéis Gerenciais</span>}
               </button>
             </div>
           </div>
@@ -4124,7 +4124,7 @@ const renderSupplyTable = () => {
               {activeTab === "home"
                 ? "Página Inicial"
                 : activeTab === "gerencial"
-                ? "Painéis Públicos"
+                ? "Painéis Gerenciais"
                 : activeTab === "compare"
                 ? "Comparar Balanços"
                 : activeTab === "analyze"

@@ -73,7 +73,7 @@ export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas, o
             <div className="p-1 px-2.5 bg-blue-50 text-blue-700 rounded-lg text-xs font-black uppercase tracking-wider">
               Painéis
             </div>
-            <h2 className="text-lg font-black text-slate-800 tracking-tight">Painéis Públicos</h2>
+            <h2 className="text-lg font-black text-slate-800 tracking-tight">Painéis Gerenciais</h2>
           </div>
         </div>
 

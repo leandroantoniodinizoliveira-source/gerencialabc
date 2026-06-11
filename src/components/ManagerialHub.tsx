@@ -42,7 +42,7 @@ export function ManagerialHub({ onOpenPlanning, onOpenResolutions, isPublic = fa
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
             <div className="p-2 px-4 bg-blue-50 text-blue-700 rounded-xl text-sm sm:text-lg font-black uppercase tracking-wider border border-blue-150">
-              Painéis Públicos
+              Painéis Gerenciais
             </div>
           </div>
         </div>
