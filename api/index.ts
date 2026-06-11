@@ -521,6 +521,80 @@ async function runStartupMigration() {
       await client.query(`ALTER TABLE pl_areas ALTER COLUMN abbreviation TYPE VARCHAR(4);`);
       await client.query("UPDATE pl_areas SET abbreviation = 'CORA' WHERE abbreviation = 'CO';");
 
+      // Ensure re_resolutions table exists for regulation module (prefix re_)
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS re_resolutions (
+          id SERIAL PRIMARY KEY,
+          especie VARCHAR(100),
+          numero INTEGER,
+          ano INTEGER,
+          data VARCHAR(20),
+          ementa TEXT,
+          situacao VARCHAR(100),
+          area VARCHAR(255),
+          segmento VARCHAR(255),
+          tipo VARCHAR(100),
+          link TEXT
+        );
+      `);
+
+      const resCheck = await client.query("SELECT COUNT(*) FROM re_resolutions");
+      if (parseInt(resCheck.rows[0].count) === 0) {
+        console.log("Seeding re_resolutions table in api...");
+        const seedRows = [
+          ["Resolução", 162, 2006, "11/05/2006", "Estabelece os procedimentos para a instalação de hidrômetros individualizados em condomínios verticais residenciais e de uso misto no Distrito Federal. Revoga as Resoluções nº 175, de 19 de dezembro de 2007, e nº 99, de 16 de novembro de 2009.", "Revogada", "Saneamento Básico", "Medição Individualizada", "Acessória", "https://www.sinj.df.gov.br/sinj/Norma/52952/Resolu_o_162_11_05_2006.html"],
+          ["Resolução", 188, 2006, "24/05/2006", "Regulamenta os procedimentos para aplicação de penalidades às infrações cometidas contra os Regulamentos e Contrato de Concessão dos Serviços de Abastecimento de Água e Esgotamento Sanitário.", "Vigente com alterações", "Saneamento Básico", "Penalidades Prestador", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2006/Resolucao_188_2006_Consolidada_Resolu%C3%A7%C3%A3o_35_2024.pdf"],
+          ["Resolução", 175, 2007, "19/12/2007", "Estabelece os procedimentos para a instalação de hidrômetros individualizados em condomínios verticais residenciais e de uso misto no Distrito Federal. Revoga as Resoluções nº 175, de 19 de dezembro de 2007, e nº 99, de 16 de novembro de 2009.", "Revogada", "Saneamento Básico", "Medição Individualizada", "Acessória", "https://www.sinj.df.gov.br/sinj/Norma/56711/adasa_res_175_2007.html#art14"],
+          ["Resolução", 99, 2009, "16/11/2009", "Altera a Resolução nº 175, de 19 de dezembro de 2007, que estabelece os procedimentos para a instalação de hidrômetros individualizados em cada unidade habitacional, nas edificações verticais residenciais e nas de uso misto e nos condomínios residenciais do Distrito Federal.", "Revogada", "Saneamento Básico", "Medição Individualizada", "Acessória", "https://www.sinj.df.gov.br/sinj/Norma/76543/Resolu_o_99_16_11_2009.html"],
+          ["Resolução", 14, 2011, "27/10/2011", "Estabelece as condições da prestação e utilização dos serviços públicos de abastecimento de água e de esgotamento sanitário no Distrito Federal.", "Vigente com alterações", "Saneamento Básico", "Condições Gerais", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/resolucoes_adasa/2011/Versao_Consolidada_Resolucao_n_14_2011.pdf"],
+          ["Resolução", 15, 2011, "10/11/2011", "Estabelece os procedimentos para a instalação de hidrômetros individualizados em condomínios verticais residenciais e de uso misto no Distrito Federal. Revoga as Resoluções nº 175, de 19 de dezembro de 2007, e nº 99, de 16 de novembro de 2009.", "Vigente com alterações", "Saneamento Básico", "Medição Individualizada", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/Res_15_compilada.pdf"],
+          ["Resolução", 3, 2012, "13/04/2012", "Disciplina os procedimentos a serem observados nos processos administrativos instaurados pelo prestador de serviços públicos de abastecimento de água e de esgotamento sanitário que tenham por objetivo a correção de irregularidades praticadas por usuários ou a aplicação de sanções a estes.", "Vigente com alterações", "Saneamento Básico", "Penalidades Usuários", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/resolucoes_adasa/2012/RESOLU%C3%87%C3%83O N%C2%BA 03_2012 Consolidada Site Vrs.pdf"],
+          ["Resolução", 8, 2016, "04/07/2016", "Anexo II - Informações Periódicas Complementares Manual de avaliação de desempenho da prestação dos serviços de abastecimento de água e esgotamento sanitário do Distrito Federal.", "Revogada", "Saneamento Básico", "Indicadores", "Acessória", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2016/pdf_01_03_2023/Resolu%C3%A7%C3%A3o n%C2%BA 08_2016_Anexo II.pdf"],
+          ["Resolução", 8, 2016, "04/07/2016", "Anexo I - Manual de avaliação de desempenho da prestação dos serviços de abastecimento de água e esgotamento sanitário do Distrito Federal.", "Revogada", "Saneamento Básico", "Indicadores", "Acessória", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2016/pdf_01_03_2023/Resolu%C3%A7%C3%A3o n%C2%BA 08_2016_Anexo I.pdf"],
+          ["Resolução", 8, 2016, "04/07/2016", "Dispõe sobre a instituição da metodologia de avaliação de desempenho da prestação dos serviços públicos de abastecimento de água e de esgotamento sanitário do Distrito Federal e sobre os procedimento gerais de comunicações oficiais realizadas entre a ADASA e o prestador de serviços públicos de abastecimento de água e esgotamento sanitário, e dá outras providências.", "Revogada", "Saneamento Básico", "Indicadores", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2016/pdf_01_03_2023/Resolu%C3%A7%C3%A3o n%C2%BA 08_2016.pdf"],
+          ["Resolução", 9, 2016, "13/07/2016", "Estabelece as diretrizes para a constituição, organização e funcionamento do Conselho de Consumidores dos Serviços Públicos de Abastecimento de Água e de Esgotamento Sanitário do Distrito Federal.", "Vigente com alterações", "Saneamento Básico", "Conselho de Consumidores", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2016/pdf_01_03_2023/Resolu%C3%A7%C3%A3o n%C2%BA 09_2016.pdf"],
+          ["Resolução", 20, 2016, "07/11/2016", "Declara o estado de restrição de uso dos recursos hídricos, estabelece o regime de racionamento do serviço de abastecimento de água nas localidades atendidas pelos reservatórios do Descoberto e Santa Maria.", "Revogada", "Saneamento Básico", "Crise Hídrica", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2016/pdf_01_03_2023/Resolu%C3%A7%C3%A3o n%C2%BA 20_2016.pdf"],
+          ["Resolução", 10, 2017, "19/05/2017", "Altera o Art. 1º. da Resolução n° 15, de 10 de novembro de 2011.", "Vigente", "Saneamento Básico", "Medição Individualizada", "Acessória", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2017/Res_17pdf/Resolu%C3%A7%C3%A3o n%C2%BA 10_2017.pdf"],
+          ["Resolução", 21, 2017, "08/09/2017", "Declara estado de restrição de uso dos recursos hídricos e o regime de racionamento nas regiões administrativas de São Sebastião, Sobradinho I e II, Fercal, Planaltina e Brazlândia, atendidas pelos sistemas isolados operados pela Companhia de Saneamento Ambiental do Distrito Federal – CAESB. (Revogada pela Resolução nº 13, de 06 de junho de 2018).", "Revogada", "Saneamento Básico", "Crise Hídrica", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2017/Res_17pdf/Resolu%C3%A7%C3%A3o n%C2%BA 21_2017.pdf"],
+          ["Resolução", 11, 2018, "22/05/2018", "Altera o Art. 29 da Resolução nº. 14, de 27 de outubro de 2011.", "Vigente", "Saneamento Básico", "Condições Gerais", "Acessória", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2018/2018pdf/Resolu%C3%A7%C3%A3o n%C2%BA 11_2018.pdf"],
+          ["Resolução", 13, 2018, "06/06/2018", "Revoga as Resoluções ADASA nº 20/2016 e 21/2017, e estabelece procedimentos complementares, a serem observados pela Concessionária, para o atendimento das Resoluções ADASA nº 8/2018 e 12/2018 e dá outras providências.", "Vigente", "Saneamento Básico", "Crise Hídrica", "Acessória", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2018/2018pdf/Resolu%C3%A7%C3%A3o n%C2%BA 13_2018.pdf"],
+          ["Resolução", 3, 2019, "20/03/2019", "Estabelece diretrizes para implantação e operação de sistemas prediais de água não potável em edificações residenciais.", "Revogada", "Saneamento Básico", "Sistemas Não Potáveis", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2019/2019pdf/Resolu%C3%A7%C3%A3o n%C2%BA 03_2019.pdf"],
+          ["Resolução", 9, 2019, "30/09/2019", "Determina que a Companhia de Saneamento Ambiental do Distrito Federal – Caesb apresente plano para implementar medidas de restrição do abastecimento de água em regiões atendidas por sistemas isolados e sob regime de alocação negociada de recursos hídricos no Distrito Federal.", "Revogada", "Saneamento Básico", "Crise Hídrica", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/resolucoes_adasa/2016/Resolu%C3%A7%C3%A3o n%C2%BA 09_2016 Consolidada.pdf"],
+          ["Resolução", 10, 2019, "07/11/2019", "Dispõe sobre a instituição da metodologia de auditoria e certificação das informações provenientes da prestação dos serviços públicos de abastecimento de água e de esgotamento sanitário no Distrito Federal.", "Vigente", "Saneamento Básico", "Auditoria e Certificação", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2019/2019pdf/Resolu%C3%A7%C3%A3o n%C2%BA 10_2019.pdf"],
+          ["Resolução", 12, 2019, "29/11/2019", "Altera as Resoluções nº 14, de 27 de outubro de 2011, nº 15, de 10 de novembro de 2011 e nº 6, de 26 de april de 2019 e revoga a Resolução nº 10, de 19 de mais de 2017.", "Vigente", "Saneamento Básico", "Condições Gerais", "Acessória", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2019/2019pdf/Resolu%C3%A7%C3%A3o n%C2%BA 12_2019.pdf"],
+          ["Resolução", 15, 2019, "20/12/2019", "Estabelece diretrizes e procedimentos para elaboração e apresentação do Plano de Exploração dos Serviços de Abastecimento de Água e de Esgotamento Sanitário do Distrito Federal.", "Vigente com alterações", "Saneamento Básico", "Plano de Exploração", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/resolucoes_adasa/2019/Resolu%C3%A7%C3%A3o n%C2%BA 15_2019.pdf Site.pdf"],
+          ["Resolução", 16, 2019, "23/12/2019", "Altera a Resolução nº 12, de 29 de novembro de 2019.", "Vigente", "Saneamento Básico", "Condições Gerais", "Acessória", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2019/2019pdf/Resolu%C3%A7%C3%A3o n%C2%BA 16_2019.pdf"],
+          ["Resolução", 7, 2020, "07/05/2020", "Estabelece condições excepcionais para prestação e utilização dos serviços públicos de abastecimento de água e de esgotamento sanitário no Distrito Federal, durante a situação de emergência em saúde pública, em razão da pandemia de COVID-19.", "Revogada", "Saneamento Básico", "Crise Hídrica", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2020/Res_2020pdf/Resolu%C3%A7%C3%A3o n%C2%BA 07_2020 - Estabelece condi%C3%A7%C3%B5es excepcionais dos servi%C3%A7os p%C3%BAblicos, durante a situa%C3%A7%C3%A3o de emerg%C3%AAncia em sa%C3%BAde p%C3%BAblica, em raz%C3%A3o da p.pdf"],
+          ["Resolução", 15, 2020, "02/09/2020", "Altera o art. 6º da Resolução nº 07, de 06 de maio de 2020.", "Revogada", "Saneamento Básico", "Crise Hídrica", "Acessória", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2020/Res_2020pdf/Resolu%C3%A7%C3%A3o n%C2%BA 15_2020 - Altera o art. 6%C2%BA da Resolu%C3%A7%C3%A3o n%C2%BA 07, de 06 de maio de 2020.pdf"],
+          ["Resolução", 2, 2021, "26/03/2021", "Altera a Resolução nº 09, de 13 de julho de 2016 que estabelece as diretrizes para a constituição, organização e funcionamento do Conselho de Consumidores dos Serviços Públicos de Abastecimento de Água e de Esgotamento Sanitário do Distrito Federal.", "Vigente", "Saneamento Básico", "Conselho de Consumidores", "Acessória", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2021/Res_pdf/Resolu%C3%A7%C3%A3o n%C2%BA 02_2021.pdf"],
+          ["Resolução", 6, 2021, "06/05/2021", "Revoga o inciso III do art. 4º da Resolução n.º 07, de 06 de maio de 2020, e dá outras providências.", "Revogada", "Saneamento Básico", "Crise Hídrica", "Acessória", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2021/Res_pdf/Resolu%C3%A7%C3%A3o n%C2%BA 06_2021.pdf"],
+          ["Resolução", 9, 2021, "19/08/2021", "Altera o inciso I do art. 4º da Resolução Adasa nº 7, de 6 de maio de 2020.", "Revogada", "Saneamento Básico", "Crise Hídrica", "Acessória", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2021/Res_pdf/Resolu%C3%A7%C3%A3o n%C2%BA 09_2021.pdf"],
+          ["Resolução", 13, 2021, "20/12/2021", "Institui o Manual de Elaboração e Avaliação dos Projetos do Programa de Pesquisa, Desenvolvimento e Inovação – Programa PDI para os Serviços de Abastecimento de Água e de Esgotamento Sanitário do Distrito Federal e define o limite máximo de investimento autorizado.", "Vigente", "Saneamento Básico", "PDI", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2021/Res_pdf/Resolu%C3%A7%C3%A3o n%C2%BA 13_2021 (1).pdf"],
+          ["Resolução", 3, 2022, "26/04/2022", "Revoga a Resolução Adasa nº 7, de 6 de maio de 2020, e dá outras providências.", "Revogada", "Saneamento Básico", "Crise Hídrica", "Acessória", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2022/res2_pdf/RESOLU%C3%87%C3%83O N%C2%BA 03_2022.pdf"],
+          ["Resolução", 5, 2022, "09/05/2022", "Estabelece diretrizes para o aproveitamento ou reúso de água não potável em edificações no Distrito Federal.", "Vigente", "Saneamento Básico", "Sistemas Não Potáveis", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2022/Resolucao05_09052022_.pdf"],
+          ["Resolução", 10, 2022, "26/09/2022", "Altera a Resolução nº 14, de 27 de outubro de 2011.", "Vigente", "Saneamento Básico", "Condições Gerais", "Acessória", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2022/RESOLU%C3%87%C3%83O_N_010_2022.pdf"],
+          ["Resolução", 13, 2022, "19/12/2022", "Aprova o Plano de Exploração dos Serviços de Abastecimento de Água e de Esgotamento Sanitário do Distrito Federal e dá outras providências.", "Vigente", "Saneamento Básico", "Plano de Exploração", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2022/res2_pdf/RESOLU%C3%87%C3%83O%20N%C2%BA%2013_2022.pdf"],
+          ["Resolução", 17, 2023, "06/03/2023", "Altera a Resolução n.º 188, de 24 de maio de 2006.", "Vigente", "Saneamento Básico", "Penalidades Prestador", "Acessória", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2023/RESOLU%C3%87%C3%83O N%C2%BA 17_2023_Altera%C3%A7%C3%A3o Resolu%C3%A7%C3%A3o 188_2006_Penalidades.pdf"],
+          ["Resolução", 23, 2023, "06/07/2023", "Aprova os projetos do Programa de Pesquisa, Desenvolvimento e Inovação – PDI – Adasa/Caesb.", "Vigente", "Saneamento Básico", "PDI", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/resolucoes_adasa/2023/RESOLU%C3%87%C3%83O N%C2%BA 23.23_ PDI1.pdf"],
+          ["Resolução", 21, 2023, "17/07/2023", "Altera a Resolução nº 03, de 13 de april de 2012.", "Vigente", "Saneamento Básico", "Penalidades Usuários", "Acessória", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2023/RESOLU%C3%87%C3%83O N%C2%BA 21_2023 Vers%C3%A3o Final Republicada.pdf"],
+          ["Resolução", 25, 2023, "17/08/2023", "Estabelece procedimentos gerais para execução integrada das atividades de inspeção, identificação e correção dos lançamentos irregulares de esgotos sanitários ou outros efluentes no sistema público de drenagem e manejo de águas pluviais urbanas e de águas pluviais no sistema público de esgotamento sanitário.", "Vigente", "Saneamento Básico", "Interface Esgoto Drenagem", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/resolucoes_adasa/2023/RESOLU%C3%87%C3%83O N%C2%BA 25-2023.pdf"],
+          ["Resolução", 41, 2024, "24/10/2024", "Estabelece, no Distrito Federal, as metas progressivas de universalização de abastecimento de água e de esgotamento sanitário, indicadores de acesso e sistema de avaliação, em adoção à Norma de Referência nº 8/2024, da Agência Nacional de Águas e Saneamento Básico – ANA.", "Vigente", "Saneamento Básico", "Indicadores", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/resolucoes_adasa/2024/RESOLU%C3%87%C3%83O_N%C2%BA_41_2024_-_Ado%C3%A7%C3%A3o_da_Norma_de_Refer%C3%AAncia_n%C2%BA_8-2024_ANA_1.pdf"],
+          ["Resolução", 48, 2024, "23/12/2024", "Estabelece diretrizes e procedimentos para a execução das atividades realizadas por caminhões limpa-fossa no Distrito Federal e dá outras providências", "Vigente", "Saneamento Básico", "Caminhões Limpa-fossa", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/resolucoes_adasa/2024/SEI_159268953_Resolucao_48_3.pdf"],
+          ["Resolução", 57, 2025, "06/10/2025", "Aprova os projetos do Programa de Pesquisa, Desenvolvimento e Inovação – PDI – Adasa/Caesb, para os Serviços de Abastecimento de Água e de Esgotamento Sanitário do Distrito Federal, apresentados pela Concessionária, nos termos da Resolução nº 13, de 20 de dezembro de 2021.", "Vigente", "Saneamento Básico", "PDI", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/resolucoes_adasa/2025/SEI_183620524_Resolucao_57.pdf"],
+          ["Resolução", 58, 2025, "05/11/2025", "Dispõe sobre as soluções alternativas de abastecimento de água e de esgotamento sanitário, individuais e coletivas, quando configuradas como serviço público ou ações de saneamento de responsabilidade privada, e sua contabilização para fins de cumprimento das metas de universalização no Distrito Federal, e dá outras providências.", "Vigente", "Saneamento Básico", "Soluções Alternativas", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/resolucoes_adasa/2025/SEI_186418676_Resolucao_58.pdf"],
+          ["Resolução", 59, 2025, "12/11/2025", "Dispõe sobre indicadores operacionais da prestação dos serviços públicos de abastecimento de água e esgotamento sanitário no Distrito Federal, em adoção à Norma de Referência nº 9/2024, da Agência Nacional de Águas e Saneamento Básico.", "Vigente", "Saneamento Básico", "Indicadores", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/resolucoes_adasa/2025/SEI_187086634_Resolucao_59.pdf"],
+          ["Resolução", 65, 2025, "05/12/2025", "Altera as Resoluções nº 03, de 13 de abril de 2012, nº 21, de 17 de julho de 2023 e nº 14, de 27 de outubro de 2011.", "Vigente", "Saneamento Básico", "Penalidades Usuários", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/resolucoes_adasa/2025/SEI_189034238_Resolucao_65.pdf"]
+        ];
+
+        for (const row of seedRows) {
+          await client.query(
+            "INSERT INTO re_resolutions (especie, numero, ano, data, ementa, situacao, area, segmento, tipo, link) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+            row
+          );
+        }
+        console.log("Seeding re_resolutions in api completed successfully!");
+      }
+
       await client.query("COMMIT");
       console.log("Database tables verified successfully on server start!");
     } catch (err) {
@@ -2133,6 +2207,110 @@ async function startServer() {
       res.json({ success: true, deletedId: catId });
     } catch (error: any) {
       console.error("Erro ao deletar categoria:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // REST endpoints for resolutions (prefix re_)
+  app.get("/api/resolutions", async (req, res) => {
+    try {
+      const pool = getDbPool();
+      const result = await pool.query("SELECT * FROM re_resolutions ORDER BY numero DESC, ano DESC");
+      res.json({ success: true, data: result.rows });
+    } catch (error: any) {
+      console.error("Erro ao obter resoluções:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/resolutions", async (req, res) => {
+    try {
+      const { especie, numero, ano, data, ementa, situacao, area, segmento, tipo, link } = req.body;
+      const pool = getDbPool();
+      const result = await pool.query(
+        "INSERT INTO re_resolutions (especie, numero, ano, data, ementa, situacao, area, segmento, tipo, link) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *",
+        [especie || "Resolução", parseInt(numero) || 0, parseInt(ano) || 0, data || "", ementa || "", situacao || "Vigente", area || "", segmento || "", tipo || "Principal", link || ""]
+      );
+      res.json({ success: true, data: result.rows[0] });
+    } catch (error: any) {
+      console.error("Erro ao criar resolução:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.put("/api/resolutions/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { especie, numero, ano, data, ementa, situacao, area, segmento, tipo, link } = req.body;
+      const pool = getDbPool();
+      const result = await pool.query(
+        "UPDATE re_resolutions SET especie = $1, numero = $2, ano = $3, data = $4, ementa = $5, situacao = $6, area = $7, segmento = $8, tipo = $9, link = $10 WHERE id = $11 RETURNING *",
+        [especie || "Resolução", parseInt(numero) || 0, parseInt(ano) || 0, data || "", ementa || "", situacao || "Vigente", area || "", segmento || "", tipo || "Principal", link || "", id]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ success: false, error: "Resolução não encontrada" });
+      }
+      res.json({ success: true, data: result.rows[0] });
+    } catch (error: any) {
+      console.error("Erro ao atualizar resolução:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.delete("/api/resolutions/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const pool = getDbPool();
+      await pool.query("DELETE FROM re_resolutions WHERE id = $1", [id]);
+      res.json({ success: true, deletedId: id });
+    } catch (error: any) {
+      console.error("Erro ao deletar resolução:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/resolutions/import", async (req, res) => {
+    try {
+      const { csvData } = req.body;
+      if (!csvData) {
+        return res.status(400).json({ success: false, error: "Nenhum dado CSV fornecido." });
+      }
+      
+      const pool = getDbPool();
+      const records = parse(csvData, {
+        delimiter: ";",
+        columns: true,
+        skip_empty_lines: true,
+        relax_column_count: true
+      });
+
+      console.log(`Importing ${records.length} records...`);
+      let count = 0;
+      for (const r of records) {
+        const row = r as any;
+        const especie = (row.especie || "").trim();
+        const numero = parseInt(row.Numero || row.numero) || 0;
+        const ano = parseInt(row.ano) || 1900;
+        const dataStr = (row.data || "").trim();
+        const ementa = (row.ementa || "").trim();
+        const situacao = (row.situacao || "").trim();
+        const area = (row.area || "").trim();
+        const segmento = (row.segmento || "").trim();
+        const tipo = (row.tipo || "").trim();
+        const link = (row.link || "").trim();
+
+        if (especie || numero) {
+          await pool.query(
+            "INSERT INTO re_resolutions (especie, numero, ano, data, ementa, situacao, area, segmento, tipo, link) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+            [especie || "Resolução", numero, ano, dataStr, ementa, situacao || "Vigente", area, segmento, tipo, link]
+          );
+          count++;
+        }
+      }
+
+      res.json({ success: true, count });
+    } catch (error: any) {
+      console.error("Erro ao importar CSV:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
