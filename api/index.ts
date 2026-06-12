@@ -540,7 +540,7 @@ async function runStartupMigration() {
 
       const resCheck = await client.query("SELECT COUNT(*) FROM re_resolutions");
       if (parseInt(resCheck.rows[0].count) === 0) {
-        console.log("Seeding re_resolutions table in api...");
+        console.log("Seeding re_resolutions in api...");
         const seedRows = [
           ["Resolução", 162, 2006, "11/05/2006", "Estabelece os procedimentos para a instalação de hidrômetros individualizados em condomínios verticais residenciais e de uso misto no Distrito Federal. Revoga as Resoluções nº 175, de 19 de dezembro de 2007, e nº 99, de 16 de novembro de 2009.", "Revogada", "Saneamento Básico", "Medição Individualizada", "Acessória", "https://www.sinj.df.gov.br/sinj/Norma/52952/Resolu_o_162_11_05_2006.html"],
           ["Resolução", 188, 2006, "24/05/2006", "Regulamenta os procedimentos para aplicação de penalidades às infrações cometidas contra os Regulamentos e Contrato de Concessão dos Serviços de Abastecimento de Água e Esgotamento Sanitário.", "Vigente com alterações", "Saneamento Básico", "Penalidades Prestador", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2006/Resolucao_188_2006_Consolidada_Resolu%C3%A7%C3%A3o_35_2024.pdf"],
@@ -575,8 +575,8 @@ async function runStartupMigration() {
           ["Resolução", 10, 2022, "26/09/2022", "Altera a Resolução nº 14, de 27 de outubro de 2011.", "Vigente", "Saneamento Básico", "Condições Gerais", "Acessória", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2022/RESOLU%C3%87%C3%83O_N_010_2022.pdf"],
           ["Resolução", 13, 2022, "19/12/2022", "Aprova o Plano de Exploração dos Serviços de Abastecimento de Água e de Esgotamento Sanitário do Distrito Federal e dá outras providências.", "Vigente", "Saneamento Básico", "Plano de Exploração", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2022/res2_pdf/RESOLU%C3%87%C3%83O%20N%C2%BA%2013_2022.pdf"],
           ["Resolução", 17, 2023, "06/03/2023", "Altera a Resolução n.º 188, de 24 de maio de 2006.", "Vigente", "Saneamento Básico", "Penalidades Prestador", "Acessória", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2023/RESOLU%C3%87%C3%83O N%C2%BA 17_2023_Altera%C3%A7%C3%A3o Resolu%C3%A7%C3%A3o 188_2006_Penalidades.pdf"],
-          ["Resolução", 23, 2023, "06/07/2023", "Aprova os projetos do Programa de Pesquisa, Desenvolvimento e Inovação – PDI – Adasa/Caesb.", "Vigente", "Saneamento Básico", "PDI", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/resolucoes_adasa/2023/RESOLU%C3%87%C3%83O N%C2%BA 23.23_ PDI1.pdf"],
-          ["Resolução", 21, 2023, "17/07/2023", "Altera a Resolução nº 03, de 13 de april de 2012.", "Vigente", "Saneamento Básico", "Penalidades Usuários", "Acessória", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2023/RESOLU%C3%87%C3%83O N%C2%BA 21_2023 Vers%C3%A3o Final Republicada.pdf"],
+          ["Resolução", 23, 2023, "06/07/2023", "Aprova os projects do Programa de Pesquisa, Desenvolvimento e Inovação – PDI – Adasa/Caesb.", "Vigente", "Saneamento Básico", "PDI", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/resolucoes_adasa/2023/RESOLU%C3%87%C3%83O N%C2%BA 23.23_ PDI1.pdf"],
+          ["Resolução", 21, 2023, "17/07/2023", "Altera a Resolução nº 03, de 13 de abril de 2012.", "Vigente", "Saneamento Básico", "Penalidades Usuários", "Acessória", "https://www.adasa.df.gov.br/images/storage/legislacao/Res_ADASA/2023/RESOLU%C3%87%C3%83O N%C2%BA 21_2023 Vers%C3%A3o Final Republicada.pdf"],
           ["Resolução", 25, 2023, "17/08/2023", "Estabelece procedimentos gerais para execução integrada das atividades de inspeção, identificação e correção dos lançamentos irregulares de esgotos sanitários ou outros efluentes no sistema público de drenagem e manejo de águas pluviais urbanas e de águas pluviais no sistema público de esgotamento sanitário.", "Vigente", "Saneamento Básico", "Interface Esgoto Drenagem", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/resolucoes_adasa/2023/RESOLU%C3%87%C3%83O N%C2%BA 25-2023.pdf"],
           ["Resolução", 41, 2024, "24/10/2024", "Estabelece, no Distrito Federal, as metas progressivas de universalização de abastecimento de água e de esgotamento sanitário, indicadores de acesso e sistema de avaliação, em adoção à Norma de Referência nº 8/2024, da Agência Nacional de Águas e Saneamento Básico – ANA.", "Vigente", "Saneamento Básico", "Indicadores", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/resolucoes_adasa/2024/RESOLU%C3%87%C3%83O_N%C2%BA_41_2024_-_Ado%C3%A7%C3%A3o_da_Norma_de_Refer%C3%AAncia_n%C2%BA_8-2024_ANA_1.pdf"],
           ["Resolução", 48, 2024, "23/12/2024", "Estabelece diretrizes e procedimentos para a execução das atividades realizadas por caminhões limpa-fossa no Distrito Federal e dá outras providências", "Vigente", "Saneamento Básico", "Caminhões Limpa-fossa", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/resolucoes_adasa/2024/SEI_159268953_Resolucao_48_3.pdf"],
@@ -584,6 +584,67 @@ async function runStartupMigration() {
           ["Resolução", 58, 2025, "05/11/2025", "Dispõe sobre as soluções alternativas de abastecimento de água e de esgotamento sanitário, individuais e coletivas, quando configuradas como serviço público ou ações de saneamento de responsabilidade privada, e sua contabilização para fins de cumprimento das metas de universalização no Distrito Federal, e dá outras providências.", "Vigente", "Saneamento Básico", "Soluções Alternativas", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/resolucoes_adasa/2025/SEI_186418676_Resolucao_58.pdf"],
           ["Resolução", 59, 2025, "12/11/2025", "Dispõe sobre indicadores operacionais da prestação dos serviços públicos de abastecimento de água e esgotamento sanitário no Distrito Federal, em adoção à Norma de Referência nº 9/2024, da Agência Nacional de Águas e Saneamento Básico.", "Vigente", "Saneamento Básico", "Indicadores", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/resolucoes_adasa/2025/SEI_187086634_Resolucao_59.pdf"],
           ["Resolução", 65, 2025, "05/12/2025", "Altera as Resoluções nº 03, de 13 de abril de 2012, nº 21, de 17 de julho de 2023 e nº 14, de 27 de outubro de 2011.", "Vigente", "Saneamento Básico", "Penalidades Usuários", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/resolucoes_adasa/2025/SEI_189034238_Resolucao_65.pdf"]
+        ];
+
+        for (const row of seedRows) {
+          await client.query(
+            "INSERT INTO re_resolutions (especie, numero, ano, data, ementa, situacao, area, segmento, tipo, link) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
+            row
+          );
+        }
+        console.log("Seeding re_resolutions in api completed successfully!");
+      }
+
+      // Ensure pu_publications table exists for publications module
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS pu_publications (
+          id SERIAL PRIMARY KEY,
+          titulo_assunto TEXT,
+          descricao TEXT,
+          tipo_documento VARCHAR(255),
+          responsavel_autor VARCHAR(255),
+          data_publicacao VARCHAR(50),
+          link_acesso TEXT,
+          observacoes TEXT
+        );
+      `);
+
+      const pubCheck = await client.query("SELECT COUNT(*) FROM pu_publications");
+      if (parseInt(pubCheck.rows[0].count) === 0) {
+        console.log("Seeding pu_publications table with parsed historical rows in api...");
+        const pubSeedRows = [
+          ["Relatório de Atividades de 2019", "Documento institucional que consolida as ações, fiscalizações e resultados regulatórios da SAE/Adasa ao longo do ano de 2019.", "Relatório de Atividades", "Superintendência", "31/12/2019", "https://www.adasa.df.gov.br/images/storage/area_de_atuacao/abastecimento_agua_esgotamento_sanitario/INFORMATIVOS/REL_ATIVIDADES_SAE_2019.pdf", ""],
+          ["Relatório de Atividades de 2020", "Documento institucional que consolida as ações, fiscalizações e resultados regulatórios da SAE/Adasa ao longo do ano de 2020.", "Relatório de Atividades", "Superintendência", "31/12/2020", "https://www.adasa.df.gov.br/images/storage/area_de_atuacao/abastecimento_agua_esgotamento_sanitario/INFORMATIVOS/RELATORIO_DE_ATIVIDADES_SAE_2020vf.pdf", ""],
+          ["Relatório de Atividades de 2021", "Documento institucional que consolida as ações, fiscalizações e resultados regulatórios da SAE/Adasa ao longo do ano de 2021", "Relatório de Atividades", "Superintendência", "31/12/2021", "https://www.adasa.df.gov.br/images/storage/area_de_atuacao/abastecimento_agua_esgotamento_sanitario/INFORMATIVOS/2021_SAE_RELATORIO_DE_ATIVIDADES_SAE.pdf", ""],
+          ["Relatório de Atividades de 2022", "Documento institucional que consolida as ações, fiscalizações e resultados regulatórios da SAE/Adasa ao longo do ano de 2022.", "Relatório de Atividades", "Superintendência", "31/12/2022", "https://www.adasa.df.gov.br/images/storage/area_de_atuacao/abastecimento_agua_esgotamento_sanitario/INFORMATIVOS/Relat%C3%B3rio%20Final%20de%20Atividades%202022.pdf", ""],
+          ["Relatório de Atividades de 2023", "Documento institucional que consolida as ações, fiscalizações e resultados regulatórios da SAE/Adasa ao longo do ano de 2023.", "Relatório de Atividades", "Superintendência", "31/12/2023", "https://www.adasa.df.gov.br/images/storage/area_de_atuacao/abastecimento_agua_esgotamento_sanitario/INFORMATIVOS/2023_SAE_RelatorioAtividades.pdf", ""],
+          ["Relatório de Atividades de 2024", "Documento institucional que consolida as ações, fiscalizações e resultados regulatórios da SAE/Adasa ao longo do ano de 2024.", "Relatório de Atividades", "Superintendência", "31/12/2024", "https://www.adasa.df.gov.br/images/storage/area_de_atuacao/abastecimento_agua_esgotamento_sanitario/INFORMATIVOS/2024Sae_RelatorioAtividadesSAE_2024.pdf", ""],
+          ["Relatório de Atividades de 2025", "Documento institucional que consolida as ações, fiscalizações e resultados regulatórios da SAE/Adasa ao longo do ano de 2025.", "Relatório de Atividades", "Superintendência", "31/12/2025", "https://samediasites.blob.core.windows.net/hotsites-wp-media/SAE/Relatorio%20de%20atividades/Relat%C3%B3rio_%20SAE_Impress%C3%A3o%20(1)_compressed%20(1).pdf", ""],
+          ["Boletim Informativo 04-25 (Outubro a Dezembro)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 4º trimestre de 2025.", "Boletim", "Superintendência", "31/12/2025", "https://www.adasa.df.gov.br/images/storage/area_de_atuacao/abastecimento_agua_esgotamento_sanitario/Boletim_Informativo/Boletim4Trimestre_2025.pdf", ""],
+          ["Boletim Informativo 03-25 (Julho a Setembro)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 3º trimestre de 2025.", "Boletim", "Superintendência", "30/09/2025", "https://www.adasa.df.gov.br/images/storage/area_de_atuacao/abastecimento_agua_esgotamento_sanitario/Boletim_Informativo/Boletim_3_Trimestre_2025_compressed.pdf", ""],
+          ["Boletim Informativo 02-25 (Abril a Junho)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 2º trimestre de 2025.", "Boletim", "Superintendência", "30/06/2025", "https://www.canva.com/design/DAGsfRNxAq4/510wjGIwRs4e1zSbPNcUrA/view?utm_content=DAGsfRNxAq4&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=h3886a200ef", ""],
+          ["Boletim Informativo 01-25 (Janeiro a Março)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 1º trimestre de 2025.", "Boletim", "Superintendência", "31/03/2025", "https://www.adasa.df.gov.br/images/storage/area_de_atuacao/abastecimento_agua_esgotamento_sanitario/Boletim_Informativo/Boletim_1_Trimestre_2025_compressed.pdf", ""],
+          ["Boletim Informativo 04-24 (outubro a dezembro)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 4º trimestre de 2024.", "Boletim", "Superintendência", "31/12/2024", "https://www.adasa.df.gov.br/images/storage/area_de_atuacao/abastecimento_agua_esgotamento_sanitario/Boletim_Informativo/BoletimInformativo_042024.pdf", ""],
+          ["Boletim Informativo 03-24 (julho a setembro)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 3º trimestre de 2024.", "Boletim", "Superintendência", "30/09/2024", "https://sway.cloud.microsoft/hqMgrAW5pNJLSICc", ""],
+          ["Boletim informativo 02-24 (abril a junho)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 2º trimestre de 2024.", "Boletim", "Superintendência", "30/06/2024", "https://sway.cloud.microsoft/DjbaBR2OJBB08TAq?ref=Link", ""],
+          ["Boletim informativo 01-24 (janeiro a março)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 1º trimestre de 2024.", "Boletim", "Superintendência", "31/03/2024", "https://sway.cloud.microsoft/tFVgNJkXYuODX76t?ref=Link", ""],
+          ["Boletim Informativo 04-23 (Outubro a Dezembro)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 4º trimestre de 2023.", "Boletim", "Superintendência", "31/12/2023", "https://sway.cloud.microsoft/982okByINhIRKXBg?ref=Link", ""],
+          ["Boletim Informativo 03-23 (Julho a Setembro)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 3º trimestre de 2023.", "Boletim", "Superintendência", "30/09/2023", "https://sway.office.com/v3lJyMVb2wdZfDDB", ""],
+          ["Boletim Informativo 02-23 (Abril a Junho)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 2º trimestre de 2023.", "Boletim", "Superintendência", "30/06/2023", "https://sway.office.com/WXWWGwTMGG8HrqjH?ref=Link", ""],
+          ["Boletim Informativo 01-23 (Janeiro a Março)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 1º trimestre de 2023.", "Boletim", "Superintendência", "31/03/2023", "https://sway.office.com/Mp1OOSARmKY3b0wD?ref=Link", ""]
+        ];
+
+        for (const row of pubSeedRows) {
+          await client.query(
+            "INSERT INTO pu_publications (titulo_assunto, descricao, tipo_documento, responsavel_autor, data_publicacao, link_acesso, observacoes) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+            row
+          );
+        }
+        console.log("Seeding pu_publications in api completed successfully!");
+      }
+
+      await client.query("COMMIT");
+      console.log("Database tables verified successfully on server start!"); Usuários", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/resolucoes_adasa/2025/SEI_189034238_Resolucao_65.pdf"]
         ];
 
         for (const row of seedRows) {
@@ -2311,6 +2372,121 @@ async function startServer() {
       res.json({ success: true, count });
     } catch (error: any) {
       console.error("Erro ao importar CSV:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // REST endpoints for publications (prefix pu_)
+  app.get("/api/publications", async (req, res) => {
+    try {
+      const pool = getDbPool();
+      const result = await pool.query("SELECT * FROM pu_publications ORDER BY id DESC");
+      res.json({ success: true, data: result.rows });
+    } catch (error: any) {
+      console.error("Erro ao obter publicações:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/publications", async (req, res) => {
+    try {
+      const { titulo_assunto, descricao, tipo_documento, responsavel_autor, data_publicacao, link_acesso, observacoes } = req.body;
+      const pool = getDbPool();
+      const result = await pool.query(
+        "INSERT INTO pu_publications (titulo_assunto, descricao, tipo_documento, responsavel_autor, data_publicacao, link_acesso, observacoes) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
+        [titulo_assunto || "", descricao || "", tipo_documento || "", responsavel_autor || "", data_publicacao || "", link_acesso || "", observacoes || ""]
+      );
+      res.json({ success: true, data: result.rows[0] });
+    } catch (error: any) {
+      console.error("Erro ao criar publicação:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.put("/api/publications/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { titulo_assunto, descricao, tipo_documento, responsavel_autor, data_publicacao, link_acesso, observacoes } = req.body;
+      const pool = getDbPool();
+      const result = await pool.query(
+        "UPDATE pu_publications SET titulo_assunto = $1, descricao = $2, tipo_documento = $3, responsavel_autor = $4, data_publicacao = $5, link_acesso = $6, observacoes = $7 WHERE id = $8 RETURNING *",
+        [titulo_assunto || "", descricao || "", tipo_documento || "", responsavel_autor || "", data_publicacao || "", link_acesso || "", observacoes || "", id]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ success: false, error: "Publicação não encontrada" });
+      }
+      res.json({ success: true, data: result.rows[0] });
+    } catch (error: any) {
+      console.error("Erro ao atualizar publicação:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.delete("/api/publications/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const pool = getDbPool();
+      const result = await pool.query("DELETE FROM pu_publications WHERE id = $1 RETURNING id", [id]);
+      if (result.rows.length === 0) {
+        return res.status(404).json({ success: false, error: "Publicação não encontrada" });
+      }
+      res.json({ success: true, deletedId: id });
+    } catch (error: any) {
+      console.error("Erro ao deletar publicação:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/publications/import", async (req, res) => {
+    try {
+      const { csvData } = req.body;
+      if (!csvData) {
+        return res.status(400).json({ success: false, error: "Nenhum dado CSV fornecido." });
+      }
+
+      const pool = getDbPool();
+      const lines = csvData.split(/\r?\n/);
+      let count = 0;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        // Skip header if it is present
+        if (i === 0 && line.toLowerCase().includes("titulo_assunto") && line.toLowerCase().includes("descricao")) {
+          continue;
+        }
+
+        // Split by semicolon
+        const parts = line.split(";");
+        if (parts.length >= 2) {
+          // If ID is specified in first column, handle it
+          let offset = 0;
+          if (parts.length >= 8 && !isNaN(parseInt(parts[0]))) {
+            offset = 1;
+          }
+
+          const titulo = (parts[0 + offset] || "").trim();
+          const desc = (parts[1 + offset] || "").trim();
+          const docType = (parts[2 + offset] || "").trim();
+          const author = (parts[3 + offset] || "").trim();
+          const pubDate = (parts[4 + offset] || "").trim();
+          const link = (parts[5 + offset] || "").trim();
+          const obs = (parts[6 + offset] || "").trim();
+
+          if (titulo && desc) {
+            await pool.query(
+              "INSERT INTO pu_publications (titulo_assunto, descricao, tipo_documento, responsavel_autor, data_publicacao, link_acesso, observacoes) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+              [titulo, desc, docType, author, pubDate, link, obs]
+            );
+            count++;
+          }
+        }
+      }
+
+      res.json({ success: true, count });
+    } catch (error: any) {
+      console.error("Erro ao importar CSV de publicações:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
