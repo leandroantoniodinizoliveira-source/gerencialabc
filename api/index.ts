@@ -49,9 +49,9 @@ function parseSafeFloatOrNull(val: any): number | null {
 
 function getDbPool(): Pool {
   if (!dbPool) {
-    const connectionString = process.env.DATABASE_URL;
+    const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL;
     if (!connectionString) {
-      throw new Error("A variável DATABASE_URL (Neon PostgreSQL) está ausente no ambiente.");
+      throw new Error("As variáveis de conexão (DATABASE_URL ou POSTGRES_URL) estão ausentes no ambiente.");
     }
     // Remove o parâmetro "channel_binding=require" se existir, pois o Node.js pg
     // node-postgres pode ter problemas de compatibilidade com ele em algumas versões,
@@ -641,19 +641,6 @@ async function runStartupMigration() {
           );
         }
         console.log("Seeding pu_publications in api completed successfully!");
-      }
-
-      await client.query("COMMIT");
-      console.log("Database tables verified successfully on server start!"); Usuários", "Principal", "https://www.adasa.df.gov.br/images/storage/legislacao/resolucoes_adasa/2025/SEI_189034238_Resolucao_65.pdf"]
-        ];
-
-        for (const row of seedRows) {
-          await client.query(
-            "INSERT INTO re_resolutions (especie, numero, ano, data, ementa, situacao, area, segmento, tipo, link) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
-            row
-          );
-        }
-        console.log("Seeding re_resolutions in api completed successfully!");
       }
 
       await client.query("COMMIT");
