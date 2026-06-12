@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useState, useEffect } from "react";
-import { Plus, Edit2, Trash2, ArrowUpRight, Search, X, Upload, CheckCircle2, ChevronDown, ChevronUp, FileSpreadsheet, BookOpen, ExternalLink, Filter } from "lucide-react";
+import { Plus, Edit2, Trash2, ArrowUpRight, Search, X, Upload, CheckCircle2, ChevronDown, ChevronUp, FileSpreadsheet, BookOpen, ExternalLink, Filter, ArrowUpDown, ArrowDown, ArrowUp } from "lucide-react";
 
 interface Publication {
   id: number;
@@ -11,6 +11,7 @@ interface Publication {
   data_publicacao: string;
   link_acesso: string;
   observacoes: string;
+  imagem_capa?: string;
 }
 
 interface PublicationsTabProps {
@@ -41,10 +42,17 @@ export function PublicationsTab({ showToast, currentUser }: PublicationsTabProps
   const [formAutor, setFormAutor] = useState("");
   const [formDataPub, setFormDataPub] = useState("");
   const [formLink, setFormLink] = useState("");
+  const [formImagemCapa, setFormImagemCapa] = useState("");
   const [formObservacoes, setFormObservacoes] = useState("");
 
   const [csvText, setCsvText] = useState("");
   const [isImporting, setIsImporting] = useState(false);
+
+  // Sorting state
+  const [sortConfig, setSortConfig] = useState<{
+    key: keyof Publication;
+    direction: "asc" | "desc";
+  }>({ key: "data_publicacao", direction: "desc" });
 
   // Load data
   const fetchPublications = async () => {
@@ -88,6 +96,7 @@ export function PublicationsTab({ showToast, currentUser }: PublicationsTabProps
     setFormAutor("Superintendência");
     setFormDataPub("");
     setFormLink("");
+    setFormImagemCapa("");
     setFormObservacoes("");
     setIsModalOpen(true);
   };
@@ -100,8 +109,27 @@ export function PublicationsTab({ showToast, currentUser }: PublicationsTabProps
     setFormAutor(pub.responsavel_autor);
     setFormDataPub(pub.data_publicacao);
     setFormLink(pub.link_acesso);
+    setFormImagemCapa(pub.imagem_capa || "");
     setFormObservacoes(pub.observacoes);
     setIsModalOpen(true);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) { // 2MB limite
+      showToast("Arquivo muito grande", "A imagem deve ter no máximo 2MB.", "error");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setFormImagemCapa(event.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -118,7 +146,8 @@ export function PublicationsTab({ showToast, currentUser }: PublicationsTabProps
       responsavel_autor: formAutor,
       data_publicacao: formDataPub,
       link_acesso: formLink,
-      observacoes: formObservacoes
+      observacoes: formObservacoes,
+      imagem_capa: formImagemCapa
     };
 
     try {
@@ -207,6 +236,54 @@ export function PublicationsTab({ showToast, currentUser }: PublicationsTabProps
     const matchesAutor = filterAutor === "TODOS" || pub.responsavel_autor === filterAutor;
 
     return matchesSearch && matchesTipoDoc && matchesAutor;
+  });
+
+  const handleSort = (key: keyof Publication) => {
+    setSortConfig(prev => {
+      if (prev?.key === key) {
+        return { key, direction: prev.direction === "asc" ? "desc" : "asc" };
+      }
+      return { key, direction: "desc" }; // Default to desc for new columns
+    });
+  };
+
+  const getSortIcon = (key: keyof Publication) => {
+    if (sortConfig?.key !== key) return <ArrowUpDown size={12} className="text-slate-300 ml-1" />;
+    return sortConfig.direction === "asc" ? <ArrowUp size={12} className="text-indigo-600 ml-1" /> : <ArrowDown size={12} className="text-indigo-600 ml-1" />;
+  };
+
+  const parseDate = (dateStr: string) => {
+    if (!dateStr) return 0;
+    // Assuming DD/MM/YYYY
+    const parts = dateStr.split("/");
+    if (parts.length === 3) {
+      return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0])).valueOf();
+    }
+    // If it's just year YYYY
+    if (parts.length === 1 && dateStr.length === 4) {
+      return new Date(parseInt(dateStr), 0, 1).valueOf();
+    }
+    return 0; // Fallback
+  };
+
+  const sortedFiltered = [...filtered].sort((a, b) => {
+    if (!sortConfig) return 0;
+    
+    const { key, direction } = sortConfig;
+    const dirMultipler = direction === "asc" ? 1 : -1;
+
+    if (key === "data_publicacao") {
+      const dateA = parseDate(a.data_publicacao);
+      const dateB = parseDate(b.data_publicacao);
+      return (dateA - dateB) * dirMultipler;
+    }
+
+    const valA = (a[key] || "").toString().toLowerCase();
+    const valB = (b[key] || "").toString().toLowerCase();
+    
+    if (valA < valB) return -1 * dirMultipler;
+    if (valA > valB) return 1 * dirMultipler;
+    return 0;
   });
 
   return (
@@ -336,99 +413,99 @@ export function PublicationsTab({ showToast, currentUser }: PublicationsTabProps
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filtered.map(pub => {
-            const isExpanded = expandedDescs.includes(pub.id);
-            return (
-              <div 
-                key={pub.id}
-                className="bg-white border border-slate-100 rounded-2xl p-5 hover:shadow-lg transition-all flex flex-col justify-between"
-              >
-                <div>
-                  {/* Badge Row */}
-                  <div className="flex items-center justify-between gap-2 mb-3.5">
-                    <span className="px-2.5 py-1 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-lg text-[10px] font-black uppercase">
-                      {pub.tipo_documento || "Documento"}
-                    </span>
-                    <span className="text-slate-400 text-[10px] font-bold">
-                      {pub.data_publicacao || "S/D"}
-                    </span>
-                  </div>
-
-                  {/* Title */}
-                  <h3 className="text-sm font-black text-slate-800 mb-2 leading-snug">
-                    {pub.titulo_assunto}
-                  </h3>
-
-                  {/* Author metadata */}
-                  <div className="flex items-center gap-1.5 text-slate-400 text-xs leading-none mb-4">
-                    <span className="font-semibold text-slate-500">Resp/Autor:</span>
-                    <span>{pub.responsavel_autor || "Não informado"}</span>
-                  </div>
-
-                  {/* Description Box with Expand Toggle */}
-                  <div className="relative mb-4 bg-slate-50 rounded-xl p-3 text-xs leading-relaxed text-slate-600">
-                    <div className={!isExpanded ? "line-clamp-3" : ""}>
-                      {pub.descricao}
-                    </div>
-                    {pub.descricao && pub.descricao.length > 120 && (
-                      <button
-                        onClick={() => toggleDesc(pub.id)}
-                        className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-600 hover:text-indigo-700 mt-2 hover:underline cursor-pointer"
-                      >
-                        {isExpanded ? (
-                          <>Recolher <ChevronUp size={10} /></>
-                        ) : (
-                          <>Ler Resumo Completo <ChevronDown size={10} /></>
-                        )}
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Observações metadata */}
-                  {pub.observacoes && (
-                    <div className="border-t border-dashed border-slate-100 pt-3 mb-4 text-[11px] text-slate-500 flex gap-2">
-                      <span className="font-extrabold text-slate-600">Obs:</span>
-                      <span className="italic">{pub.observacoes}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="border-t border-slate-50 pt-4 flex items-center justify-between gap-3">
-                  {pub.link_acesso ? (
-                    <a
-                      href={pub.link_acesso}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-[10px] rounded-lg transition-colors flex items-center gap-1 hover:underline"
-                    >
-                      Acessar arquivo
-                      <ArrowUpRight size={12} className="text-slate-500" />
-                    </a>
-                  ) : (
-                    <span className="text-[10px] text-slate-400 italic">Sem link associado</span>
-                  )}
-
-                  <div className="flex items-center gap-1">
-                    <button
-                      onClick={() => handleOpenEdit(pub)}
-                      className="p-1 px-2.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors cursor-pointer text-xs font-bold"
-                      title="Editar Publicação"
-                    >
-                      <Edit2 size={14} />
-                    </button>
-                    <button
-                      onClick={() => handleDelete(pub.id)}
-                      className="p-1 px-2.5 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer text-xs font-bold"
-                      title="Excluir Publicação"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden flex flex-col flex-1">
+          <div className="overflow-x-auto min-h-[400px]">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase tracking-widest font-black">
+                  <th className="px-5 py-4 w-[416px] cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort("titulo_assunto")}>
+                    <div className="flex items-center">Documento / Tipo {getSortIcon("titulo_assunto")}</div>
+                  </th>
+                  <th className="px-5 py-4 w-28 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort("data_publicacao")}>
+                    <div className="flex items-center">Data {getSortIcon("data_publicacao")}</div>
+                  </th>
+                  <th className="px-5 py-4 w-[300px] cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort("descricao")}>
+                    <div className="flex items-center">Descrição / Resumo {getSortIcon("descricao")}</div>
+                  </th>
+                  <th className="px-5 py-4 w-40 text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort("responsavel_autor")}>
+                    <div className="flex items-center justify-center">Autor / Resp. {getSortIcon("responsavel_autor")}</div>
+                  </th>
+                  <th className="px-5 py-4 w-28 text-right">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-sm">
+                {sortedFiltered.map(pub => {
+                  const isExpanded = expandedDescs.includes(pub.id);
+                  return (
+                    <tr key={pub.id} className="hover:bg-slate-50/40 transition-colors group align-top">
+                      <td className="px-5 py-4 font-semibold text-slate-700 max-w-[416px]">
+                        <div className="flex flex-col">
+                          <span className="text-xs text-indigo-600 font-bold uppercase tracking-widest">{pub.tipo_documento || "Documento"}</span>
+                          <span className="text-sm font-bold text-slate-800 line-clamp-2 md:line-clamp-none">{pub.titulo_assunto}</span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-4 text-xs font-semibold text-slate-500">
+                        {pub.data_publicacao || "--"}
+                      </td>
+                      <td className="px-5 py-4 text-xs text-slate-600 leading-relaxed font-normal max-w-[300px]">
+                        <div className="relative">
+                          <p className={isExpanded ? "" : "line-clamp-3"}>
+                            {pub.descricao}
+                          </p>
+                          {pub.descricao?.length > 150 && (
+                            <button
+                              onClick={() => toggleDesc(pub.id)}
+                              className="text-[10px] text-indigo-600 hover:text-indigo-800 font-bold mt-1 flex items-center gap-0.5 transition-colors focus:outline-none"
+                            >
+                              {isExpanded ? (
+                                <>Recolher <ChevronUp size={12} /></>
+                              ) : (
+                                <>Mostrar mais <ChevronDown size={12} /></>
+                              )}
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-5 py-4 text-center align-middle">
+                        <span className="inline-flex px-2.5 py-1 text-[10px] font-black uppercase tracking-wider rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                          {pub.responsavel_autor || "Não informado"}
+                        </span>
+                      </td>
+                      <td className="px-5 py-4 text-right align-middle">
+                        <div className="flex gap-1 justify-end">
+                          {pub.link_acesso && (
+                            <a
+                              href={pub.link_acesso}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
+                              title="Visualizar Documento"
+                            >
+                              <ArrowUpRight size={15} />
+                            </a>
+                          )}
+                          <button
+                            onClick={() => handleOpenEdit(pub)}
+                            className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition"
+                            title="Editar"
+                          >
+                            <Edit2 size={15} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(pub.id)}
+                            className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition"
+                            title="Excluir"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
@@ -539,6 +616,49 @@ export function PublicationsTab({ showToast, currentUser }: PublicationsTabProps
                     placeholder="Ex: https://www.adasa.df.gov.br/pdf..."
                     className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm font-semibold text-slate-700"
                   />
+                </div>
+
+                {/* Imagem de Capa (Upload / URL) */}
+                <div className="space-y-1.5 md:col-span-2">
+                  <label className="text-xs font-bold text-slate-700">Imagem de Capa (Upload ou URL)</label>
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <div className="relative flex-1">
+                      <input
+                        type="url"
+                        value={formImagemCapa}
+                        onChange={(e) => setFormImagemCapa(e.target.value)}
+                        placeholder="Opcional. Ex: https://exemplo.com/capa.jpg"
+                        className="w-full px-3.5 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-sm font-semibold text-slate-700 pr-10"
+                      />
+                      {formImagemCapa && (
+                        <button
+                          type="button"
+                          onClick={() => setFormImagemCapa("")}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors"
+                        >
+                          <X size={16} />
+                        </button>
+                      )}
+                    </div>
+                    
+                    <div className="sm:w-auto relative">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleImageUpload}
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                      />
+                      <div className="px-4 py-2.5 bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-colors max-h-[42px]">
+                        <Upload size={16} />
+                        <span className="text-xs font-bold">Fazer Upload</span>
+                      </div>
+                    </div>
+                  </div>
+                  {formImagemCapa && (
+                    <div className="mt-2 border border-slate-200 rounded-xl overflow-hidden bg-slate-50 inline-block">
+                      <img src={formImagemCapa} alt="Preview da Capa" className="h-32 object-contain" />
+                    </div>
+                  )}
                 </div>
 
                 {/* Observações */}

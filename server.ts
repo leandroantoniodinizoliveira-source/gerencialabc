@@ -50,9 +50,9 @@ function parseSafeFloatOrNull(val: any): number | null {
 
 function getDbPool(): Pool {
   if (!dbPool) {
-    const connectionString = process.env.DATABASE_URL;
+    const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_URL;
     if (!connectionString) {
-      throw new Error("A variável DATABASE_URL (Neon PostgreSQL) está ausente no ambiente.");
+      throw new Error("As variáveis de conexão (DATABASE_URL ou POSTGRES_URL) estão ausentes no ambiente.");
     }
     // Remove o parâmetro "channel_binding=require" se existir, pois o Node.js pg
     // node-postgres pode ter problemas de compatibilidade com ele em algumas versões,
@@ -540,8 +540,14 @@ async function runStartupMigration() {
           area VARCHAR(255),
           segmento VARCHAR(255),
           tipo VARCHAR(100),
-          link TEXT
+          link TEXT,
+          imagem_capa TEXT
         );
+      `);
+      
+      // Ensure existing tables have the column
+      await client.query(`
+        ALTER TABLE re_resolutions ADD COLUMN IF NOT EXISTS imagem_capa TEXT;
       `);
 
       const resCheck = await client.query("SELECT COUNT(*) FROM re_resolutions");
@@ -611,8 +617,14 @@ async function runStartupMigration() {
           responsavel_autor VARCHAR(255),
           data_publicacao VARCHAR(50),
           link_acesso TEXT,
-          observacoes TEXT
+          observacoes TEXT,
+          imagem_capa TEXT
         );
+      `);
+      
+      // Ensure existing tables have the column
+      await client.query(`
+        ALTER TABLE pu_publications ADD COLUMN IF NOT EXISTS imagem_capa TEXT;
       `);
 
       const pubCheck = await client.query("SELECT COUNT(*) FROM pu_publications");
@@ -2318,11 +2330,11 @@ async function startServer() {
 
   app.post("/api/resolutions", async (req, res) => {
     try {
-      const { especie, numero, ano, data, ementa, situacao, area, segmento, tipo, link } = req.body;
+      const { especie, numero, ano, data, ementa, situacao, area, segmento, tipo, link, imagem_capa } = req.body;
       const pool = getDbPool();
       const result = await pool.query(
-        "INSERT INTO re_resolutions (especie, numero, ano, data, ementa, situacao, area, segmento, tipo, link) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *",
-        [especie || "Resolução", parseInt(numero) || 0, parseInt(ano) || 0, data || "", ementa || "", situacao || "Vigente", area || "", segmento || "", tipo || "Principal", link || ""]
+        "INSERT INTO re_resolutions (especie, numero, ano, data, ementa, situacao, area, segmento, tipo, link, imagem_capa) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *",
+        [especie || "Resolução", parseInt(numero) || 0, parseInt(ano) || 0, data || "", ementa || "", situacao || "Vigente", area || "", segmento || "", tipo || "Principal", link || "", imagem_capa || ""]
       );
       res.json({ success: true, data: result.rows[0] });
     } catch (error: any) {
@@ -2334,11 +2346,11 @@ async function startServer() {
   app.put("/api/resolutions/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { especie, numero, ano, data, ementa, situacao, area, segmento, tipo, link } = req.body;
+      const { especie, numero, ano, data, ementa, situacao, area, segmento, tipo, link, imagem_capa } = req.body;
       const pool = getDbPool();
       const result = await pool.query(
-        "UPDATE re_resolutions SET especie = $1, numero = $2, ano = $3, data = $4, ementa = $5, situacao = $6, area = $7, segmento = $8, tipo = $9, link = $10 WHERE id = $11 RETURNING *",
-        [especie || "Resolução", parseInt(numero) || 0, parseInt(ano) || 0, data || "", ementa || "", situacao || "Vigente", area || "", segmento || "", tipo || "Principal", link || "", id]
+        "UPDATE re_resolutions SET especie = $1, numero = $2, ano = $3, data = $4, ementa = $5, situacao = $6, area = $7, segmento = $8, tipo = $9, link = $10, imagem_capa = $11 WHERE id = $12 RETURNING *",
+        [especie || "Resolução", parseInt(numero) || 0, parseInt(ano) || 0, data || "", ementa || "", situacao || "Vigente", area || "", segmento || "", tipo || "Principal", link || "", imagem_capa || "", id]
       );
       if (result.rows.length === 0) {
         return res.status(404).json({ success: false, error: "Resolução não encontrada" });
@@ -2422,11 +2434,11 @@ async function startServer() {
 
   app.post("/api/publications", async (req, res) => {
     try {
-      const { titulo_assunto, descricao, tipo_documento, responsavel_autor, data_publicacao, link_acesso, observacoes } = req.body;
+      const { titulo_assunto, descricao, tipo_documento, responsavel_autor, data_publicacao, link_acesso, observacoes, imagem_capa } = req.body;
       const pool = getDbPool();
       const result = await pool.query(
-        "INSERT INTO pu_publications (titulo_assunto, descricao, tipo_documento, responsavel_autor, data_publicacao, link_acesso, observacoes) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
-        [titulo_assunto || "", descricao || "", tipo_documento || "", responsavel_autor || "", data_publicacao || "", link_acesso || "", observacoes || ""]
+        "INSERT INTO pu_publications (titulo_assunto, descricao, tipo_documento, responsavel_autor, data_publicacao, link_acesso, observacoes, imagem_capa) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *",
+        [titulo_assunto || "", descricao || "", tipo_documento || "", responsavel_autor || "", data_publicacao || "", link_acesso || "", observacoes || "", imagem_capa || ""]
       );
       res.json({ success: true, data: result.rows[0] });
     } catch (error: any) {
@@ -2438,11 +2450,11 @@ async function startServer() {
   app.put("/api/publications/:id", async (req, res) => {
     try {
       const id = parseInt(req.params.id);
-      const { titulo_assunto, descricao, tipo_documento, responsavel_autor, data_publicacao, link_acesso, observacoes } = req.body;
+      const { titulo_assunto, descricao, tipo_documento, responsavel_autor, data_publicacao, link_acesso, observacoes, imagem_capa } = req.body;
       const pool = getDbPool();
       const result = await pool.query(
-        "UPDATE pu_publications SET titulo_assunto = $1, descricao = $2, tipo_documento = $3, responsavel_autor = $4, data_publicacao = $5, link_acesso = $6, observacoes = $7 WHERE id = $8 RETURNING *",
-        [titulo_assunto || "", descricao || "", tipo_documento || "", responsavel_autor || "", data_publicacao || "", link_acesso || "", observacoes || "", id]
+        "UPDATE pu_publications SET titulo_assunto = $1, descricao = $2, tipo_documento = $3, responsavel_autor = $4, data_publicacao = $5, link_acesso = $6, observacoes = $7, imagem_capa = $8 WHERE id = $9 RETURNING *",
+        [titulo_assunto || "", descricao || "", tipo_documento || "", responsavel_autor || "", data_publicacao || "", link_acesso || "", observacoes || "", imagem_capa || "", id]
       );
       if (result.rows.length === 0) {
         return res.status(404).json({ success: false, error: "Publicação não encontrada" });

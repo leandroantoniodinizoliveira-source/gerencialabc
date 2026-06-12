@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useState, useEffect } from "react";
-import { Plus, Edit2, Trash2, ArrowUpRight, Search, X, Upload, CheckCircle2, ChevronDown, ChevronUp, FileSpreadsheet } from "lucide-react";
+import { Plus, Edit2, Trash2, ArrowUpRight, Search, X, Upload, CheckCircle2, ChevronDown, ChevronUp, FileSpreadsheet, ArrowUpDown, ArrowDown, ArrowUp } from "lucide-react";
 
 interface Resolution {
   id: number;
@@ -14,6 +14,7 @@ interface Resolution {
   segmento: string;
   tipo: string;
   link: string;
+  imagem_capa?: string;
 }
 
 interface ResolutionsTabProps {
@@ -49,9 +50,16 @@ export function ResolutionsTab({ showToast, currentUser }: ResolutionsTabProps) 
   const [formSegmento, setFormSegmento] = useState("");
   const [formTipo, setFormTipo] = useState("Principal");
   const [formLink, setFormLink] = useState("");
+  const [formImagemCapa, setFormImagemCapa] = useState("");
 
   const [csvText, setCsvText] = useState("");
   const [isImporting, setIsImporting] = useState(false);
+
+  // Sorting state
+  const [sortConfig, setSortConfig] = useState<{
+    key: keyof Resolution;
+    direction: "asc" | "desc";
+  }>({ key: "data", direction: "desc" });
 
   // Load data
   const fetchResolutions = async () => {
@@ -101,6 +109,7 @@ export function ResolutionsTab({ showToast, currentUser }: ResolutionsTabProps) 
     setFormSegmento("");
     setFormTipo("Principal");
     setFormLink("");
+    setFormImagemCapa("");
     setIsModalOpen(true);
   };
 
@@ -116,7 +125,26 @@ export function ResolutionsTab({ showToast, currentUser }: ResolutionsTabProps) 
     setFormSegmento(res.segmento);
     setFormTipo(res.tipo);
     setFormLink(res.link);
+    setFormImagemCapa(res.imagem_capa || "");
     setIsModalOpen(true);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) { // 2MB limite
+      showToast("Arquivo muito grande, a imagem deve ter no máximo 2MB.", "error");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        setFormImagemCapa(event.target.result as string);
+      }
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -136,7 +164,8 @@ export function ResolutionsTab({ showToast, currentUser }: ResolutionsTabProps) 
       area: formArea,
       segmento: formSegmento,
       tipo: formTipo,
-      link: formLink
+      link: formLink,
+      imagem_capa: formImagemCapa
     };
 
     try {
@@ -237,6 +266,56 @@ export function ResolutionsTab({ showToast, currentUser }: ResolutionsTabProps) 
     const matchTipo = filterTipo === "TODOS" || res.tipo === filterTipo;
 
     return matchSearch && matchSituacao && matchSegmento && matchTipo;
+  });
+
+  const handleSort = (key: keyof Resolution) => {
+    setSortConfig(prev => {
+      if (prev?.key === key) {
+        return { key, direction: prev.direction === "asc" ? "desc" : "asc" };
+      }
+      return { key, direction: "desc" };
+    });
+  };
+
+  const getSortIcon = (key: keyof Resolution) => {
+    if (sortConfig?.key !== key) return <ArrowUpDown size={12} className="text-slate-300 ml-1" />;
+    return sortConfig.direction === "asc" ? <ArrowUp size={12} className="text-indigo-600 ml-1" /> : <ArrowDown size={12} className="text-indigo-600 ml-1" />;
+  };
+
+  const parseDate = (dateStr: string) => {
+    if (!dateStr) return 0;
+    const parts = dateStr.split("/");
+    if (parts.length === 3) {
+      return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0])).valueOf();
+    }
+    if (parts.length === 1 && dateStr.length === 4) {
+      return new Date(parseInt(dateStr), 0, 1).valueOf();
+    }
+    return 0;
+  };
+
+  const sortedFilteredResolutions = [...filteredResolutions].sort((a, b) => {
+    if (!sortConfig) return 0;
+    
+    const { key, direction } = sortConfig;
+    const dirMultipler = direction === "asc" ? 1 : -1;
+
+    if (key === "data") {
+      const dateA = parseDate(a.data);
+      const dateB = parseDate(b.data);
+      return (dateA - dateB) * dirMultipler;
+    }
+
+    if (key === "numero" || key === "ano") {
+      return ((a[key] as number) - (b[key] as number)) * dirMultipler;
+    }
+
+    const valA = (a[key] || "").toString().toLowerCase();
+    const valB = (b[key] || "").toString().toLowerCase();
+    
+    if (valA < valB) return -1 * dirMultipler;
+    if (valA > valB) return 1 * dirMultipler;
+    return 0;
   });
 
   return (
@@ -341,16 +420,26 @@ export function ResolutionsTab({ showToast, currentUser }: ResolutionsTabProps) 
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase tracking-widest font-black">
-                  <th className="px-5 py-4 w-44">Resolução / Ato</th>
-                  <th className="px-5 py-4 w-28">Data</th>
-                  <th className="px-5 py-4">Ementa Reguladora</th>
-                  <th className="px-5 py-4 w-36 text-center">Situação</th>
-                  <th className="px-5 py-4 w-48">Segmentação</th>
+                  <th className="px-5 py-4 w-44 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort("numero")}>
+                    <div className="flex items-center">Resolução / Ato {getSortIcon("numero")}</div>
+                  </th>
+                  <th className="px-5 py-4 w-28 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort("data")}>
+                    <div className="flex items-center">Data {getSortIcon("data")}</div>
+                  </th>
+                  <th className="px-5 py-4 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort("ementa")}>
+                    <div className="flex items-center">Ementa Reguladora {getSortIcon("ementa")}</div>
+                  </th>
+                  <th className="px-5 py-4 w-36 text-center cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort("situacao")}>
+                    <div className="flex items-center justify-center">Situação {getSortIcon("situacao")}</div>
+                  </th>
+                  <th className="px-5 py-4 w-48 cursor-pointer hover:bg-slate-100 transition-colors" onClick={() => handleSort("segmento")}>
+                    <div className="flex items-center">Segmentação {getSortIcon("segmento")}</div>
+                  </th>
                   <th className="px-5 py-4 w-28 text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 text-sm">
-                {filteredResolutions.map(res => {
+                {sortedFilteredResolutions.map(res => {
                   const isExpanded = expandedEmentas.includes(res.id);
                   return (
                     <tr key={res.id} className="hover:bg-slate-50/40 transition-colors group align-top">
@@ -574,6 +663,49 @@ export function ResolutionsTab({ showToast, currentUser }: ResolutionsTabProps) 
                   placeholder="https://www.adasa.df.gov.br/..."
                   className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-xs font-semibold text-slate-700 focus:border-indigo-500 outline-none transition-all"
                 />
+              </div>
+
+              {/* Imagem de Capa (Upload / URL) */}
+              <div className="space-y-1.5 md:col-span-2">
+                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Imagem de Capa (Upload ou URL)</label>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <input
+                      type="url"
+                      value={formImagemCapa}
+                      onChange={(e) => setFormImagemCapa(e.target.value)}
+                      placeholder="Opcional. Ex: https://exemplo.com/capa.jpg"
+                      className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 pr-10 text-xs font-semibold text-slate-700 focus:border-indigo-500 outline-none transition-all"
+                    />
+                    {formImagemCapa && (
+                      <button
+                        type="button"
+                        onClick={() => setFormImagemCapa("")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-red-500 transition-colors"
+                      >
+                        <X size={16} />
+                      </button>
+                    )}
+                  </div>
+                  
+                  <div className="sm:w-auto relative">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageUpload}
+                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                    />
+                    <div className="px-4 py-3 bg-blue-50 text-blue-600 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 rounded-xl flex items-center justify-center gap-2 cursor-pointer transition-colors h-full">
+                      <Upload size={16} />
+                      <span className="text-xs font-bold whitespace-nowrap">Fazer Upload</span>
+                    </div>
+                  </div>
+                </div>
+                {formImagemCapa && (
+                  <div className="mt-2 border border-slate-200 rounded-xl overflow-hidden bg-slate-50 inline-block p-1">
+                    <img src={formImagemCapa} alt="Preview da Capa" className="h-32 object-contain rounded-lg" />
+                  </div>
+                )}
               </div>
 
               {/* Ementa */}

@@ -426,7 +426,7 @@ export default function App() {
     "list" | "balance" | "systems" | "demand" | "supply"
   >("list");
   
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(true);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [templateFiles, setTemplateFiles] = useState<{ id: number | string, name: string, description: string, url: string }[]>([]);
   const [demandSubTab, setDemandSubTab] = useState<"edit" | "view">("edit");
   const [supplySubTab, setSupplySubTab] = useState<"edit" | "view">("edit");

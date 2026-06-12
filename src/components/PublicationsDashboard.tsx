@@ -1,6 +1,79 @@
 import { useState, useEffect } from "react";
 import { ResponsiveContainer, ComposedChart, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Line, LabelList } from "recharts";
-import { BookOpen, FileText, Calendar, History, Search, ArrowUpDown, Filter, ExternalLink, Share2, ClipboardList, TrendingUp, Inbox } from "lucide-react";
+import { BookOpen, FileText, Calendar, History, Search, ArrowUpDown, Filter, ExternalLink, Share2, ClipboardList, TrendingUp, Inbox, Image as ImageIcon } from "lucide-react";
+
+// Helper component for Document Thumbnail
+const DocumentThumbnail = ({ tipo, titulo, className, imageUrl }: { tipo?: string, titulo?: string, className?: string, imageUrl?: string }) => {
+  const [imgError, setImgError] = useState(false);
+  const containerClasses = className || "w-24 h-32 md:w-32 md:h-44";
+  const iconSize = className ? 18 : 32;
+
+  if (imageUrl && !imgError) {
+    return (
+      <div className={`${containerClasses} bg-slate-100 rounded-xl shrink-0 overflow-hidden border relative shadow-sm group`}>
+        <img 
+          src={imageUrl} 
+          alt={titulo || "Capa do Documento"} 
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+          onError={() => setImgError(true)}
+        />
+        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+          <ImageIcon size={iconSize} className="text-white drop-shadow-md" />
+        </div>
+      </div>
+    );
+  }
+
+  // Determine color theme based on document type
+  let themeClass = "from-indigo-500 to-indigo-700 border-indigo-600 text-indigo-50";
+  let icon = <FileText size={iconSize} className="opacity-90 drop-shadow-sm" />;
+  
+  const docType = (tipo || "").toLowerCase();
+  if (docType.includes("relatório")) {
+    themeClass = "from-blue-500 to-blue-700 border-blue-600 text-blue-50";
+    icon = <BookOpen size={iconSize} className="opacity-90 drop-shadow-sm" />;
+  } else if (docType.includes("guia")) {
+    themeClass = "from-emerald-500 to-emerald-700 border-emerald-600 text-emerald-50";
+    icon = <FileText size={iconSize} className="opacity-90 drop-shadow-sm" />;
+  } else if (docType.includes("boletim")) {
+    themeClass = "from-orange-500 to-red-600 border-orange-600 text-orange-50";
+    icon = <ClipboardList size={iconSize} className="opacity-90 drop-shadow-sm" />;
+  } else if (docType.includes("estudo")) {
+    themeClass = "from-purple-500 to-purple-700 border-purple-600 text-purple-50";
+    icon = <TrendingUp size={iconSize} className="opacity-90 drop-shadow-sm" />;
+  }
+
+  return (
+    <div className={`${containerClasses} bg-gradient-to-br ${themeClass} rounded-xl shrink-0 overflow-hidden border relative shadow-sm flex flex-col justify-between group`}>
+      {/* Decorative top fold */}
+      <div className="absolute top-0 right-0 w-8 h-8 md:w-10 md:h-10 border-b border-l border-white/20 bg-white/10 rounded-bl-xl shadow-sm"></div>
+      
+      {/* Decorative pattern top left */}
+      <div className="absolute top-2 left-2 flex gap-0.5 opacity-30">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="w-1 h-1 rounded-full bg-white"></div>
+        ))}
+      </div>
+
+      <div className="flex-1 flex flex-col items-center justify-center pt-4">
+        <div className="transform group-hover:scale-110 transition-transform duration-300">
+          {icon}
+        </div>
+      </div>
+      
+      {/* Fake text lines for document aesthetic */}
+      <div className="w-full px-4 mb-3 opacity-60 flex flex-col gap-1.5 items-center">
+        <div className="w-full h-1 bg-white/40 rounded-full"></div>
+        <div className="w-2/3 h-1 bg-white/40 rounded-full"></div>
+      </div>
+      
+      {/* Document Type Label */}
+      <div className="w-full py-1.5 bg-black/20 text-center text-[9px] md:text-[10px] font-black uppercase tracking-wider truncate px-2 border-t border-black/10">
+        {tipo || "Documento"}
+      </div>
+    </div>
+  );
+};
 
 interface Publication {
   id: number;
@@ -11,6 +84,7 @@ interface Publication {
   data_publicacao: string;
   link_acesso: string;
   observacoes: string;
+  imagem_capa?: string;
 }
 
 interface PublicationsDashboardProps {
@@ -26,9 +100,10 @@ export function PublicationsDashboard({ showToast }: PublicationsDashboardProps)
   const [selectedTipoDoc, setSelectedTipoDoc] = useState("TODOS");
   const [selectedAutor, setSelectedAutor] = useState("TODOS");
   const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc");
+  const [viewMode, setViewMode] = useState<"chart" | "scorecards">("scorecards");
 
   // Expand states for publications timeline
-  const [expandedItems, setExpandedItems] = useState<{ [id: number]: boolean }>({});
+
 
   useEffect(() => {
     const fetchPublications = async () => {
@@ -141,9 +216,7 @@ export function PublicationsDashboard({ showToast }: PublicationsDashboardProps)
       : (a.titulo_assunto || "").localeCompare(b.titulo_assunto || "");
   });
 
-  const toggleExpand = (id: number) => {
-    setExpandedItems(prev => ({ ...prev, [id]: !prev[id] }));
-  };
+
 
   const renderCustomBarLabel = (props: any) => {
     const { x, y, width, value } = props;
@@ -206,20 +279,20 @@ export function PublicationsDashboard({ showToast }: PublicationsDashboardProps)
       </div>
 
       {/* Main KPI Card Row */}
-      <div className="bg-gradient-to-r from-indigo-950 to-indigo-850 p-6 md:p-8 rounded-2xl border border-indigo-800/30 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-6 hover:translate-y-[-2px] transition-all text-white">
+      <div className="bg-gradient-to-r from-adasa-dark to-adasa-mid p-6 md:p-8 rounded-2xl border border-adasa-mid/20 shadow-md flex flex-col md:flex-row items-start md:items-center justify-between gap-6 hover:translate-y-[-2px] transition-all text-white">
         <div className="flex items-center gap-4">
-          <div className="p-4 bg-white/10 rounded-2xl text-white backdrop-blur-md border border-white/25 shadow-inner">
-            <BookOpen size={32} />
+          <div className="p-4 bg-white/10 rounded-2xl text-white backdrop-blur-md border border-white/25">
+            <FileText size={32} />
           </div>
           <div>
-            <span className="block text-xs font-black uppercase tracking-widest text-[#0091DA]">Acervo de Publicações Total</span>
+            <span className="block text-xs font-black uppercase tracking-widest text-adasa-light">Acervo de Publicações Total</span>
             <span className="text-4xl md:text-5xl font-black leading-none mt-1">{totalCount}</span>
-            <span className="block text-xs text-indigo-100 font-bold mt-1.5">Relatórios institucionais, guias e boletins publicados</span>
+            <span className="block text-xs text-blue-100 font-bold mt-1.5">Publicações cadastradas no acervo</span>
           </div>
         </div>
-        <div className="flex items-center gap-2 px-4 py-2 bg-white/15 rounded-xl border border-white/20 text-xs font-semibold tracking-wide shadow-inner text-indigo-100">
-          <History size={14} className="text-indigo-300" />
-          <span>Série Histórica: {uniqueYears[0] || 2019} - {uniqueYears[uniqueYears.length-1] || 2026}</span>
+        <div className="flex items-center gap-2 px-4 py-2 bg-white/15 rounded-xl border border-white/20 text-xs font-semibold tracking-wide shadow-inner">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-450 animate-pulse"></span>
+          <span className="font-extrabold text-blue-50">Base de Dados Integrada em Tempo Real</span>
         </div>
       </div>
 
@@ -346,27 +419,117 @@ export function PublicationsDashboard({ showToast }: PublicationsDashboardProps)
 
         {/* Chart 2: Distribuição por Tipo de Publicação */}
         <div className="bg-white border border-slate-200 rounded-2xl p-6 flex flex-col shadow-sm">
-          <div className="mb-4">
-            <h4 className="text-sm font-black text-slate-800 uppercase tracking-tight">Distribuição por Categoria/Tipo de Documento</h4>
-            <p className="text-xs text-slate-400 font-medium mt-0.5">Contagem absoluta de cada espécie ou natureza das publicações técnicas.</p>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 border-b border-slate-100 pb-4">
+            <div>
+              <h4 className="text-sm font-black text-slate-900 uppercase tracking-tight">RANKING POR TIPO DE PUBLICAÇÃO</h4>
+              <p className="text-xs text-slate-400 font-medium mt-0.5">Distribuição do volume de publicações de acordo com os principais focos de saneamento regulado.</p>
+            </div>
+            
+            {/* Toggle controls resembling the image */}
+            <div className="flex bg-slate-100 hover:bg-slate-200/70 p-1 rounded-xl shrink-0 self-start sm:self-center">
+              <button
+                type="button"
+                onClick={() => setViewMode("chart")}
+                className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                  viewMode === "chart"
+                    ? "bg-white text-[#0b3b80] shadow-xs"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                Gráfico
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("scorecards")}
+                className={`px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all cursor-pointer ${
+                  viewMode === "scorecards"
+                    ? "bg-white text-[#0b3b80] shadow-xs"
+                    : "text-slate-500 hover:text-slate-800"
+                }`}
+              >
+                Scorecards
+              </button>
+            </div>
           </div>
 
-          <div className="h-72 mt-2">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={typeChartData} layout="vertical" margin={{ top: 10, right: 30, left: 30, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                <XAxis type="number" stroke="#94a3b8" fontSize={11} fontWeight={600} allowDecimals={false} />
-                <YAxis dataKey="name" type="category" stroke="#475569" fontSize={11} fontWeight={700} width={120} />
-                <Tooltip
-                  contentStyle={{ backgroundColor: "#1e293b", borderColor: "#334155", borderRadius: "12px", color: "#fff" }}
-                  itemStyle={{ fontSize: "11px", fontWeight: "bold" }}
-                />
-                <Bar dataKey="count" fill="#4f46e5" radius={[0, 6, 6, 0]} barSize={16}>
-                  <LabelList dataKey="count" position="right" style={{ fontSize: "11px", fill: "#334155", fontWeight: "bold" }} />
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          {viewMode === "chart" ? (
+            <div className="h-72 mt-2">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={typeChartData} layout="vertical" margin={{ top: 10, right: 30, left: 30, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                  <XAxis type="number" stroke="#94a3b8" fontSize={11} fontWeight={600} allowDecimals={false} />
+                  <YAxis dataKey="name" type="category" stroke="#475569" fontSize={11} fontWeight={700} width={120} />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: "#1e293b", borderColor: "#334155", borderRadius: "12px", color: "#fff" }}
+                    itemStyle={{ fontSize: "11px", fontWeight: "bold" }}
+                  />
+                  <Bar dataKey="count" fill="#0091DA" radius={[0, 6, 6, 0]} barSize={16}>
+                    <LabelList dataKey="count" position="right" style={{ fontSize: "11px", fill: "#334155", fontWeight: "bold" }} />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {typeChartData.map((item, index) => {
+                const percentage = totalCount > 0 ? ((item.count / totalCount) * 100).toFixed(1) : "0.0";
+                
+                // Colors matching the original rankings image
+                let rankBg = "bg-blue-900 border-blue-950 text-white";
+                let barBg = "bg-blue-900 shadow-xs shadow-blue-900/10";
+                
+                if (index === 0) {
+                  rankBg = "bg-[#0b3b80] text-white border-[#062654]";
+                  barBg = "bg-[#0b3b80]";
+                } else if (index === 1) {
+                  rankBg = "bg-[#0091DA] text-white border-[#007cd0]";
+                  barBg = "bg-[#0091DA]";
+                } else if (index === 2) {
+                  rankBg = "bg-[#00b4d8] text-white border-[#0096b4]";
+                  barBg = "bg-[#00b4d8]";
+                } else if (index === 3) {
+                  rankBg = "bg-sky-300 text-blue-900 border-sky-400";
+                  barBg = "bg-sky-300";
+                } else {
+                  rankBg = "bg-slate-100 text-slate-400 border-slate-200";
+                  barBg = "bg-blue-200/50";
+                }
+
+                // Width calculation
+                const maxCount = typeChartData[0]?.count || 1;
+                const barWidthPercent = Math.min(100, Math.max(2, (item.count / maxCount) * 100));
+
+                return (
+                  <div key={item.name} className="flex items-center gap-3 p-3 bg-slate-50/30 rounded-xl hover:bg-slate-50/85 transition-colors border border-slate-100">
+                    {/* Rank Indicator */}
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center text-[10px] font-black border shrink-0 ${rankBg}`}>
+                      {index + 1}º
+                    </div>
+                    
+                    {/* Content Group (Label, Progress and Values) */}
+                    <div className="flex-1 flex flex-col justify-center min-w-0">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs sm:text-sm font-black text-[#0b3b80] truncate">
+                          {item.name}
+                        </span>
+                        <div className="text-xs font-black text-slate-800 scale-95 origin-right shrink-0">
+                          {item.count} <span className="text-[10px] text-slate-400 font-bold">({percentage}%)</span>
+                        </div>
+                      </div>
+                      
+                      {/* Progress Bar Container */}
+                      <div className="w-full h-2 bg-slate-100 rounded-full overflow-hidden relative">
+                        <div 
+                          className={`h-full rounded-full transition-all duration-1000 ${barBg}`}
+                          style={{ width: `${barWidthPercent}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
@@ -445,69 +608,76 @@ export function PublicationsDashboard({ showToast }: PublicationsDashboardProps)
         ) : (
           <div className="space-y-4">
             {sortedPublications.map(pub => {
-              const isOpen = !!expandedItems[pub.id];
               return (
                 <div
                   key={pub.id}
-                  className="bg-slate-50 border border-slate-200 rounded-2xl p-4 transition-all hover:bg-indigo-50/20"
+                  className="bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col sm:flex-row transition-all hover:bg-slate-50/50 group hover:shadow-md"
                 >
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div className="flex items-start gap-3">
-                      <div className="p-3 bg-indigo-100 text-indigo-700 rounded-xl shrink-0 mt-0.5">
-                        <FileText size={16} />
+                  {/* Thumbnail Section */}
+                  <div className="w-full sm:w-32 md:w-44 bg-slate-50/50 shrink-0 border-b sm:border-b-0 sm:border-r border-slate-100 flex items-center justify-center p-4">
+                    <DocumentThumbnail tipo={pub.tipo_documento} titulo={pub.titulo_assunto} imageUrl={pub.imagem_capa} />
+                  </div>
+                  
+                  {/* Content Section */}
+                  <div className="p-5 flex-1 flex flex-col justify-between">
+                    <div>
+                      {/* Badges */}
+                      <div className="flex flex-wrap items-center gap-2 mb-2">
+                        <span className="px-2 py-0.5 bg-indigo-50 border border-indigo-100 text-indigo-700 rounded-md text-[9px] font-black uppercase tracking-widest">
+                          {pub.tipo_documento}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                          {pub.data_publicacao}
+                        </span>
                       </div>
-                      <div>
-                        {/* Badges */}
-                        <div className="flex flex-wrap items-center gap-2 mb-1.5">
-                          <span className="px-2 py-0.5 bg-indigo-100 text-indigo-700 rounded-md text-[9px] font-black uppercase">
-                            {pub.tipo_documento}
-                          </span>
-                          <span className="text-[10px] font-bold text-slate-500 bg-slate-200/60 px-1.5 py-0.5 rounded">
-                            {pub.data_publicacao}
-                          </span>
-                          <span className="text-[10px] text-slate-400 italic">
-                            Por: {pub.responsavel_autor}
-                          </span>
+                      
+                      {/* Title */}
+                      <h4 className="text-base sm:text-lg font-black text-slate-800 leading-tight mb-1.5 flex items-start gap-2">
+                        <span>{pub.titulo_assunto}</span>
+                      </h4>
+                      
+                      {/* Author */}
+                      <span className="text-xs text-slate-500 font-semibold block mb-3 flex items-center gap-1.5">
+                        <div className="w-4 h-4 rounded-full bg-slate-200 flex items-center justify-center text-[8px] text-slate-500">
+                          <BookOpen size={8} />
                         </div>
-                        {/* Title */}
-                        <h4 className="text-sm font-black text-slate-800 leading-tight">
-                          {pub.titulo_assunto}
-                        </h4>
-                      </div>
+                        {pub.responsavel_autor}
+                      </span>
+                      
+                      {/* Description */}
+                      <p className="text-xs text-slate-600 leading-relaxed mb-4 line-clamp-3 md:line-clamp-4">
+                        {pub.descricao}
+                      </p>
                     </div>
 
-                    <div className="flex items-center gap-2 self-end sm:self-center">
-                      {pub.link_acesso && (
+                    <div className="flex flex-wrap items-end justify-between gap-3 pt-4 border-t border-slate-100 mt-auto">
+                      <div className="text-[10px] sm:text-xs text-slate-400 max-w-[65%] leading-snug">
+                        {pub.observacoes ? (
+                          <span className="italic flex gap-1.5 items-start">
+                            <strong className="text-slate-500 shrink-0">Obs:</strong> 
+                            <span className="line-clamp-2" title={pub.observacoes}>{pub.observacoes}</span>
+                          </span>
+                        ) : null}
+                      </div>
+                      
+                      {pub.link_acesso ? (
                         <a
                           href={pub.link_acesso}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="p-2 bg-white text-indigo-600 hover:text-white hover:bg-indigo-600 border border-indigo-200 rounded-xl transition-all shadow-xs flex items-center justify-center cursor-pointer"
-                          title="Acessar Relatório"
+                          className="px-4 py-2 sm:px-5 sm:py-2.5 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl transition-all shadow-sm shadow-indigo-200 flex items-center gap-1.5 text-xs font-bold"
+                          title="Acessar Relatório Completo"
                         >
                           <ExternalLink size={14} />
+                          <span>Acessar</span>
                         </a>
+                      ) : (
+                         <span className="px-3 py-1.5 bg-slate-100 text-slate-400 rounded-lg text-[10px] font-bold">
+                           Sem arquivo
+                         </span>
                       )}
-                      <button
-                        onClick={() => toggleExpand(pub.id)}
-                        className="p-1 px-2.5 text-xs font-black text-slate-600 hover:text-indigo-600 hover:bg-white rounded-xl transition-colors cursor-pointer border border-transparent hover:border-slate-200"
-                      >
-                        {isOpen ? "Recolher" : "Mostrar Resumo"}
-                      </button>
                     </div>
                   </div>
-
-                  {/* Collapsible description box */}
-                  {isOpen && (
-                    <div className="mt-4 pt-4 border-t border-slate-200/70 text-xs text-slate-600 leading-relaxed font-medium pl-1 mr-4 animate-in fade-in duration-200">
-                      <p className="mb-2"><strong>Resumo Executivo:</strong> {pub.descricao}</p>
-                      {pub.observacoes && (
-                        <div className="bg-white/85 p-2.5 border border-slate-150 rounded-lg text-[11px] text-slate-500 italic mt-3">
-                          <strong>Observações:</strong> {pub.observacoes}
-                        </div>
-                      )}
-                    </div>
-                  )}
                 </div>
               );
             })}
