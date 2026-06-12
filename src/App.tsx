@@ -46,7 +46,8 @@ import {
   GitCompare,
   LogOut,
   Copy,
-  FileSpreadsheet
+  FileSpreadsheet,
+  BookOpen
 } from "lucide-react";
 import {
   LineChart,
@@ -89,6 +90,8 @@ import { UserManagementTab } from "./components/UserManagementTab";
 import { HomeTab } from "./components/HomeTab";
 import { ResolutionsTab } from "./components/ResolutionsTab";
 import { ResolutionsDashboard } from "./components/ResolutionsDashboard";
+import { PublicationsTab } from "./components/PublicationsTab";
+import { PublicationsDashboard } from "./components/PublicationsDashboard";
 import { ManagerialHub } from "./components/ManagerialHub";
 
 const formatSaldoValue = (val: number, type: 'percent' | 'hab' | 'ls', showSuffix = true) => {
@@ -381,7 +384,7 @@ export default function App() {
     const saved = localStorage.getItem("adasa-demands");
     return saved ? JSON.parse(saved) : [INITIAL_DEMAND];
   });
-  const [activeTab, setActiveTab] = useState<"home" | "gerencial" | "edit" | "compare" | "manage" | "analyze" | "templates" | "planning" | "users" | "reg_cadastro" | "reg_painel">(
+  const [activeTab, setActiveTab] = useState<"home" | "gerencial" | "edit" | "compare" | "manage" | "analyze" | "templates" | "planning" | "users" | "reg_cadastro" | "reg_painel" | "pub_cadastro" | "pub_painel">(
     "home",
   );
   const [activePlanningSubTab, setActivePlanningSubTab] = useState<"tasks" | "dashboard" | "plans" | "areas" | "categories" | "responsibles" | "import" | "models">("dashboard");
@@ -3610,6 +3613,38 @@ const renderSupplyTable = () => {
                 </div>
               </div>
 
+              <div>
+                <h4 className="text-xs font-black text-white/50 uppercase tracking-widest mb-2 flex items-center gap-1.5 px-2 mt-2">
+                  <BookOpen size={14} /> Publicações
+                </h4>
+                <div className="pl-4 border-l border-white/10 ml-3.5 space-y-2 mt-2 mb-4">
+                  <div className="space-y-1">
+                    <button
+                      onClick={() => {
+                        setIsMyTasksSelected(false);
+                        setIsMobileMenuOpen(false);
+                        handleTabChange("pub_cadastro");
+                      }}
+                      className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "pub_cadastro" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                    >
+                      <FileText size={20} className={activeTab === "pub_cadastro" ? "text-adasa-mid" : "text-white/60"} />
+                      Cadastrar Publicações
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsMyTasksSelected(false);
+                        setIsMobileMenuOpen(false);
+                        handleTabChange("pub_painel");
+                      }}
+                      className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "pub_painel" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                    >
+                      <BarChart2 size={20} className={activeTab === "pub_painel" ? "text-adasa-mid" : "text-white/60"} />
+                      Painel de Publicações
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <RequirePermission moduleId="users" action="view">
                 <div>
                   <h4 className="text-xs font-black text-white/50 uppercase tracking-widest mb-2 flex items-center gap-1.5 px-2 mt-2">
@@ -4083,6 +4118,62 @@ const renderSupplyTable = () => {
             </div>
           </div>
 
+          <div>
+            {!isSidebarCollapsed && (
+              <h4 className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1 flex items-center gap-1.5 px-2">
+                <BookOpen size={12} /> Publicações
+              </h4>
+            )}
+            <div className={cn(isSidebarCollapsed ? "" : "pl-3 border-l border-white/10 ml-3", "space-y-2 mt-2 mb-3")}>
+              <div className="space-y-1">
+                <button
+                  title={isSidebarCollapsed ? "Cadastrar Publicações" : undefined}
+                  onClick={() => {
+                    setIsMyTasksSelected(false);
+                    handleTabChange("pub_cadastro");
+                  }}
+                  className={cn(
+                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                    activeTab === "pub_cadastro"
+                      ? "bg-white/10 text-white shadow-sm border border-white/10"
+                      : "text-white/60 hover:text-white hover:bg-white/5",
+                  )}
+                >
+                  <FileText
+                    size={16}
+                    className={cn(
+                      "flex-shrink-0 transition-colors",
+                      activeTab === "pub_cadastro" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    )}
+                  />
+                  {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Publicações</span>}
+                </button>
+                <button
+                  title={isSidebarCollapsed ? "Painel de Publicações" : undefined}
+                  onClick={() => {
+                    setIsMyTasksSelected(false);
+                    handleTabChange("pub_painel");
+                  }}
+                  className={cn(
+                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                    activeTab === "pub_painel"
+                      ? "bg-white/10 text-white shadow-sm border border-white/10"
+                      : "text-white/60 hover:text-white hover:bg-white/5",
+                  )}
+                >
+                  <BarChart2
+                    size={16}
+                    className={cn(
+                      "flex-shrink-0 transition-colors",
+                      activeTab === "pub_painel" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    )}
+                  />
+                  {!isSidebarCollapsed && <span className="hidden md:inline">Painel de Publicações</span>}
+                </button>
+              </div>
+            </div>
+          </div>
+
           <RequirePermission moduleId="users" action="view">
             <div>
               {!isSidebarCollapsed && (
@@ -4141,7 +4232,7 @@ const renderSupplyTable = () => {
                          activePlanningSubTab === "categories" ? "Cadastrar Categorias" :
                          activePlanningSubTab === "responsibles" ? "Cadastrar Responsáveis" :
                          activePlanningSubTab === "models" ? "Cadastrar Modelo de Tarefas" : "Importar Tarefas")
-                       : activeTab === "reg_cadastro" ? "Cadastrar Resoluções" : activeTab === "reg_painel" ? "Painel Estratégico de Resoluções" : "Cadastrar Balanço"}
+                       : activeTab === "reg_cadastro" ? "Cadastrar Resoluções" : activeTab === "reg_painel" ? "Painel Estratégico de Resoluções" : activeTab === "pub_cadastro" ? "Cadastrar Publicações" : activeTab === "pub_painel" ? "Painel de Publicações" : "Cadastrar Balanço"}
             </h1>
             <p className="text-slate-500 text-sm font-medium">
               {activeTab === "home"
@@ -4158,7 +4249,7 @@ const renderSupplyTable = () => {
                           ? "Gerencie as contas de usuários, papéis e níveis de acesso (RBAC)."
                         : activeTab === "planning"
                           ? "Gerencie o cronograma consolidado, planos, áreas e status de execução."
-                          : activeTab === "reg_cadastro" ? "Gestão do acervo de normas, atos legais e resoluções aplicados à regulação do saneamento básico e recursos hídricos." : activeTab === "reg_painel" ? "Estoque Regulatório da Superintendência de Abastecimento de Água e Esgoto" : "Gerencie os balanços hídricos e cadastre novas informações."}
+                          : activeTab === "reg_cadastro" ? "Gestão do acervo de normas, atos legais e resoluções aplicados à regulação do saneamento básico e recursos hídricos." : activeTab === "reg_painel" ? "Estoque Regulatório da Superintendência de Abastecimento de Água e Esgoto" : activeTab === "pub_cadastro" ? "Gestão do acervo bibliográfico, relatórios anuais de atividades, boletins informativos e artigos de pesquisa científica." : activeTab === "pub_painel" ? "Painel analítico gráfico de publicações, volumes históricos, distribuição de documentos e filtro do acervo próximo." : "Gerencie os balanços hídricos e cadastre novas informações."}
             </p>
           </div>
           <div className="flex flex-col md:flex-row items-center gap-3">
@@ -7554,6 +7645,30 @@ const renderSupplyTable = () => {
               className="max-w-7xl mx-auto w-full"
             >
               <ResolutionsDashboard showToast={showToast} />
+            </motion.div>
+          ) : activeTab === "pub_cadastro" ? (
+            <motion.div
+              key="pub_cadastro"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="max-w-7xl mx-auto w-full"
+            >
+              <React.Suspense fallback={<div className="flex justify-center p-12 text-slate-400">Carregando...</div>}>
+                <PublicationsTab showToast={showToast} currentUser={currentUser} />
+              </React.Suspense>
+            </motion.div>
+          ) : activeTab === "pub_painel" ? (
+            <motion.div
+              key="pub_painel"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="max-w-7xl mx-auto w-full"
+            >
+              <PublicationsDashboard showToast={showToast} />
             </motion.div>
           ) : activeTab === "gerencial" ? (
             <motion.div

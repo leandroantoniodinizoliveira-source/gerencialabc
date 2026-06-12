@@ -12,7 +12,10 @@ import {
   Tags, 
   ClipboardList,
   BarChart3,
-  CalendarCheck
+  CalendarCheck,
+  FileText,
+  BarChart2,
+  BookOpen
 } from "lucide-react";
 import { motion } from "motion/react";
 import { Task, Area } from "../types";
@@ -65,8 +68,8 @@ export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas, o
           </div>
         </div>
 
-        {/* Master Row with three major cards: Painel de Atividades, Painel de Resoluções, Painel de Balanço Hídrico */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        {/* Master Row with four major cards: Painel de Atividades, Painel de Resoluções, Painel de Balanço Hídrico, Painel de Publicações */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {/* Painel de Atividades Card */}
           <motion.div 
             whileHover={{ y: -2 }}
@@ -127,6 +130,26 @@ export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas, o
             </div>
             <div className="mt-8 flex items-center gap-2 text-xs font-bold text-blue-700">
               Abrir Painel do Balanço Hídrico <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
+            </div>
+          </motion.div>
+
+          {/* Painel de Publicações Card */}
+          <motion.div 
+            whileHover={{ y: -2 }}
+            onClick={() => setActiveTab("pub_painel")}
+            className="p-6 rounded-2xl border border-indigo-200 bg-gradient-to-br from-white to-indigo-50/20 shadow-sm cursor-pointer hover:shadow-md transition-all duration-300 flex flex-col justify-between group text-left h-full"
+          >
+            <div>
+              <div className="mb-4 p-3 rounded-xl bg-indigo-50 text-indigo-600 w-max border border-indigo-100 group-hover:bg-indigo-100 transition-colors">
+                <BookOpen size={24} className="text-indigo-600" />
+              </div>
+              <h3 className="text-lg font-black text-slate-800 leading-tight mb-2">Painel de Publicações</h3>
+              <p className="text-slate-600 text-xs font-medium leading-relaxed mb-6">
+                Visualize estatísticas gerais de publicações da agência. Explore a ementa de relatórios técnicos, artigos científicos e boletins informativos.
+              </p>
+            </div>
+            <div className="mt-8 flex items-center gap-2 text-xs font-bold text-indigo-700">
+              Abrir Painel de Publicações <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
             </div>
           </motion.div>
         </div>
@@ -276,12 +299,68 @@ export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas, o
         </div>
       </section>
 
-      {/* Module Group 2: Fiscalização */}
+      {/* Module Group 2: Regulação */}
       <section className="space-y-4">
         <div className="flex flex-col gap-1 border-b border-slate-100 pb-3">
           <div className="flex items-center gap-2">
             <div className="p-1 px-2.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-black uppercase tracking-wider">
               Módulo 2
+            </div>
+            <h2 className="text-lg font-black text-slate-800 tracking-tight">Regulação</h2>
+          </div>
+        </div>
+        
+        <div className="pt-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Item 2.1: Cadastrar Resoluções */}
+            <motion.div 
+              whileHover={{ y: -3 }}
+              onClick={() => setActiveTab("reg_cadastro")}
+              className="p-6 rounded-2xl border border-slate-200 hover:border-blue-300 bg-white cursor-pointer group shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between"
+            >
+              <div>
+                <div className="mb-4 p-3 rounded-xl bg-blue-50 text-blue-500 w-max border border-blue-100 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                  <FileText size={24} />
+                </div>
+                <h3 className="text-base font-bold text-slate-800 mb-1.5 leading-tight">Cadastrar Resoluções</h3>
+                <p className="text-slate-500 text-xs font-medium leading-relaxed mb-4">
+                  Cadastre e gerencie o estoque regulatório, resoluções vigentes, atos normativos e atas de audiência da superintendência.
+                </p>
+              </div>
+              <div className="flex items-center gap-1 text-xs font-bold text-blue-600 mt-2">
+                Acessar cadastro <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
+              </div>
+            </motion.div>
+
+            {/* Item 2.2: Painel de Resoluções */}
+            <motion.div 
+              whileHover={{ y: -3 }}
+              onClick={() => setActiveTab("reg_painel")}
+              className="p-6 rounded-2xl border border-indigo-200 hover:border-indigo-300 bg-white cursor-pointer group shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between"
+            >
+              <div>
+                <div className="mb-4 p-3 rounded-xl bg-indigo-50 text-indigo-500 w-max border border-indigo-100 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
+                  <BarChart2 size={24} />
+                </div>
+                <h3 className="text-base font-bold text-slate-800 mb-1.5 leading-tight">Painel de Resoluções</h3>
+                <p className="text-slate-500 text-xs font-medium leading-relaxed mb-4">
+                  Visualize estatísticas gerenciais do estoque regulatório, painel de monitoramento de obrigações e relatórios analíticos de resoluções.
+                </p>
+              </div>
+              <div className="flex items-center gap-1 text-xs font-bold text-indigo-600 mt-2">
+                Visualizar painel <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* Module Group 3: Fiscalização */}
+      <section className="space-y-4">
+        <div className="flex flex-col gap-1 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-1 px-2.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-black uppercase tracking-wider">
+              Módulo 3
             </div>
             <h2 className="text-lg font-black text-slate-800 tracking-tight">Fiscalização</h2>
           </div>
@@ -290,13 +369,13 @@ export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas, o
         <div className="pt-2">
           <div className="flex items-center gap-2 mb-4">
             <div className="p-1 px-2.5 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-black uppercase tracking-widest border border-slate-200">
-              Sub-Módulo 2.1
+              Sub-Módulo 3.1
             </div>
             <h3 className="text-xs font-black text-slate-600 uppercase tracking-widest">Balanço Hídrico dos Sistemas de Abastecimento de Água</h3>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Item 2.1: Gerenciar Balancos */}
+          {/* Item 3.1: Gerenciar Balancos */}
           <motion.div 
             whileHover={{ y: -3 }}
             onClick={() => setActiveTab("manage")}
@@ -316,7 +395,7 @@ export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas, o
             </div>
           </motion.div>
 
-          {/* Item 2.2: Análie Individual */}
+          {/* Item 3.2: Análie Individual */}
           <motion.div 
             whileHover={{ y: -3 }}
             onClick={() => setActiveTab("analyze")}
@@ -336,7 +415,7 @@ export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas, o
             </div>
           </motion.div>
 
-          {/* Item 2.3: Comparar Balanços */}
+          {/* Item 3.3: Comparar Balanços */}
           <motion.div 
             whileHover={{ y: -3 }}
             onClick={() => setActiveTab("compare")}
@@ -356,6 +435,62 @@ export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas, o
             </div>
           </motion.div>
         </div>
+        </div>
+      </section>
+
+      {/* Module Group 4: Publicações */}
+      <section className="space-y-4">
+        <div className="flex flex-col gap-1 border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <div className="p-1 px-2.5 bg-blue-50 text-blue-600 rounded-lg text-xs font-black uppercase tracking-wider">
+              Módulo 4
+            </div>
+            <h2 className="text-lg font-black text-slate-800 tracking-tight">Publicações</h2>
+          </div>
+        </div>
+
+        <div className="pt-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Sub-Módulo 4.1: Cadastrar Publicações */}
+            <motion.div 
+              whileHover={{ y: -3 }}
+              onClick={() => setActiveTab("pub_cadastro")}
+              className="p-6 rounded-2xl border border-slate-200 hover:border-blue-300 bg-white cursor-pointer group shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between"
+            >
+              <div>
+                <div className="mb-4 p-3 rounded-xl bg-blue-50 text-blue-500 w-max border border-blue-100 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                  <BookOpen size={24} />
+                </div>
+                <h3 className="text-base font-bold text-slate-800 mb-1.5 leading-tight">Cadastrar Publicações</h3>
+                <p className="text-slate-500 text-xs font-medium leading-relaxed mb-4">
+                  Cadastre e gerencie o acervo bibliográfico da agência, relatórios anuais de atividades, boletins informativos e artigos de pesquisa científica. Siga o mesmo layout da página de Resoluções.
+                </p>
+              </div>
+              <div className="flex items-center gap-1 text-xs font-bold text-blue-600 mt-2">
+                Acessar cadastro <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
+              </div>
+            </motion.div>
+
+            {/* Sub-Módulo 4.2: Painel de Publicações */}
+            <motion.div 
+              whileHover={{ y: -3 }}
+              onClick={() => setActiveTab("pub_painel")}
+              className="p-6 rounded-2xl border border-indigo-200 hover:border-indigo-300 bg-white cursor-pointer group shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between"
+            >
+              <div>
+                <div className="mb-4 p-3 rounded-xl bg-indigo-50 text-indigo-500 w-max border border-indigo-100 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
+                  <BarChart2 size={24} />
+                </div>
+                <h3 className="text-base font-bold text-slate-800 mb-1.5 leading-tight">Painel de Publicações</h3>
+                <p className="text-slate-500 text-xs font-medium leading-relaxed mb-4">
+                  Visualize os painéis gerenciais gráficos de publicações, filtre seu acervo histórico e pesquise relatórios e artigos por autor, tipo de arquivo ou ementa explicativa de forma dinâmica.
+                </p>
+              </div>
+              <div className="flex items-center gap-1 text-xs font-bold text-indigo-600 mt-2">
+                Visualizar painel gráfico <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
+              </div>
+            </motion.div>
+          </div>
         </div>
       </section>
 

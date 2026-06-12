@@ -601,6 +601,89 @@ async function runStartupMigration() {
         console.log("Seeding re_resolutions completed successfully!");
       }
 
+      // Ensure pu_publications table exists for publications module (prefix pu_)
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS pu_publications (
+          id SERIAL PRIMARY KEY,
+          titulo_assunto TEXT,
+          descricao TEXT,
+          tipo_documento VARCHAR(255),
+          responsavel_autor VARCHAR(255),
+          data_publicacao VARCHAR(50),
+          link_acesso TEXT,
+          observacoes TEXT
+        );
+      `);
+
+      const pubCheck = await client.query("SELECT COUNT(*) FROM pu_publications");
+      if (parseInt(pubCheck.rows[0].count) === 0) {
+        console.log("Seeding pu_publications table with parsed historical rows...");
+        const pubSeedRows = [
+          ["Relatório de Atividades de 2019", "Documento institucional que consolida as ações, fiscalizações e resultados regulatórios da SAE/Adasa ao longo do ano de 2019.", "Relatório de Atividades", "Superintendência", "31/12/2019", "https://www.adasa.df.gov.br/images/storage/area_de_atuacao/abastecimento_agua_esgotamento_sanitario/INFORMATIVOS/REL_ATIVIDADES_SAE_2019.pdf", ""],
+          ["Relatório de Atividades de 2020", "Documento institucional que consolida as ações, fiscalizações e resultados regulatórios da SAE/Adasa ao longo do ano de 2020.", "Relatório de Atividades", "Superintendência", "31/12/2020", "https://www.adasa.df.gov.br/images/storage/area_de_atuacao/abastecimento_agua_esgotamento_sanitario/INFORMATIVOS/RELATORIO_DE_ATIVIDADES_SAE_2020vf.pdf", ""],
+          ["Relatório de Atividades de 2021", "Documento institucional que consolida as ações, fiscalizações e resultados regulatórios da SAE/Adasa ao longo do ano de 2021", "Relatório de Atividades", "Superintendência", "31/12/2021", "https://www.adasa.df.gov.br/images/storage/area_de_atuacao/abastecimento_agua_esgotamento_sanitario/INFORMATIVOS/2021_SAE_RELATORIO_DE_ATIVIDADES_SAE.pdf", ""],
+          ["Relatório de Atividades de 2022", "Documento institucional que consolida as ações, fiscalizações e resultados regulatórios da SAE/Adasa ao longo do ano de 2022.", "Relatório de Atividades", "Superintendência", "31/12/2022", "https://www.adasa.df.gov.br/images/storage/area_de_atuacao/abastecimento_agua_esgotamento_sanitario/INFORMATIVOS/Relat%C3%B3rio%20Final%20de%20Atividades%202022.pdf", ""],
+          ["Relatório de Atividades de 2023", "Documento institucional que consolida as ações, fiscalizações e resultados regulatórios da SAE/Adasa ao longo do ano de 2023.", "Relatório de Atividades", "Superintendência", "31/12/2023", "https://www.adasa.df.gov.br/images/storage/area_de_atuacao/abastecimento_agua_esgotamento_sanitario/INFORMATIVOS/2023_SAE_RelatorioAtividades.pdf", ""],
+          ["Relatório de Atividades de 2024", "Documento institucional que consolida as ações, fiscalizações e resultados regulatórios da SAE/Adasa ao longo do ano de 2024.", "Relatório de Atividades", "Superintendência", "31/12/2024", "https://www.adasa.df.gov.br/images/storage/area_de_atuacao/abastecimento_agua_esgotamento_sanitario/INFORMATIVOS/2024Sae_RelatorioAtividadesSAE_2024.pdf", ""],
+          ["Relatório de Atividades de 2025", "Documento institucional que consolida as ações, fiscalizações e resultados regulatórios da SAE/Adasa ao longo do ano de 2025.", "Relatório de Atividades", "Superintendência", "31/12/2025", "https://samediasites.blob.core.windows.net/hotsites-wp-media/SAE/Relatorio%20de%20atividades/Relat%C3%B3rio_%20SAE_Impress%C3%A3o%20(1)_compressed%20(1).pdf", ""],
+          ["Boletim Informativo 04-25 (Outubro a Dezembro)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 4º trimestre de 2025.", "Boletim", "Superintendência", "31/12/2025", "https://www.adasa.df.gov.br/images/storage/area_de_atuacao/abastecimento_agua_esgotamento_sanitario/Boletim_Informativo/Boletim4Trimestre_2025.pdf", ""],
+          ["Boletim Informativo 03-25 (Julho a Setembro)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 3º trimestre de 2025.", "Boletim", "Superintendência", "30/09/2025", "https://www.adasa.df.gov.br/images/storage/area_de_atuacao/abastecimento_agua_esgotamento_sanitario/Boletim_Informativo/Boletim_3_Trimestre_2025_compressed.pdf", ""],
+          ["Boletim Informativo 02-25 (Abril a Junho)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 2º trimestre de 2025.", "Boletim", "Superintendência", "30/06/2025", "https://www.canva.com/design/DAGsfRNxAq4/510wjGIwRs4e1zSbPNcUrA/view?utm_content=DAGsfRNxAq4&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=h3886a200ef", ""],
+          ["Boletim Informativo 01-25 (Janeiro a Março)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 1º trimestre de 2025.", "Boletim", "Superintendência", "31/03/2025", "https://www.adasa.df.gov.br/images/storage/area_de_atuacao/abastecimento_agua_esgotamento_sanitario/Boletim_Informativo/Boletim_1_Trimestre_2025_compressed.pdf", ""],
+          ["Boletim Informativo 04-24 (outubro a dezembro)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 4º trimestre de 2024.", "Boletim", "Superintendência", "31/12/2024", "https://www.adasa.df.gov.br/images/storage/area_de_atuacao/abastecimento_agua_esgotamento_sanitario/Boletim_Informativo/BoletimInformativo_042024.pdf", ""],
+          ["Boletim Informativo 03-24 (julho a setembro)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 3º trimestre de 2024.", "Boletim", "Superintendência", "30/09/2024", "https://sway.cloud.microsoft/hqMgrAW5pNJLSICc", ""],
+          ["Boletim informativo 02-24 (abril a junho)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 2º trimestre de 2024.", "Boletim", "Superintendência", "30/06/2024", "https://sway.cloud.microsoft/DjbaBR2OJBB08TAq?ref=Link", ""],
+          ["Boletim informativo 01-24 (janeiro a março)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 1º trimestre de 2024.", "Boletim", "Superintendência", "31/03/2024", "https://sway.cloud.microsoft/tFVgNJkXYuODX76t?ref=Link", ""],
+          ["Boletim Informativo 04-23 (Outubro a Dezembro)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 4º trimestre de 2023.", "Boletim", "Superintendência", "31/12/2023", "https://sway.cloud.microsoft/982okByINhIRKXBg?ref=Link", ""],
+          ["Boletim Informativo 03-23 (Julho a Setembro)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 3º trimestre de 2023.", "Boletim", "Superintendência", "30/09/2023", "https://sway.office.com/v3lJyMVb2wdZfDDB", ""],
+          ["Boletim Informativo 02-23 (Abril a Junho)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 2º trimestre de 2023.", "Boletim", "Superintendência", "30/06/2023", "https://sway.office.com/WXWWGwTMGG8HrqjH?ref=Link", ""],
+          ["Boletim Informativo 01-23 (Janeiro a Março)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 1º trimestre de 2023.", "Boletim", "Superintendência", "31/03/2023", "https://sway.office.com/Mp1OOSARmKY3b0wD?ref=Link", ""],
+          ["Boletim Informativo 04-22 (Outubro a Dezembro)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 4º trimestre de 2022.", "Boletim", "Superintendência", "31/12/2022", "https://sway.office.com/CNYGM13GpAQBiWrE?ref=Link", ""],
+          ["Boletim Informativo 03-22 (Julho a Setembro)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 3º trimestre de 2022.", "Boletim", "Superintendência", "30/09/2022", "https://sway.office.com/Fbk1IoE0wn0UnqCt?ref=Link&loc=play", ""],
+          ["Boletim Informativo 02-22 (Abril a Junho)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 2º trimestre de 2022.", "Boletim", "Superintendência", "30/06/2022", "https://sway.office.com/zLQuLewHExlA4O0h?ref=Link", ""],
+          ["Boletim Informativo 01-22 (Janeiro a Março)", "Boletim informativo trimestral da Coordenação de Regulação (CORA/SAE), contendo os principais destaques e acompanhamentos do 1º trimestre de 2022.", "Boletim", "Superintendência", "31/03/2022", "https://sway.office.com/Y3Pga8w5dJTowi3g?ref=Link&loc=play", ""],
+          ["Informativo - Resolução nº 13/2021", "Documento explicativo contendo os destaques, diretrizes e o impacto regulatório trazido pela Resolução nº 13/2021.", "Informativo", "Regulação", "01/01/2025", "https://samediasites.blob.core.windows.net/hotsites-wp-media/Publicacoes/Informativo%20Res%20132021%20-%20Pesquisa,%20Desenvolvimento%20e%252520Inovacao_compressed.pdf", "Tema: Pesquisa, Desenvolvimento e Inovação."],
+          ["Resolução n. 14/2011: Condições Gerais da Prestação dos Serviços", "Normativo oficial que estabelece as regras, os direitos e os deveres relativos aos serviços de abastecimento de água e esgoto.", "Resolução", "Regulação", "01/01/2025", "https://samediasites.blob.core.windows.net/hotsites-wp-media/Publicacoes/Informativo%20-%20Resolu%C3%A7%C3%A3o%20n.%2014-2011-Condicoes%20Gerais%2520(2).pdf", "Abastecimento de Água e Esgoto."],
+          ["Informativo Resolução 15/2011 - Hidrometração Individualizada", "Material didático voltado a esclarecer as regras e procedimentos para a instalação de hidrômetros individuais em condomínios.", "Informativo", "Regulação", "01/01/2025", "https://samediasites.blob.core.windows.net/hotsites-wp-media/Publicacoes/Informativo%2520Resolu%25C3%25A7%25C3%25A3o%252015-2011-Hidrometra%25C3%25A7%25C3%25A3o%2520Individualizada.pdf", "-"],
+          ["Informativo – Hábitos de consumo para economia de água", "Cartilha de conscientização com dicas práticas para a população reduzir o desperdício de água no dia a dia.", "Informativo", "Regulação", "01/01/2025", "https://samediasites.blob.core.windows.net/hotsites-wp-media/Publicacoes/Informativo%2520-%2520H%25C3%25A1bitos%2520de%25252520consumo%2520para%2520economia%2520de%2520%25C3%25A1gua%2520(1).pdf", "-"],
+          ["Guia de Conservação e Gestão da Água em Edificações – Vol. I", "Primeiro volume do manual técnico focado em estratégias de gestão da demanda para otimizar o uso da água em prédios e residências.", "Guia", "Regulação", "01/01/2024", "https://www.adasa.df.gov.br/images/storage/publicacoes_adasa/guia_conserva%C3%A7%C3%A3o_v2/ADASA_VOL1_GuiaConservacaoGestaoAguaEdificacoes.pdf", "Foco: Gestão da Demanda."],
+          ["Guia de Conservação e Gestão da Água em Edificações – Vol. II", "Segundo volume do manual técnico, aprofundando-se na adoção de fontes alternativas de água para edificações.", "Guia", "Regulação", "01/01/2024", "https://www.adasa.df.gov.br/images/storage/publicacoes_adasa/guia_conserva%C3%A7%C3%A3o_v2/ADASA_VOL2_GuiaConservacaoGestaoAguaEdificacoes.pdf", "Foco: Fontes Alternativas."],
+          ["Informativo - Sistemas prediais de água não potável", "Orientações técnicas e de segurança para a instalação e o uso de águas destinadas a fins menos restritivos (como lavagem de pisos e descargas).", "Informativo", "Regulação", "01/01/2025", "https://samediasites.blob.core.windows.net/hotsites-wp-media/Publicacoes/Informativo%20-%20Sistemas%20prediais%20de%20%C3%A1gua%20n%C3%A3o%20pot%C3%A1vel.pdf", "-"],
+          ["Informativo - Prêmio Guardião da Água 2026", "Material de divulgação contendo as regras, os prazos ou os vencedores do prêmio ambiental referente ao ano de 2026.", "Informativo", "Regulação", "01/01/2026", "https://samediasites.blob.core.windows.net/hotsites-wp-media/SAE/Informativo%20-%20Pr%C3%AAmio%20Guardi%C3%A3o%20da%20%C3%81gua%202026.pdf", "-"],
+          ["Guia de Orientações – Poupa-DF", "Manual instrutivo vinculado ao programa governamental \"Poupa-DF\", com foco no uso racional de recursos hídricos.", "Guia", "Regulação", "01/01/2019", "https://drive.google.com/file/d/0Bz4P1U7JZbO9MktJX1lra3FCSTEyWWdoWlFuS1NOQnB1V3lz/view", "Hospedado no Google Drive."],
+          ["Guia de Orientação ao Usuário - Versão Atualizada", "Cartilha detalhada com os direitos, os deveres e os canais de comunicação disponíveis para os consumidores regulados.", "Guia", "Atendimento", "01/01/2025", "https://drive.google.com/file/d/1Jvy4m-qvxf0169caUXBV7GsjQqrfsFlp/view", "-"],
+          ["Folder rápido - Orientações básicas ao usuário", "Material de leitura rápida (panfleto) resumindo as instruções mais essenciais de atendimento ao público.", "Guia", "Atendimento", "01/01/2025", "https://www.canva.com/design/DAGgNFnH9Hc/lQDFuuSl5Oj5Rtb8e5J96A/view?utm_content=DAGgNFnH9Hc&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=hc1ec86d8bd", "Hospedado no Canva."],
+          ["Informativo – Entenda sua tarifa", "Documento didático que explica a composição da conta de água, as faixas de consumo e os critérios de cobrança.", "Informativo", "Atendimento", "01/01/2025", "https://www.adasa.df.gov.br/images/storage/publicacoes_adasa/26-12-2024/Informativo%20-%20Entenda%20sua%20tarifa%20(1).pdf", "Data inferida pela URL do arquivo."],
+          ["Informativo Qualidade da Água", "Relatório ou material de transparência sobre os parâmetros, testes e resultados referentes à potabilidade da água fornecida.", "Informativo", "Fiscalização", "01/01/2025", "https://www.adasa.df.gov.br/images/storage/area_de_atuacao/abastecimento_agua_esgotamento_sanitario/publicacoes/Informativo_Qualidade_da_%C3%81gua_2_compressed.pdf", "-"],
+          ["Informativo Esgotamento Sanitário", "Material educativo e técnico sobre a coleta e o tratamento de esgotos, destacando sua importância sanitária e ambiental.", "Informativo", "Fiscalização", "01/01/2025", "https://www.adasa.df.gov.br/images/storage/area_de_atuacao/abastecimento_agua_esgotamento_sanitario/publicacoes/Informativo_Esgotamento_Sanit%C3%A1rio_1_compressed.pdf", "-"],
+          ["AVALIAÇÃO DA CONTINUIDADE DO FORNECIMENTO DE ÁGUA EM SITUAÇÃO DE ESCASSEZ HÍDRICA", "Estudo técnico que analisa a resiliência e a manutenção do abastecimento durante períodos prolongados de seca.", "Artigo", "Leandro Oliveira et al.", "01/01/2023", "https://www.academia.edu/109016684/AVALIA%C3%87%C3%83O_DA_CONTINUIDADE_DO_FORNECIMENTO_DE_%C3%81GUA_EM_SITUA%C3%87%C3%83O_DE_ESCASSEZ_H%C3%8DDRICA", "Congresso Brasileiro de Regulação, ABAR."],
+          ["SIMULAÇÃO DE CENÁRIOS DE SEGURANÇA HÍDRICA DO SISTEMA BRAZLÂNDIA-DF", "Artigo prospectivo que modela e prevê diferentes situações de oferta e demanda de recursos hídricos na região de Brazlândia.", "Artigo", "Leandro Oliveira et al.", "01/01/2023", "https://www.academia.edu/109016761/SIMULA%C3%87%C3%83O_DE_CEN%C3%81RIOS_DE_SEGURAN%C3%87A_H%C3%8DDRICA_DO_SISTEMA_BRAZL%C3%82NDIA_DF", "Congresso Brasileiro de Regulação, ABAR."],
+          ["REVISÃO DA NORMA DE APLICAÇÃO DE PENALIDADES: EXPERIÊNCIA DA ADASA-DF", "Relato técnico-institucional detalhando o processo de atualização e aprimoramento das regras de sanção e multas pela Agência Reguladora.", "Artigo", "Leandro Oliveira et al.", "01/01/2023", "https://www.academia.edu/109016987/REVIS%C3%83O_DA_NORMA_DE_APLICA%C3%87%C3%83O_DE_PENALIDADES_EXPERI%C3%8ANCIA_DA_ADASA_DF", "Congresso Brasileiro de Regulação, ABAR."],
+          ["O REÚSO DE ÁGUAS E O DESAFIO DA EFETIVIDADE EM SUA REGULAMENTAÇÃO E MONITORAMENTO", "Artigo sobre os entraves técnicos e legais na criação de normas eficientes para o reaproveitamento da água.", "Artigo", "Leandro Oliveira et al.", "01/01/2023", "https://www.academia.edu/109019695/O_RE%C3%9ASO_DE_%C3%81GUAS_E_O_DESAFIO_DA_EFETIVIDADE_EM_SUA_REGULAMENTA%C3%87%C3%83O_E_MONITORAMENTO", "Congresso Brasileiro de Regulação, ABAR."],
+          ["METODOLOGIA DE GESTÃO DE RISCO PARA ANÁLISE DA SEGURANÇA HÍDRICA DE ZONAS URBANAS", "Proposta metodológica voltada a identificar, calcular e mitigar riscos de desabastecimento em áreas densamente povoadas.", "Artigo", "Leandro Oliveira et al.", "01/01/2023", "https://www.academia.edu/109019855/METODOLOGIA_DE_GEST%C3%83O_DE_RISCO_PARA_AN%C3%81LISE_DA_SEGURAN%C3%87A_H%C3%8DDRICA_DE_ZONAS_URBANAS", "Congresso Brasileiro de Regulação, ABAR."],
+          ["REVISÃO DE NORMA SOBRE PROCEDIMENTOS DE APLICAÇÃO DE PENALIDADES AOS USUÁRIOS...", "Estudo focado na atualização do processo administrativo de multas aplicadas diretamente aos consumidores finais (ex: fraudes).", "Artigo", "Leandro Oliveira et al.", "01/01/2023", "https://www.academia.edu/109020002/REVIS%C3%83O_DE_NORMA_SOBRE_PROCEDIMENTOS_DE_APLICA%C3%87%C3%83O_DE_PENALIDADES_AOS_USU%C3%81RIOS_DOS_SERVI%C3%87OS_DE_%C3%81GUA_E_ESGOTO", "AESabesp."],
+          ["APLICAÇÃO COMPLETA DA METODOLOGIA ACERTAR NO DISTRITO FEDERAL", "Análise da implantação da padronização nacional (Metodologia ACERTAR) para auditoria de dados de saneamento no DF.", "Artigo", "Leandro Oliveira et al.", "01/01/2021", "https://www.academia.edu/109020114/APLICA%C3%87%C3%83O_COMPLETA_DA_METODOLOGIA_ACERTAR_NO_DISTRITO_FEDERAL", "Congresso Brasileiro de Regulação."],
+          ["APLICAÇÃO DE METODOLOGIA DE GESTÃO DE RISCO PARA ANÁLISE DA SEGURANÇA HÍDRICA...", "Estudo de caso acadêmico testando na prática um modelo de gestão para evitar ou lidar com a falta d'água.", "Artigo", "Leandro Oliveira et al.", "01/01/2020", "https://www.academia.edu/109016547/APLICA%C3%87%C3%83O_DE_METODOLOGIA_DE_GEST%C3%83O_DE_RISCO_PARA_AN%C3%81LISE_DA_SEGURAN%C3%87A_H%C3%8DDRICA_DE_ZONAS_URBANAS_O_CASO_DE_BRAZL%C3%82NDIA_DF", "Congresso Brasileiro de Regulação."],
+          ["PERSPECTIVAS DA IMPLEMENTAÇÃO DA COBRANÇA PELO USO DOS RECURSOS HÍDRICOS NO DF", "Avaliação econômica e regulatória sobre a viabilidade e os impactos de se cobrar pela captação de água bruta no Distrito Federal.", "Artigo", "Leandro Oliveira et al.", "01/01/2019", "https://www.academia.edu/109020259/PERSPECTIVAS_DA_IMPLEMENTA%C3%87%C3%83O_DA_COBRAN%C3%87A_PELO_USO_DOS_RECURSOS_H%C3%8DDRICOS_NO_DISTRITO_FEDERAL", "Simpósio Brasileiro de Recursos Hídricos."],
+          ["REGULAMENTAÇÃO DO REÚSO DE ÁGUAS CINZAS E APROVEITAMENTO DE ÁGUAS PLUVIAIS...", "Documento técnico/normativo contendo as exigências para captar chuvas e reaproveitar águas de chuveiro/pias de forma segura.", "Artigo", "Leandro Oliveira et al.", "01/01/2019", "https://www.academia.edu/40255809/REGULAMENTA%C3%87%C3%83O_DO_RE%C3%9ASO_DE_%C3%81GUAS_CINZAS_E_APROVEITAMENTO_DE_%C3%81GUAS_PLUVIAIS_EM_EDIFICA%C3%87%C3%95ES_RESIDENCIAIS_A_EXPERI%C3%8ANCIA_DO_DF", "Regulamentação do Reúso de Águas Cinzas..."],
+          ["FISCALIZAÇÃO INDIRETA DA PRESTAÇÃO DOS SERVIÇOS DE ABASTECIMENTO DE ÁGUA E ESGOTO NO DF", "Estudo focado nas metodologias de acompanhamento das concessionárias sem necessidade de vistorias de campo (via indicadores).", "Artigo", "Leandro Oliveira et al.", "01/01/2019", "https://www.academia.edu/40255787/FISCALIZA%C3%87%C3%83O_INDIRETA_DA_PRESTA%C3%87%C3%83O_DOS_SERVI%C3%87OS_DE_ABASTECIMENTO_DE_%C3%81GUA_E_ESGOTO_NO_DISTRITO_FEDERAL", "Congresso de Regulação, ABAR."],
+          ["AUDITORIA E CERTIFICAÇÃO DE INFORMAÇÕES: ESTUDO PILOTO (PROJETO ACERTAR)", "Relatório da fase inicial de testes do Projeto ACERTAR para garantir a confiabilidade das informações reportadas pelas concessionárias.", "Artigo", "Leandro Oliveira et al.", "01/01/2019", "https://www.academia.edu/109020410/AUDITORIA_E_CERTIFICA%C3%87%C3%83O_DE_INFORMA%C3%87%C3%95ES_ESTUDO_PILOTO_DE_APLICA%C3%87%C3%83O_DA_METODOLOGIA_DO_PROJETO_ACERTAR", "Congresso Brasileiro de Regulação, ABAR."],
+          ["AVALIAÇÃO DA SATISFAÇÃO DOS USUÁRIOS DOS SERVIÇOS DE ÁGUA E ESGOTO NO DF...", "Resultados ou metodologia de pesquisas de percepção aplicadas para medir a qualidade do serviço na visão do consumidor.", "Artigo", "Leandro Oliveira et al.", "01/01/2019", "https://www.academia.edu/109020655/AVALIA%C3%87%C3%83O_DA_SATISFA%C3%87%C3%83O_DOS_USU%C3%81RIOS_DOS_SERVI%C3%87OS_DE_%C3%81GUA_E_ESGOTO_NO_DISTRITO_FEDERAL_%C3%80_LUZ_DE_UMA_FISCALIZA%C3%87%C3%83O_ESTRAT%C3%89GICA", "Congresso Brasileiro de Regulação, ABAR."],
+          ["MECANISMOS ADOTADOS PELO DISTRITO FEDERAL NO COMBATE À CRISE HÍDRICA", "Retrospectiva analítica das políticas públicas, contingenciamentos e medidas de gestão tomadas historicamente em épocas de estiagem grave.", "Artigo", "Leandro Oliveira et al.", "01/01/2018", "https://www.academia.edu/109020698/MECANISMOS_ADOTADOS_PELO_DISTRITO_FEDERAL_NO_COMBATE_%C3%80_CRISE_%C3%8DDRICA", "XXXVI Congreso Interamericano de Ingeniería Sanitária."],
+          ["MONITORAMENTO DA PRESTAÇÃO DOS SERVIÇOS PÚBLICOS DE ÁGUA E ESGOTO", "Material acadêmico que descreve as práticas, os indicadores e os desafios do controle contínuo exercido sobre as prestadoras do serviço.", "Artigo", "Leandro Oliveira et al.", "01/01/2018", "https://www.academia.edu/109021429/MONITORAMENTO_DA_PRESTA%C3%87%C3%83O_DOS_SERVI%C3%87OS_P%C3%9ABLICOS_DE_%C3%81GUA_E_ESGOTO", "Livro: Gestão da Crise Hídrica."],
+          ["MEDIÇÃO INDIVIDUALIZADA EM EDIFICAÇÕES NO DF: ANÁLISE DO POTENCIAL DE REDUÇÃO...", "Investigação empírica quantificando a economia de água gerada após a instalação de hidrômetros separados por unidade em condomínios.", "Artigo", "Leandro Oliveira et al.", "01/01/2017", "https://www.academia.edu/109021262/MEDI%C3%87%C3%83O_INDIVIDUALIZADA_EM_EDIFICA%C3%87%C3%95ES_NO_DISTRITO_FEDERAL_UMA_AN%C3%81LISE_DO_POTENCIAL_DE_REDU%C3%87%C3%83O_NO_CONSUMO_DE_%C3%81GUA", "SILUBESA."],
+          ["MANUAL DE AVALIAÇÃO DE DESEMPENHO DA PRESTAÇÃO DOS SERVIÇOS DE ABASTECIMENTO...", "Guia estruturado de métricas, critérios técnicos e fórmulas operacionais para julgar a eficiência das concessionárias de saneamento.", "Artigo", "Leandro Oliveira et al.", "01/01/2015", "https://www.academia.edu/109020818/MANUAL_DE_AVALIA%C3%87%C3%83O_DE_DESEMPENHO_DA_PRESTA%C3%87%C3%83O_DOS_SERVI%C3%87OS_DE_ABASTECIMENTO_DE_%C3%81GUA_E_ESGOTAMENTO_SANIT%C3%81RIO_DO_DISTRITO_FEDERAL", "Congresso Brasileiro de Regulação."]
+        ];
+
+        for (const row of pubSeedRows) {
+          await client.query(
+            "INSERT INTO pu_publications (titulo_assunto, descricao, tipo_documento, responsavel_autor, data_publicacao, link_acesso, observacoes) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+            row
+          );
+        }
+        console.log("Seeding pu_publications completed successfully!");
+      }
+
       await client.query("COMMIT");
       console.log("Database tables verified successfully on server start!");
     } catch (err) {
@@ -2321,6 +2404,121 @@ async function startServer() {
       res.json({ success: true, count });
     } catch (error: any) {
       console.error("Erro ao importar CSV:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // REST endpoints for publications (prefix pu_)
+  app.get("/api/publications", async (req, res) => {
+    try {
+      const pool = getDbPool();
+      const result = await pool.query("SELECT * FROM pu_publications ORDER BY id DESC");
+      res.json({ success: true, data: result.rows });
+    } catch (error: any) {
+      console.error("Erro ao obter publicações:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/publications", async (req, res) => {
+    try {
+      const { titulo_assunto, descricao, tipo_documento, responsavel_autor, data_publicacao, link_acesso, observacoes } = req.body;
+      const pool = getDbPool();
+      const result = await pool.query(
+        "INSERT INTO pu_publications (titulo_assunto, descricao, tipo_documento, responsavel_autor, data_publicacao, link_acesso, observacoes) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
+        [titulo_assunto || "", descricao || "", tipo_documento || "", responsavel_autor || "", data_publicacao || "", link_acesso || "", observacoes || ""]
+      );
+      res.json({ success: true, data: result.rows[0] });
+    } catch (error: any) {
+      console.error("Erro ao criar publicação:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.put("/api/publications/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const { titulo_assunto, descricao, tipo_documento, responsavel_autor, data_publicacao, link_acesso, observacoes } = req.body;
+      const pool = getDbPool();
+      const result = await pool.query(
+        "UPDATE pu_publications SET titulo_assunto = $1, descricao = $2, tipo_documento = $3, responsavel_autor = $4, data_publicacao = $5, link_acesso = $6, observacoes = $7 WHERE id = $8 RETURNING *",
+        [titulo_assunto || "", descricao || "", tipo_documento || "", responsavel_autor || "", data_publicacao || "", link_acesso || "", observacoes || "", id]
+      );
+      if (result.rows.length === 0) {
+        return res.status(404).json({ success: false, error: "Publicação não encontrada" });
+      }
+      res.json({ success: true, data: result.rows[0] });
+    } catch (error: any) {
+      console.error("Erro ao atualizar publicação:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.delete("/api/publications/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const pool = getDbPool();
+      const result = await pool.query("DELETE FROM pu_publications WHERE id = $1 RETURNING id", [id]);
+      if (result.rows.length === 0) {
+        return res.status(404).json({ success: false, error: "Publicação não encontrada" });
+      }
+      res.json({ success: true, deletedId: id });
+    } catch (error: any) {
+      console.error("Erro ao deletar publicação:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/publications/import", async (req, res) => {
+    try {
+      const { csvData } = req.body;
+      if (!csvData) {
+        return res.status(400).json({ success: false, error: "Nenhum dado CSV fornecido." });
+      }
+
+      const pool = getDbPool();
+      const lines = csvData.split(/\r?\n/);
+      let count = 0;
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i].trim();
+        if (!line) continue;
+        
+        // Skip header if it is present
+        if (i === 0 && line.toLowerCase().includes("titulo_assunto") && line.toLowerCase().includes("descricao")) {
+          continue;
+        }
+
+        // Split by semicolon
+        const parts = line.split(";");
+        if (parts.length >= 2) {
+          // If ID is specified in first column, handle it
+          let offset = 0;
+          if (parts.length >= 8 && !isNaN(parseInt(parts[0]))) {
+            offset = 1;
+          }
+
+          const titulo = (parts[0 + offset] || "").trim();
+          const desc = (parts[1 + offset] || "").trim();
+          const docType = (parts[2 + offset] || "").trim();
+          const author = (parts[3 + offset] || "").trim();
+          const pubDate = (parts[4 + offset] || "").trim();
+          const link = (parts[5 + offset] || "").trim();
+          const obs = (parts[6 + offset] || "").trim();
+
+          if (titulo && desc) {
+            await pool.query(
+              "INSERT INTO pu_publications (titulo_assunto, descricao, tipo_documento, responsavel_autor, data_publicacao, link_acesso, observacoes) VALUES ($1, $2, $3, $4, $5, $6, $7)",
+              [titulo, desc, docType, author, pubDate, link, obs]
+            );
+            count++;
+          }
+        }
+      }
+
+      res.json({ success: true, count });
+    } catch (error: any) {
+      console.error("Erro ao importar CSV de publicações:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });
