@@ -47,7 +47,9 @@ import {
   LogOut,
   Copy,
   FileSpreadsheet,
-  BookOpen
+  BookOpen,
+  Globe,
+  FolderKanban
 } from "lucide-react";
 import {
   LineChart,
@@ -333,6 +335,13 @@ export default function App() {
         name = window.location.hash.replace("#share-", "");
       }
     }
+    const hasPublicQuery = params.has("public") || params.has("share");
+    const hasPublicHash = window.location.hash.startsWith("#public-") || window.location.hash.startsWith("#share-");
+    if (hasPublicQuery || hasPublicHash) {
+      if (!name || name === "gerencial" || name === "true") {
+        return "publico_hub";
+      }
+    }
     return name;
   });
 
@@ -351,7 +360,12 @@ export default function App() {
         }
       }
       
-      setIsPublicMode(Boolean(hasPublicQuery || hasPublicHash));
+      const isPublic = Boolean(hasPublicQuery || hasPublicHash);
+      if (isPublic && (!name || name === "gerencial" || name === "true")) {
+        name = "publico_hub";
+      }
+      
+      setIsPublicMode(isPublic);
       setPublicTabName(name || null);
     };
 
@@ -384,7 +398,7 @@ export default function App() {
     const saved = localStorage.getItem("adasa-demands");
     return saved ? JSON.parse(saved) : [INITIAL_DEMAND];
   });
-  const [activeTab, setActiveTab] = useState<"home" | "gerencial" | "edit" | "compare" | "manage" | "analyze" | "templates" | "planning" | "users" | "reg_cadastro" | "reg_painel" | "pub_cadastro" | "pub_painel">(
+  const [activeTab, setActiveTab] = useState<"home" | "gerencial" | "public_hub" | "edit" | "compare" | "manage" | "analyze" | "templates" | "planning" | "users" | "reg_cadastro" | "reg_painel" | "pub_cadastro" | "pub_painel">(
     "home",
   );
   const [activePlanningSubTab, setActivePlanningSubTab] = useState<"tasks" | "dashboard" | "plans" | "areas" | "categories" | "responsibles" | "import" | "models">("dashboard");
@@ -3239,7 +3253,7 @@ const renderSupplyTable = () => {
     } else if (publicTabName === "planning" || publicTabName === "planejamento") {
       publicTabTitle = "Painel de Atividades • ADASA";
     } else {
-      publicTabTitle = "Painéis Gerenciais • ADASA";
+      publicTabTitle = "Painéis Públicos • ADASA";
     }
 
     return (
@@ -3306,35 +3320,136 @@ const renderSupplyTable = () => {
                   <div className="flex items-center gap-2 mb-4">
                     <button 
                        onClick={() => {
-                         window.location.hash = "#public-gerencial";
-                         setPublicTabName("gerencial");
+                         window.location.hash = "#public-publico_hub";
+                         setPublicTabName("publico_hub");
                        }}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-xs font-bold text-slate-700 shadow-sm transition-all"
                     >
-                      ← Voltar para Painéis Gerenciais
+                      ← Voltar para Painéis Públicos
                     </button>
                   </div>
-                  <PlanningTab 
-                    tasks={tasks}
-                    setTasks={setTasks}
-                    showToast={showToast}
-                    activeSubTab="dashboard"
-                  />
+                  <div className="max-w-3xl mx-auto py-12 px-6 bg-white border border-slate-200 rounded-3xl text-center shadow-sm space-y-6">
+                    <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto border border-blue-100">
+                      <FolderKanban size={32} />
+                    </div>
+                    <div className="space-y-2">
+                      <h2 className="text-2xl font-black text-slate-800 tracking-tight">Painel de Atividades Institucional</h2>
+                      <p className="text-slate-500 text-sm max-w-lg mx-auto leading-relaxed">
+                        O Painel Completo de Plano de Atividades, contendo o monitoramento detalhado de tarefas e metas corporativas das diferentes áreas operacionais, é de acesso privado e está disponível apenas após a autenticação institucional para garantir a segurança operacional e os dados estratégicos da superintendência.
+                      </p>
+                    </div>
+                    
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 max-w-md mx-auto text-left flex items-start gap-3">
+                      <div className="p-1 px-2.5 bg-blue-100 text-blue-800 rounded text-[9px] font-black uppercase mt-0.5">Dica</div>
+                      <p className="text-slate-600 text-xs font-medium leading-relaxed">
+                        Se você for um funcionário ou técnico da agência, faça login no portal utilizando as suas credenciais para visualizar e gerenciar o cronograma de atividades completo.
+                      </p>
+                    </div>
+
+                    <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
+                      <button
+                        onClick={() => {
+                          window.location.search = "";
+                          window.location.hash = "";
+                        }}
+                        className="px-6 py-3 bg-[#1e3a8a] text-white rounded-xl text-xs font-bold hover:bg-blue-900 transition-all shadow-sm"
+                      >
+                        Ir para Tela de Login (Acesso Completo)
+                      </button>
+                      <button
+                        onClick={() => {
+                          window.location.hash = "#public-publico_hub";
+                          setPublicTabName("publico_hub");
+                        }}
+                        className="px-6 py-3 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl text-xs font-bold transition-all"
+                      >
+                        Voltar aos Painéis Públicos
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ) : publicTabName === "reg_painel" || publicTabName === "resolutions" || publicTabName === "resolucoes" ? (
                 <div className="space-y-6">
                   <div className="flex items-center gap-2 mb-4">
                     <button 
                        onClick={() => {
-                         window.location.hash = "#public-gerencial";
-                         setPublicTabName("gerencial");
+                         window.location.hash = "#public-publico_hub";
+                         setPublicTabName("publico_hub");
                        }}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-xs font-bold text-slate-700 shadow-sm transition-all"
                     >
-                      ← Voltar para Painéis Gerenciais
+                      ← Voltar para Painéis Públicos
                     </button>
                   </div>
                   <ResolutionsDashboard showToast={showToast} />
+                </div>
+              ) : publicTabName === "pub_painel" ? (
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <button 
+                       onClick={() => {
+                         window.location.hash = "#public-publico_hub";
+                         setPublicTabName("publico_hub");
+                       }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-xs font-bold text-slate-700 shadow-sm transition-all"
+                    >
+                      ← Voltar para Painéis Públicos
+                    </button>
+                  </div>
+                  <PublicationsDashboard showToast={showToast} />
+                </div>
+              ) : publicTabName === "analyze" || publicTabName === "balanco" ? (
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <button 
+                       onClick={() => {
+                         window.location.hash = "#public-publico_hub";
+                         setPublicTabName("publico_hub");
+                       }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-xs font-bold text-slate-700 shadow-sm transition-all"
+                    >
+                      ← Voltar para Painéis Públicos
+                    </button>
+                  </div>
+                  <div className="max-w-3xl mx-auto py-12 px-6 bg-white border border-slate-200 rounded-3xl text-center shadow-sm space-y-6">
+                    <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto border border-blue-100">
+                      <Droplets size={32} />
+                    </div>
+                    <div className="space-y-2">
+                      <h2 className="text-2xl font-black text-slate-800 tracking-tight">Painel de Balanço Hídrico Institucional</h2>
+                      <p className="text-slate-500 text-sm max-w-lg mx-auto leading-relaxed">
+                        O Painel Completo do Balanço Hídrico, que inclui simulação de cenários de oferta/demanda, índices de criticidade, projeções decenais e mapa geográfico interativo integrado de subsistemas, está disponível na área logada da agência para garantir a segurança operacional dos dados hídricos do DF.
+                      </p>
+                    </div>
+                    
+                    <div className="p-4 bg-slate-50 rounded-2xl border border-slate-100 max-w-md mx-auto text-left flex items-start gap-3">
+                      <div className="p-1 px-2.5 bg-blue-100 text-blue-800 rounded text-[9px] font-black uppercase mt-0.5">Dica</div>
+                      <p className="text-slate-600 text-xs font-medium leading-relaxed">
+                        Faça login no portal utilizando a conta padrão demonstrativa para acessar e simular dados do balanço completo imediatamente.
+                      </p>
+                    </div>
+
+                    <div className="pt-2 flex flex-col sm:flex-row gap-3 justify-center">
+                      <button
+                        onClick={() => {
+                          window.location.search = "";
+                          window.location.hash = "";
+                        }}
+                        className="px-6 py-3 bg-[#1e3a8a] text-white rounded-xl text-xs font-bold hover:bg-blue-900 transition-all shadow-sm"
+                      >
+                        Ir para Tela de Login (Acesso Completo)
+                      </button>
+                      <button
+                        onClick={() => {
+                          window.location.hash = "#public-publico_hub";
+                          setPublicTabName("publico_hub");
+                        }}
+                        className="px-6 py-3 bg-slate-100 text-slate-700 hover:bg-slate-200 rounded-xl text-xs font-bold transition-all"
+                      >
+                        Voltar aos Painéis Públicos
+                      </button>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <ManagerialHub 
@@ -3346,7 +3461,16 @@ const renderSupplyTable = () => {
                     window.location.hash = "#public-resolutions";
                     setPublicTabName("reg_painel");
                   }}
+                  onOpenWaterBalance={() => {
+                    window.location.hash = "#public-analyze";
+                    setPublicTabName("analyze");
+                  }}
+                  onOpenPublications={() => {
+                    window.location.hash = "#public-pub_painel";
+                    setPublicTabName("pub_painel");
+                  }}
                   isPublic={true}
+                  showOnlyPublic={true}
                 />
               )}
             </motion.div>
@@ -3430,6 +3554,13 @@ const renderSupplyTable = () => {
                   >
                     <BarChart2 size={20} className={activeTab === "gerencial" ? "text-adasa-mid" : "text-white/60"} />
                     Painéis Gerenciais
+                  </button>
+                  <button
+                    onClick={() => handleTabChange("public_hub")}
+                    className={cn("w-full px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "public_hub" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                  >
+                    <Globe size={20} className={activeTab === "public_hub" ? "text-adasa-mid" : "text-white/60"} />
+                    Painéis Públicos
                   </button>
                 </div>
               </div>
@@ -3749,6 +3880,26 @@ const renderSupplyTable = () => {
                   )}
                 />
                 {!isSidebarCollapsed && <span className="hidden md:inline">Painéis Gerenciais</span>}
+              </button>
+
+              <button
+                title={isSidebarCollapsed ? "Painéis Públicos" : undefined}
+                onClick={() => handleTabChange("public_hub")}
+                className={cn(
+                  "w-full px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                  activeTab === "public_hub"
+                    ? "bg-white/10 text-white shadow-sm border border-white/10"
+                    : "text-white/60 hover:text-white hover:bg-white/5",
+                )}
+              >
+                <Globe
+                  size={16}
+                  className={cn(
+                    "flex-shrink-0 transition-colors",
+                    activeTab === "public_hub" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                  )}
+                />
+                {!isSidebarCollapsed && <span className="hidden md:inline">Painéis Públicos</span>}
               </button>
             </div>
           </div>
@@ -4216,6 +4367,8 @@ const renderSupplyTable = () => {
                 ? "Página Inicial"
                 : activeTab === "gerencial"
                 ? "Painéis Gerenciais"
+                : activeTab === "public_hub"
+                ? "Painéis Públicos"
                 : activeTab === "compare"
                 ? "Comparar Balanços"
                 : activeTab === "analyze"
@@ -4239,6 +4392,8 @@ const renderSupplyTable = () => {
                 ? "Selecione um módulo abaixo para iniciar o trabalho ou visualizar relatórios."
                 : activeTab === "gerencial"
                   ? "Centralizadores de monitoramento estratégico, estoque regulatório e resultados da superintendência ADASA."
+                : activeTab === "public_hub"
+                  ? "Acesso externo e público do estoque regulatório e biblioteca de publicações científicas e técnicas da SAE."
                   : activeTab === "compare"
                     ? "Compare e analise a evolução da demanda e balanço."
                     : activeTab === "analyze"
@@ -7679,20 +7834,6 @@ const renderSupplyTable = () => {
               transition={{ duration: 0.3, ease: "easeOut" }}
               className="max-w-7xl mx-auto w-full space-y-6"
             >
-              <div className="flex justify-end pr-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const shareUrl = `${window.location.origin}${window.location.pathname}?public=gerencial`;
-                    navigator.clipboard.writeText(shareUrl);
-                    showToast("Sucesso", "Link público copiado com sucesso! Compartilhe com qualquer pessoa.", "success");
-                  }}
-                  className="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 font-bold text-xs rounded-xl shadow-sm transition-all"
-                >
-                  <Copy size={14} />
-                  Copiar Link Público do Painel
-                </button>
-              </div>
               <ManagerialHub 
                 onOpenPlanning={() => {
                   setActivePlanningSubTab("dashboard");
@@ -7701,7 +7842,36 @@ const renderSupplyTable = () => {
                 onOpenResolutions={() => {
                   handleTabChange("reg_painel");
                 }}
+                onOpenWaterBalance={() => {
+                  handleTabChange("analyze");
+                }}
+                onOpenPublications={() => {
+                  handleTabChange("pub_painel");
+                }}
                 isPublic={false}
+                showOnlyPublic={false}
+              />
+            </motion.div>
+          ) : activeTab === "public_hub" ? (
+            <motion.div
+              key="public_hub"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="max-w-7xl mx-auto w-full space-y-6"
+            >
+              <ManagerialHub 
+                onOpenPlanning={() => {}}
+                onOpenResolutions={() => {
+                  handleTabChange("reg_painel");
+                }}
+                onOpenWaterBalance={() => {}}
+                onOpenPublications={() => {
+                  handleTabChange("pub_painel");
+                }}
+                isPublic={false}
+                showOnlyPublic={true}
               />
             </motion.div>
           ) : null}
