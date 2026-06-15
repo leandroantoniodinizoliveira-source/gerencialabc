@@ -7894,6 +7894,15 @@ const renderSupplyTable = () => {
                 activeSubTab={activePlanningSubTab}
                 setConfirmState={setConfirmState}
                 myTasksFilterTrigger={myTasksFilterTrigger}
+                isMyTasksSelected={isMyTasksSelected}
+                plansProp={plans}
+                areasProp={areas}
+                categoriesProp={categories}
+                responsiblesProp={responsibles}
+                setPlansProp={setPlans}
+                setAreasProp={setAreas}
+                setCategoriesProp={setCategories}
+                setResponsiblesProp={setResponsibles}
               />
             </motion.div>
           ) : activeTab === "reg_cadastro" ? (
