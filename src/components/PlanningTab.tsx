@@ -606,7 +606,7 @@ export function PlanningTab({
     }
 
     try {
-      const res = await fetch("/api/task-models");
+      const res = await fetch(`/api/task-models?t=${Date.now()}`);
       const resData = await res.json();
       if (resData.success && Array.isArray(resData.data)) {
         setTaskModels(resData.data);

@@ -84,7 +84,7 @@ export const TaskModelManager: React.FC<TaskModelManagerProps> = ({
   const fetchModels = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/task-models");
+      const res = await fetch(`/api/task-models?t=${Date.now()}`);
       let text = "";
       try {
         text = await res.text();
