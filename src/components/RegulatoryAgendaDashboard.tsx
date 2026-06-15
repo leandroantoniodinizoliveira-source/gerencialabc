@@ -82,9 +82,15 @@ export function RegulatoryAgendaDashboard({ showToast }: RegulatoryAgendaDashboa
     const fetchData = async () => {
       try {
         const agendasRes = await fetch("/api/agendas");
+        if (!agendasRes.ok) {
+          throw new Error(`Erro na API agendas: ${agendasRes.status}`);
+        }
         const agendasJson = await agendasRes.json();
         
         const tasksRes = await fetch("/api/tasks");
+        if (!tasksRes.ok) {
+          throw new Error(`Erro na API tasks: ${tasksRes.status}`);
+        }
         const tasksJson = await tasksRes.json();
 
         if (agendasJson.success) {
@@ -96,8 +102,9 @@ export function RegulatoryAgendaDashboard({ showToast }: RegulatoryAgendaDashboa
         if (tasksJson.success) {
           setTasks(tasksJson.data || []);
         }
-      } catch (error) {
-        showToast("Erro ao estabelecer conexão de dados.", "error");
+      } catch (error: any) {
+        console.error("Erro no fetchData do RegulatoryAgendaDashboard:", error);
+        showToast(error.message || "Erro ao estabelecer conexão de dados.", "error");
       } finally {
         setIsLoading(false);
       }

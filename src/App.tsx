@@ -3400,6 +3400,21 @@ const renderSupplyTable = () => {
                   </div>
                   <PublicationsDashboard showToast={showToast} />
                 </div>
+              ) : publicTabName === "reg_agenda_painel" ? (
+                <div className="space-y-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <button 
+                       onClick={() => {
+                         window.location.hash = "#public-publico_hub";
+                         setPublicTabName("publico_hub");
+                       }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 text-xs font-bold text-slate-700 shadow-sm transition-all"
+                    >
+                      ← Voltar para Painéis Públicos
+                    </button>
+                  </div>
+                  <RegulatoryAgendaDashboard showToast={showToast} />
+                </div>
               ) : publicTabName === "analyze" || publicTabName === "balanco" ? (
                 <div className="space-y-6">
                   <div className="flex items-center gap-2 mb-4">

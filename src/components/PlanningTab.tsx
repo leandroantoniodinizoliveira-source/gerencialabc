@@ -6967,9 +6967,9 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                                           <div className="flex items-center gap-1.5 text-[9px] font-bold text-slate-400">
                                             <CalendarRange size={12} className="text-slate-350 shrink-0" />
                                             <span className="truncate">
-                                              {task.startDate ? new Date(task.startDate).toLocaleDateString("pt-BR") : "S/D"}
+                                              {task.startDate ? new Date(task.startDate).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "S/D"}
                                               {" - "}
-                                              {task.endDate ? new Date(task.endDate).toLocaleDateString("pt-BR") : "S/D"}
+                                              {task.endDate ? new Date(task.endDate).toLocaleDateString("pt-BR", { timeZone: "UTC" }) : "S/D"}
                                             </span>
                                           </div>
                                         )}
