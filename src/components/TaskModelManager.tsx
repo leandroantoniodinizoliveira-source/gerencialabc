@@ -85,23 +85,36 @@ export const TaskModelManager: React.FC<TaskModelManagerProps> = ({
     setLoading(true);
     try {
       const res = await fetch("/api/task-models");
-      if (!res.ok) {
-        throw new Error(`HTTP Error: ${res.status} ${res.statusText}`);
+      let text = "";
+      try {
+        text = await res.text();
+      } catch (e: any) {
+        throw new Error(`Failed to read response: ${e.message}`);
       }
-      const resData = await res.json();
-      if (resData.success && Array.isArray(resData.data)) {
+
+      if (!res.ok) {
+        throw new Error(`HTTP Error ${res.status}: ${text.substring(0, 100)}`);
+      }
+
+      let resData;
+      try {
+        resData = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Invalid JSON response: ${text.substring(0, 100)}`);
+      }
+
+      if (resData && resData.success && Array.isArray(resData.data)) {
         setModels(resData.data);
-        // Maintain selection if exists
         if (selectedModel) {
           const updatedSelected = resData.data.find((m: any) => m.id === selectedModel.id);
           setSelectedModel(updatedSelected || null);
         }
       } else {
-        showToast("Erro", "Falha ao carregar modelos de processos", "error");
+        showToast("Erro", "O servidor não retornou o formato esperado de dados.", "error");
       }
     } catch (err: any) {
       console.error("DEBUG fetchModels error:", err);
-      showToast("Erro", "Erro ao comunicar com o servidor", "error");
+      showToast("Erro", `Comunicação falhou: ${err.message}`, "error");
     } finally {
       setLoading(false);
     }

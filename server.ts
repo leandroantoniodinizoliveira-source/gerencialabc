@@ -3384,6 +3384,7 @@ async function startServer() {
 
   // REST endpoints for task templates (models)
   app.get("/api/task-models", async (req, res) => {
+    console.log("[API] GET /api/task-models accessed by frontend");
     try {
       const pool = getDbPool();
       const modelsRes = await pool.query("SELECT id, name, created_at, created_by FROM pl_task_models ORDER BY id ASC");
