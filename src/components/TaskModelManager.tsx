@@ -85,9 +85,12 @@ export const TaskModelManager: React.FC<TaskModelManagerProps> = ({
     setLoading(true);
     try {
       const res = await fetch("/api/task-models");
+      if (!res.ok) {
+        throw new Error(`HTTP Error: ${res.status} ${res.statusText}`);
+      }
       const resData = await res.json();
-      if (resData.success) {
-        setModels(resData.data || []);
+      if (resData.success && Array.isArray(resData.data)) {
+        setModels(resData.data);
         // Maintain selection if exists
         if (selectedModel) {
           const updatedSelected = resData.data.find((m: any) => m.id === selectedModel.id);
@@ -96,7 +99,8 @@ export const TaskModelManager: React.FC<TaskModelManagerProps> = ({
       } else {
         showToast("Erro", "Falha ao carregar modelos de processos", "error");
       }
-    } catch {
+    } catch (err: any) {
+      console.error("DEBUG fetchModels error:", err);
       showToast("Erro", "Erro ao comunicar com o servidor", "error");
     } finally {
       setLoading(false);

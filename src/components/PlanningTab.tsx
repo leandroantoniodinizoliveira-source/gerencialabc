@@ -405,7 +405,7 @@ export function PlanningTab({
   const previousSubTabRef = useRef<string | undefined>(undefined);
   const hasInitiallySelectedPlanRef = useRef<boolean>(false);
   // Navigation, search & filter state
-  const [isDashboardFiltersExpanded, setIsDashboardFiltersExpanded] = useState(false);
+  const [isDashboardFiltersExpanded, setIsDashboardFiltersExpanded] = useState(true);
   const [isTasksFiltersExpanded, setIsTasksFiltersExpanded] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -608,9 +608,9 @@ export function PlanningTab({
     try {
       const res = await fetch("/api/task-models");
       const resData = await res.json();
-      if (resData.success) {
-        setTaskModels(resData.data || []);
-        if (resData.data && resData.data.length > 0) {
+      if (resData.success && Array.isArray(resData.data)) {
+        setTaskModels(resData.data);
+        if (resData.data.length > 0) {
           setSelectedModelId(String(resData.data[0].id));
         } else {
           setSelectedModelId("");
