@@ -315,6 +315,56 @@ const isSameWb = (itemWbId: number | string | null | undefined, filterWbId: numb
   return false;
 };
 
+// Global fetch interceptor to debug 404s and timeouts
+try {
+  const originalFetch = window.fetch;
+  if (originalFetch) {
+    const fetchInterceptor = async (...args: any[]) => {
+      const [resource, config] = args;
+      const url = typeof resource === 'string' ? resource : (resource instanceof Request ? resource.url : String(resource));
+      
+      if (url.includes('/api/')) {
+        console.log(`[FETCH DEBUG] Request: ${url}`, config);
+      }
+      
+      try {
+        const response = await originalFetch(...args);
+        if (!response.ok && url.includes('/api/')) {
+          console.error(`[FETCH DEBUG] Error Response: ${url} - Status: ${response.status}`);
+          try {
+            const cloned = response.clone();
+            const text = await cloned.text();
+            console.error(`[FETCH DEBUG] Error Body: ${text.substring(0, 200)}`);
+          } catch (e) {
+            console.error(`[FETCH DEBUG] Could not read error body`, e);
+          }
+        }
+        return response;
+      } catch (err) {
+        console.error(`[FETCH DEBUG] Fetch Exception: ${url}`, err);
+        throw err;
+      }
+    };
+
+    try {
+      (window as any).fetch = fetchInterceptor;
+    } catch (e) {
+      console.warn("[FETCH DEBUG] Direct assignment of window.fetch failed, trying Object.defineProperty", e);
+      try {
+        Object.defineProperty(window, 'fetch', {
+          value: fetchInterceptor,
+          configurable: true,
+          writable: true
+        });
+      } catch (e2) {
+        console.error("[FETCH DEBUG] Could not intercept window.fetch. Debug logs may not appear.", e2);
+      }
+    }
+  }
+} catch (globalErr) {
+  console.error("[FETCH DEBUG] Global fetch wrapper failed to initialize:", globalErr);
+}
+
 export default function App() {
   const { currentUser, roles, checkPermission, logout } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
