@@ -17,6 +17,7 @@ interface ManagerialHubProps {
   onOpenResolutions: () => void;
   onOpenWaterBalance: () => void;
   onOpenPublications: () => void;
+  onOpenRegulatoryAgenda: () => void;
   isPublic?: boolean;
   showOnlyPublic?: boolean;
 }
@@ -25,7 +26,8 @@ export function ManagerialHub({
   onOpenPlanning, 
   onOpenResolutions, 
   onOpenWaterBalance, 
-  onOpenPublications, 
+  onOpenPublications,
+  onOpenRegulatoryAgenda,
   isPublic = false,
   showOnlyPublic = false
 }: ManagerialHubProps) {
@@ -114,7 +116,7 @@ export function ManagerialHub({
         </div>
 
         {/* Master Row with relevant cards depending on public mode */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Painel de Atividades Card - PRIVATE */}
           {!showOnlyPublic && (
             <motion.div 
@@ -154,6 +156,26 @@ export function ManagerialHub({
             </div>
             <div className="mt-8 flex items-center gap-2 text-xs font-bold text-blue-700">
               Abrir Painel de Resoluções <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
+            </div>
+          </motion.div>
+
+          {/* Painel da Agenda Regulatória Card - PUBLIC */}
+          <motion.div 
+            whileHover={{ y: -2 }}
+            onClick={onOpenRegulatoryAgenda}
+            className="p-8 rounded-3xl border border-blue-200 bg-gradient-to-br from-white to-blue-50/20 shadow-sm cursor-pointer hover:shadow-md transition-all duration-300 flex flex-col justify-between group h-full"
+          >
+            <div>
+              <div className="mb-4 p-3 rounded-xl bg-blue-50 text-blue-600 w-max border border-blue-100 group-hover:bg-blue-100 transition-colors">
+                <BookOpen size={24} className="text-blue-600" />
+              </div>
+              <h3 className="text-lg font-black text-slate-800 leading-tight mb-2">Painel da Agenda Regulatória</h3>
+              <p className="text-slate-600 text-xs font-medium leading-relaxed mb-6">
+                Acompanhamento estratégico, metas, indicadores gráficos e percentual de entregas dos itens da Agenda Regulatória de forma integrada e visual.
+              </p>
+            </div>
+            <div className="mt-8 flex items-center gap-2 text-xs font-bold text-blue-700">
+              Abrir Painel da Agenda <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
             </div>
           </motion.div>
 

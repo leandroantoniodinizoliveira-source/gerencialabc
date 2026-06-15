@@ -696,7 +696,8 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
 
   // Modal/Form State for adding/editing tasks
   const [timelineTaskId, setTimelineTaskId] = useState<number | null>(null);
-  const [viewMode, setViewMode] = useState<"tree" | "table" | "status" | "category" | "area" | "responsible" | "board">("category");
+  const [viewMode, setViewMode] = useState<"tree" | "table" | "status" | "category" | "area" | "responsible" | "board" | "gantt">("category");
+  const [ganttScale, setGanttScale] = useState<"mes" | "trimestre" | "semestre">("mes");
   const [tableSort, setTableSort] = useState<{ field: string, dir: "asc" | "desc" } | null>({ field: "end", dir: "asc" });
   const [boardGroupBy, setBoardGroupBy] = useState<"status" | "category">("category");
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -6196,6 +6197,12 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                 >
                   <Table size={16} /> Tabela
                 </button>
+                <button
+                  onClick={() => { setViewMode("gantt"); setTimelineTaskId(null); }}
+                  className={`flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl transition-all whitespace-nowrap shadow-sm ${viewMode === "gantt" && timelineTaskId === null ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"}`}
+                >
+                  <CalendarRange size={16} /> Gantt
+                </button>
                 {timelineTaskId !== null && (
                   <button
                     onClick={() => setTimelineTaskId(null)}
@@ -7142,6 +7149,329 @@ export function PlanningTab({ tasks, setTasks, showToast, activeSubTab = "tasks"
                  );
               })()}
             </div>
+
+               {viewMode === "gantt" && (() => {
+                  const parseSafeDate = (dateStr: string | null | undefined): Date | null => {
+                    if (!dateStr) return null;
+                    try {
+                      let d: Date;
+                      if (dateStr.includes("-")) {
+                        const parts = dateStr.split("T")[0].split("-");
+                        d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+                      } else {
+                        d = new Date(dateStr);
+                      }
+                      return isNaN(d.getTime()) ? null : d;
+                    } catch (e) {
+                      return null;
+                    }
+                  };
+
+                  const tasksWithDates = filteredTasks.filter(t => t.startDate && t.endDate);
+                  
+                  let startDateLimit = new Date();
+                  startDateLimit.setMonth(startDateLimit.getMonth() - 1);
+                  let endDateLimit = new Date();
+                  endDateLimit.setMonth(endDateLimit.getMonth() + 4);
+                  
+                  const parsedTasks = tasksWithDates.map(t => ({
+                    task: t,
+                    start: parseSafeDate(t.startDate)!,
+                    end: parseSafeDate(t.endDate)!
+                  })).filter(item => item.start !== null && item.end !== null && item.start <= item.end);
+                  
+                  if (parsedTasks.length > 0) {
+                    let minT = new Date(Math.min(...parsedTasks.map(t => t.start.getTime())));
+                    let maxT = new Date(Math.max(...parsedTasks.map(t => t.end.getTime())));
+                    
+                    minT.setDate(minT.getDate() - 7);
+                    maxT.setDate(maxT.getDate() + 15);
+                    
+                    startDateLimit = minT;
+                    endDateLimit = maxT;
+                  }
+                  
+                  startDateLimit.setHours(0,0,0,0);
+                  endDateLimit.setHours(23,59,59,999);
+                  
+                  const totalDays = Math.max(1, Math.round((endDateLimit.getTime() - startDateLimit.getTime()) / (1000 * 60 * 60 * 24)));
+                  const gridColumns: { label: string; widthPercent: number; key: string }[] = [];
+
+                  if (ganttScale === "mes") {
+                    let currentPointer = new Date(startDateLimit);
+                    currentPointer.setDate(1);
+                    
+                    const monthsList: { year: number; month: number }[] = [];
+                    const endPointer = new Date(endDateLimit);
+                    
+                    while (currentPointer <= endPointer) {
+                      monthsList.push({
+                        year: currentPointer.getFullYear(),
+                        month: currentPointer.getMonth()
+                      });
+                      currentPointer.setMonth(currentPointer.getMonth() + 1);
+                    }
+                    
+                    monthsList.forEach(({ year, month }) => {
+                      const monthStart = new Date(year, month, 1, 0, 0, 0, 0);
+                      const monthEnd = new Date(year, month + 1, 0, 23, 59, 59, 999);
+                      
+                      const startClamp = monthStart < startDateLimit ? startDateLimit : monthStart;
+                      const endClamp = monthEnd > endDateLimit ? endDateLimit : monthEnd;
+                      
+                      const clampDays = Math.max(0, Math.round((endClamp.getTime() - startClamp.getTime()) / (1000 * 60 * 60 * 24)));
+                      if (clampDays > 0) {
+                        const monthNames = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+                        const pct = (clampDays / totalDays) * 100;
+                        gridColumns.push({
+                          label: `${monthNames[month]}/${year}`,
+                          widthPercent: pct,
+                          key: `${year}-${month}`
+                        });
+                      }
+                    });
+                  } else if (ganttScale === "trimestre") {
+                    let currentPointer = new Date(startDateLimit);
+                    const currentQ = Math.floor(currentPointer.getMonth() / 3);
+                    currentPointer.setMonth(currentQ * 3);
+                    currentPointer.setDate(1);
+
+                    const quartersList: { year: number; quarter: number }[] = [];
+                    const endPointer = new Date(endDateLimit);
+
+                    while (currentPointer <= endPointer) {
+                      const q = Math.floor(currentPointer.getMonth() / 3);
+                      quartersList.push({
+                        year: currentPointer.getFullYear(),
+                        quarter: q
+                      });
+                      currentPointer.setMonth((q + 1) * 3);
+                    }
+
+                    const uniqueQuarters = quartersList.filter((item, index, self) => 
+                      self.findIndex(t => t.year === item.year && t.quarter === item.quarter) === index
+                    );
+
+                    uniqueQuarters.forEach(({ year, quarter }) => {
+                      const qStartMonth = quarter * 3;
+                      const qEndMonth = (quarter + 1) * 3 - 1;
+
+                      const qStart = new Date(year, qStartMonth, 1, 0, 0, 0, 0);
+                      const qEnd = new Date(year, qEndMonth + 1, 0, 23, 59, 59, 999);
+
+                      const startClamp = qStart < startDateLimit ? startDateLimit : qStart;
+                      const endClamp = qEnd > endDateLimit ? endDateLimit : qEnd;
+
+                      const clampDays = Math.max(0, Math.round((endClamp.getTime() - startClamp.getTime()) / (1000 * 60 * 60 * 24)));
+                      if (clampDays > 0) {
+                        const pct = (clampDays / totalDays) * 100;
+                        gridColumns.push({
+                          label: `${quarter + 1}º Trim/${year}`,
+                          widthPercent: pct,
+                          key: `${year}-Q${quarter}`
+                        });
+                      }
+                    });
+                  } else {
+                    let currentPointer = new Date(startDateLimit);
+                    const currentS = Math.floor(currentPointer.getMonth() / 6);
+                    currentPointer.setMonth(currentS * 6);
+                    currentPointer.setDate(1);
+
+                    const semestersList: { year: number; semester: number }[] = [];
+                    const endPointer = new Date(endDateLimit);
+
+                    while (currentPointer <= endPointer) {
+                      const s = Math.floor(currentPointer.getMonth() / 6);
+                      semestersList.push({
+                        year: currentPointer.getFullYear(),
+                        semester: s
+                      });
+                      currentPointer.setMonth((s + 1) * 6);
+                    }
+
+                    const uniqueSemesters = semestersList.filter((item, index, self) => 
+                      self.findIndex(t => t.year === item.year && t.semester === item.semester) === index
+                    );
+
+                    uniqueSemesters.forEach(({ year, semester }) => {
+                      const sStartMonth = semester * 6;
+                      const sEndMonth = (semester + 1) * 6 - 1;
+
+                      const sStart = new Date(year, sStartMonth, 1, 0, 0, 0, 0);
+                      const sEnd = new Date(year, sEndMonth + 1, 0, 23, 59, 59, 999);
+
+                      const startClamp = sStart < startDateLimit ? startDateLimit : sStart;
+                      const endClamp = sEnd > endDateLimit ? endDateLimit : sEnd;
+
+                      const clampDays = Math.max(0, Math.round((endClamp.getTime() - startClamp.getTime()) / (1000 * 60 * 60 * 24)));
+                      if (clampDays > 0) {
+                        const pct = (clampDays / totalDays) * 100;
+                        gridColumns.push({
+                          label: `${semester + 1}º Sem/${year}`,
+                          widthPercent: pct,
+                          key: `${year}-S${semester}`
+                        });
+                      }
+                    });
+                  }
+
+                  return (
+                    <div className="bg-white border border-slate-200 rounded-3xl p-6 shadow-sm overflow-hidden text-left mt-2">
+                      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 pb-4 border-b border-slate-100">
+                        <div>
+                          <h4 className="text-sm font-black text-slate-800 uppercase tracking-wider flex items-center gap-2">
+                            <CalendarRange size={18} className="text-indigo-650" />
+                            Acompanhamento Temporal das Atividades (Gantt)
+                          </h4>
+                          <p className="text-[11px] font-semibold text-slate-400 mt-1">
+                            Acompanhe os prazos de início, término e o progresso (%) de cada tarefa ao longo do tempo.
+                          </p>
+                        </div>
+                        
+                        <div className="flex flex-wrap items-center gap-4 text-xs self-start md:self-center">
+                          {/* Segmented scale selector */}
+                          <div className="flex items-center bg-slate-100 p-1 rounded-xl border border-slate-200 shadow-sm shrink-0">
+                            <button
+                              onClick={() => setGanttScale("mes")}
+                              className={`px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 cursor-pointer ${ganttScale === "mes" ? "bg-white text-slate-850 shadow-sm border border-slate-200/40" : "text-slate-500 hover:text-slate-800"}`}
+                            >
+                              Mês
+                            </button>
+                            <button
+                              onClick={() => setGanttScale("trimestre")}
+                              className={`px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 cursor-pointer ${ganttScale === "trimestre" ? "bg-white text-slate-850 shadow-sm border border-slate-200/40" : "text-slate-500 hover:text-slate-800"}`}
+                            >
+                              Trimestre
+                            </button>
+                            <button
+                              onClick={() => setGanttScale("semestre")}
+                              className={`px-3 py-1.5 rounded-lg text-[10px] uppercase tracking-wider font-extrabold transition-all duration-200 cursor-pointer ${ganttScale === "semestre" ? "bg-white text-slate-850 shadow-sm border border-slate-200/40" : "text-slate-500 hover:text-slate-800"}`}
+                            >
+                              Semestre
+                            </button>
+                          </div>
+
+                          <div className="flex flex-wrap items-center gap-3">
+                            <div className="flex items-center gap-1.5 font-bold text-slate-600">
+                              <span className="w-2.5 h-2.5 bg-emerald-500 rounded-full" /> Concluída
+                            </div>
+                            <div className="flex items-center gap-1.5 font-bold text-slate-600">
+                              <span className="w-2.5 h-2.5 bg-blue-500 rounded-full" /> Em andamento
+                            </div>
+                            <div className="flex items-center gap-1.5 font-bold text-slate-600">
+                              <span className="w-2.5 h-2.5 bg-slate-400 rounded-full" /> Não Iniciada
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {filteredTasks.length === 0 ? (
+                        <div className="py-12 text-center text-slate-400 font-medium">
+                          Nenhuma atividade disponível para exibição cronológica.
+                        </div>
+                      ) : (
+                        <div className="border border-slate-200/80 rounded-2xl overflow-hidden flex flex-col bg-white">
+                          <div className="flex bg-slate-50 border-b border-slate-200 text-xs font-black uppercase text-slate-500 tracking-wider font-sans">
+                            <div className="w-1/3 min-w-[240px] px-4 py-3 bg-slate-100/30 border-r border-slate-200">
+                              Atividade / Cronograma
+                            </div>
+                            <div className="flex-1 relative flex">
+                              {gridColumns.map(gc => (
+                                <div 
+                                  key={gc.key}
+                                  style={{ width: `${gc.widthPercent}%` }}
+                                  className="px-2 py-3 border-r border-slate-200 last:border-r-0 text-center text-[10px] truncate"
+                                >
+                                  {gc.label}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                          
+                          <div className="divide-y divide-slate-100 max-h-[500px] overflow-y-auto">
+                            {filteredTasks.map(t => {
+                              const hasDates = t.startDate && t.endDate;
+                              const dateStart = hasDates ? parseSafeDate(t.startDate) : null;
+                              const dateEnd = hasDates ? parseSafeDate(t.endDate) : null;
+                              const statusName = normalizeStatus(t.status);
+                              
+                              const statusColor = statusName === "Concluída" 
+                                ? "bg-emerald-500 hover:bg-emerald-600" 
+                                : statusName === "Em andamento" 
+                                ? "bg-blue-500 hover:bg-blue-600" 
+                                : "bg-slate-400 hover:bg-slate-500";
+                              
+                              let leftPct = 0;
+                              let widthPct = 0;
+                              
+                              if (dateStart && dateEnd && dateEnd >= dateStart) {
+                                const diffLeft = dateStart.getTime() - startDateLimit.getTime();
+                                leftPct = Math.max(0, Math.min(100, (diffLeft / (1000 * 60 * 60 * 24)) / totalDays * 100));
+                                
+                                const diffWidth = dateEnd.getTime() - dateStart.getTime();
+                                widthPct = Math.max(1, Math.min(100 - leftPct, (diffWidth / (1000 * 60 * 60 * 24)) / totalDays * 100));
+                              }
+
+                              return (
+                                <div key={t.id} className="flex transition-colors hover:bg-slate-50/50 group items-stretch min-h-[52px]">
+                                  <div className="w-1/3 min-w-[240px] px-4 py-2 border-r border-slate-200 flex flex-col justify-center text-left bg-slate-50/10">
+                                    <div className="flex items-center gap-1.5 mb-0.5">
+                                      <span className={`w-2 h-2 rounded-full shrink-0 ${statusName === "Concluída" ? "bg-emerald-500" : statusName === "Em andamento" ? "bg-blue-500" : "bg-slate-400"}`} />
+                                      <span className="text-xs font-bold text-slate-850 line-clamp-1 cursor-pointer hover:text-indigo-600 transition-colors" onClick={() => handleEditTask(t)}>
+                                        {getTaskDisplayName(t)}
+                                      </span>
+                                    </div>
+                                    <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[9px] text-slate-400 font-bold uppercase tracking-wider">
+                                      {t.startDate ? <span>Início: {t.startDate.split("T")[0].split("-").reverse().join("/")}</span> : null}
+                                      {t.endDate ? <span>Término: {t.endDate.split("T")[0].split("-").reverse().join("/")}</span> : null}
+                                      {!hasDates && <span className="text-amber-500 font-bold normal-case">Período não definido</span>}
+                                    </div>
+                                  </div>
+                                  
+                                  <div className="flex-1 relative flex bg-white hover:bg-slate-50/20">
+                                    <div className="absolute inset-y-0 left-0 right-0 flex pointer-events-none">
+                                      {gridColumns.map(gc => (
+                                        <div 
+                                          key={`bg-${gc.key}`}
+                                          style={{ width: `${gc.widthPercent}%` }}
+                                          className="h-full border-r border-slate-100 last:border-r-0"
+                                        />
+                                      ))}
+                                    </div>
+                                    
+                                    {hasDates && dateStart && dateEnd ? (
+                                      <div className="w-full h-full relative flex items-center px-1">
+                                        <div
+                                          style={{ marginLeft: `${leftPct}%`, width: `${widthPct}%` }}
+                                          onClick={() => handleEditTask(t)}
+                                          className={`h-7 rounded-lg relative overflow-hidden transition-all duration-350 shadow-sm cursor-pointer select-none flex items-center ${statusColor}`}
+                                          title={`${getTaskDisplayName(t)}: ${t.progress || 0}%`}
+                                        >
+                                          <div 
+                                            className="absolute inset-y-0 left-0 bg-black/15 transition-all duration-500"
+                                            style={{ width: `${t.progress || 0}%` }}
+                                          />
+                                          <span className="relative z-10 left-2 text-[9px] font-black uppercase text-white tracking-wider drop-shadow-sm whitespace-nowrap overflow-hidden text-ellipsis max-w-[calc(100%-10px)] pointer-events-none">
+                                            {t.progress || 0}%
+                                          </span>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <div className="w-full flex items-center justify-center p-3 text-[10px] text-slate-300 italic">
+                                        -
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+               })()}
 
             {/* Timeline Modal Overlay */}
             {timelineTaskId !== null && (

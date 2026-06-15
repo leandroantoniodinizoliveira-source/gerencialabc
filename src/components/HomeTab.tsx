@@ -68,90 +68,114 @@ export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas, o
           </div>
         </div>
 
-        {/* Master Row with four major cards: Painel de Atividades, Painel de Resoluções, Painel de Balanço Hídrico, Painel de Publicações */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {/* Painel de Atividades Card */}
-          <motion.div 
-            whileHover={{ y: -2 }}
-            onClick={() => {
-              setActivePlanningSubTab("dashboard");
-              setActiveTab("planning");
-            }}
-            className="p-6 rounded-2xl border border-blue-200 bg-gradient-to-br from-white to-blue-50/20 shadow-sm cursor-pointer hover:shadow-md transition-all duration-300 flex flex-col justify-between group text-left h-full"
-          >
-            <div>
-              <div className="mb-4 p-3 rounded-xl bg-blue-50 text-blue-600 w-max border border-blue-100 group-hover:bg-blue-100 transition-colors">
-                <FolderKanban size={24} />
+        {/* Master Row with major cards */}
+        <div className="flex flex-col gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Painel de Atividades Card */}
+            <motion.div 
+              whileHover={{ y: -2 }}
+              onClick={() => {
+                setActivePlanningSubTab("dashboard");
+                setActiveTab("planning");
+              }}
+              className="p-6 rounded-2xl border border-blue-200 bg-gradient-to-br from-white to-blue-50/20 shadow-sm cursor-pointer hover:shadow-md transition-all duration-300 flex flex-col justify-between group text-left h-full"
+            >
+              <div>
+                <div className="mb-4 p-3 rounded-xl bg-blue-50 text-blue-600 w-max border border-blue-100 group-hover:bg-blue-100 transition-colors">
+                  <FolderKanban size={24} />
+                </div>
+                <h3 className="text-lg font-black text-slate-800 leading-tight mb-2">Painel de Atividades</h3>
+                <p className="text-slate-600 text-xs font-medium leading-relaxed mb-6">
+                  Acompanhe o andamento geral das tarefas e metas. Visualize status, progressos acumulados e índices gerenciais por área operacional em gráficos de tempo real.
+                </p>
               </div>
-              <h3 className="text-lg font-black text-slate-800 leading-tight mb-2">Painel de Atividades</h3>
-              <p className="text-slate-600 text-xs font-medium leading-relaxed mb-6">
-                Acompanhe o andamento geral das tarefas e metas. Visualize status, progressos acumulados e índices gerenciais por área operacional em gráficos de tempo real.
-              </p>
-            </div>
-            <div className="mt-8 flex items-center gap-2 text-xs font-bold text-blue-700">
-              Abrir Painel de Atividades <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
-            </div>
-          </motion.div>
+              <div className="mt-8 flex items-center gap-2 text-xs font-bold text-blue-700">
+                Abrir Painel de Atividades <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
+              </div>
+            </motion.div>
 
-          {/* Painel de Resoluções Card */}
-          <motion.div 
-            whileHover={{ y: -2 }}
-            onClick={() => setActiveTab("reg_painel")}
-            className="p-6 rounded-2xl border border-blue-200 bg-gradient-to-br from-white to-blue-50/20 shadow-sm cursor-pointer hover:shadow-md transition-all duration-300 flex flex-col justify-between group text-left h-full"
-          >
-            <div>
-              <div className="mb-4 p-3 rounded-xl bg-blue-50 text-blue-600 w-max border border-blue-100 group-hover:bg-blue-100 transition-colors">
-                <FileSpreadsheet size={24} />
+            {/* Painel de Resoluções Card */}
+            <motion.div 
+              whileHover={{ y: -2 }}
+              onClick={() => setActiveTab("reg_painel")}
+              className="p-6 rounded-2xl border border-blue-200 bg-gradient-to-br from-white to-blue-50/20 shadow-sm cursor-pointer hover:shadow-md transition-all duration-300 flex flex-col justify-between group text-left h-full"
+            >
+              <div>
+                <div className="mb-4 p-3 rounded-xl bg-blue-50 text-blue-600 w-max border border-blue-100 group-hover:bg-blue-100 transition-colors">
+                  <FileSpreadsheet size={24} />
+                </div>
+                <h3 className="text-lg font-black text-slate-800 leading-tight mb-2">Painel de Resoluções</h3>
+                <p className="text-slate-600 text-xs font-medium leading-relaxed mb-6">
+                  Acompanhe as resoluções vigentes, atas de audiência, estoque regulatório normas organizadas e monitoramentos das obrigações legais em formato agregador dinâmico.
+                </p>
               </div>
-              <h3 className="text-lg font-black text-slate-800 leading-tight mb-2">Painel de Resoluções</h3>
-              <p className="text-slate-600 text-xs font-medium leading-relaxed mb-6">
-                Acompanhe as resoluções vigentes, atas de audiência, estoque regulatório normas organizadas e monitoramentos das obrigações legais em formato agregador dinâmico.
-              </p>
-            </div>
-            <div className="mt-8 flex items-center gap-2 text-xs font-bold text-blue-700">
-              Abrir Painel de Resoluções <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
-            </div>
-          </motion.div>
+              <div className="mt-8 flex items-center gap-2 text-xs font-bold text-blue-700">
+                Abrir Painel de Resoluções <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
+              </div>
+            </motion.div>
 
-          {/* Painel do Balanço Hídrico Card */}
-          <motion.div 
-            whileHover={{ y: -2 }}
-            onClick={() => setActiveTab("analyze")}
-            className="p-6 rounded-2xl border border-blue-200 bg-gradient-to-br from-white to-blue-50/20 shadow-sm cursor-pointer hover:shadow-md transition-all duration-300 flex flex-col justify-between group text-left h-full"
-          >
-            <div>
-              <div className="mb-4 p-3 rounded-xl bg-blue-50 text-blue-600 w-max border border-blue-100 group-hover:bg-blue-100 transition-colors">
-                <Droplets size={24} />
+            {/* Painel da Agenda Regulatória Card */}
+            <motion.div 
+              whileHover={{ y: -2 }}
+              onClick={() => setActiveTab("reg_agenda_painel")}
+              className="p-6 rounded-2xl border border-blue-200 bg-gradient-to-br from-white to-blue-50/20 shadow-sm cursor-pointer hover:shadow-md transition-all duration-300 flex flex-col justify-between group text-left h-full"
+            >
+              <div>
+                <div className="mb-4 p-3 rounded-xl bg-blue-50 text-blue-600 w-max border border-blue-100 group-hover:bg-blue-100 transition-colors">
+                  <BookOpen size={24} />
+                </div>
+                <h3 className="text-lg font-black text-slate-800 leading-tight mb-2">Painel da Agenda Regulatória</h3>
+                <p className="text-slate-600 text-xs font-medium leading-relaxed mb-6">
+                  Acompanhamento estratégico, metas, indicadores gráficos e percentual de entregas dos itens da Agenda Regulatória de forma integrada e visual.
+                </p>
               </div>
-              <h3 className="text-lg font-black text-slate-800 leading-tight mb-2">Painel do Balanço Hídrico</h3>
-              <p className="text-slate-600 text-xs font-medium leading-relaxed mb-6">
-                Explore mapas interativos de balanço e visualize gráficos de projeções isoladas de oferta versus demandas projetadas de recursos para saneamento básico.
-              </p>
-            </div>
-            <div className="mt-8 flex items-center gap-2 text-xs font-bold text-blue-700">
-              Abrir Painel do Balanço Hídrico <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
-            </div>
-          </motion.div>
+              <div className="mt-8 flex items-center gap-2 text-xs font-bold text-blue-700">
+                Abrir Painel da Agenda <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
+              </div>
+            </motion.div>
+          </div>
 
-          {/* Painel de Publicações Card */}
-          <motion.div 
-            whileHover={{ y: -2 }}
-            onClick={() => setActiveTab("pub_painel")}
-            className="p-6 rounded-2xl border border-indigo-200 bg-gradient-to-br from-white to-indigo-50/20 shadow-sm cursor-pointer hover:shadow-md transition-all duration-300 flex flex-col justify-between group text-left h-full"
-          >
-            <div>
-              <div className="mb-4 p-3 rounded-xl bg-indigo-50 text-indigo-600 w-max border border-indigo-100 group-hover:bg-indigo-100 transition-colors">
-                <BookOpen size={24} className="text-indigo-600" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Painel do Balanço Hídrico Card */}
+            <motion.div 
+              whileHover={{ y: -2 }}
+              onClick={() => setActiveTab("analyze")}
+              className="p-6 rounded-2xl border border-blue-200 bg-gradient-to-br from-white to-blue-50/20 shadow-sm cursor-pointer hover:shadow-md transition-all duration-300 flex flex-col justify-between group text-left h-full"
+            >
+              <div>
+                <div className="mb-4 p-3 rounded-xl bg-blue-50 text-blue-600 w-max border border-blue-100 group-hover:bg-blue-100 transition-colors">
+                  <Droplets size={24} />
+                </div>
+                <h3 className="text-lg font-black text-slate-800 leading-tight mb-2">Painel do Balanço Hídrico</h3>
+                <p className="text-slate-600 text-xs font-medium leading-relaxed mb-6">
+                  Explore mapas interativos de balanço e visualize gráficos de projeções isoladas de oferta versus demandas projetadas de recursos para saneamento básico.
+                </p>
               </div>
-              <h3 className="text-lg font-black text-slate-800 leading-tight mb-2">Painel de Publicações</h3>
-              <p className="text-slate-600 text-xs font-medium leading-relaxed mb-6">
-                Visualize estatísticas gerais de publicações da agência. Explore a ementa de relatórios técnicos, artigos científicos e boletins informativos.
-              </p>
-            </div>
-            <div className="mt-8 flex items-center gap-2 text-xs font-bold text-indigo-700">
-              Abrir Painel de Publicações <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
-            </div>
-          </motion.div>
+              <div className="mt-8 flex items-center gap-2 text-xs font-bold text-blue-700">
+                Abrir Painel do Balanço Hídrico <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
+              </div>
+            </motion.div>
+
+            {/* Painel de Publicações Card */}
+            <motion.div 
+              whileHover={{ y: -2 }}
+              onClick={() => setActiveTab("pub_painel")}
+              className="p-6 rounded-2xl border border-indigo-200 bg-gradient-to-br from-white to-indigo-50/20 shadow-sm cursor-pointer hover:shadow-md transition-all duration-300 flex flex-col justify-between group text-left h-full"
+            >
+              <div>
+                <div className="mb-4 p-3 rounded-xl bg-indigo-50 text-indigo-600 w-max border border-indigo-100 group-hover:bg-indigo-100 transition-colors">
+                  <BookOpen size={24} className="text-indigo-600" />
+                </div>
+                <h3 className="text-lg font-black text-slate-800 leading-tight mb-2">Painel de Publicações</h3>
+                <p className="text-slate-600 text-xs font-medium leading-relaxed mb-6">
+                  Visualize estatísticas gerais de publicações da agência. Explore a ementa de relatórios técnicos, artigos científicos e boletins informativos.
+                </p>
+              </div>
+              <div className="mt-8 flex items-center gap-2 text-xs font-bold text-indigo-700">
+                Abrir Painel de Publicações <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
+              </div>
+            </motion.div>
+          </div>
         </div>
       </section>
 
@@ -310,47 +334,107 @@ export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas, o
           </div>
         </div>
         
-        <div className="pt-2">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Item 2.1: Cadastrar Resoluções */}
-            <motion.div 
-              whileHover={{ y: -3 }}
-              onClick={() => setActiveTab("reg_cadastro")}
-              className="p-6 rounded-2xl border border-slate-200 hover:border-blue-300 bg-white cursor-pointer group shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between"
-            >
-              <div>
-                <div className="mb-4 p-3 rounded-xl bg-blue-50 text-blue-500 w-max border border-blue-100 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
-                  <FileText size={24} />
+        <div className="pt-2 space-y-8">
+          {/* Sub-Módulo 2.1: Resoluções */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="p-1 px-2.5 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-black uppercase tracking-widest border border-slate-200">
+                Sub-Módulo 2.1
+              </div>
+              <h3 className="text-xs font-black text-slate-600 uppercase tracking-widest">Resoluções</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Item 2.1.1: Cadastrar Resoluções */}
+              <motion.div 
+                whileHover={{ y: -3 }}
+                onClick={() => setActiveTab("reg_cadastro")}
+                className="p-6 rounded-2xl border border-slate-200 hover:border-blue-300 bg-white cursor-pointer group shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between"
+              >
+                <div>
+                  <div className="mb-4 p-3 rounded-xl bg-blue-50 text-blue-500 w-max border border-blue-100 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                    <FileText size={24} />
+                  </div>
+                  <h3 className="text-base font-bold text-slate-800 mb-1.5 leading-tight">Cadastrar Resoluções</h3>
+                  <p className="text-slate-500 text-xs font-medium leading-relaxed mb-4">
+                    Cadastre e gerencie o estoque regulatório, resoluções vigentes, atos normativos e atas de audiência da superintendência.
+                  </p>
                 </div>
-                <h3 className="text-base font-bold text-slate-800 mb-1.5 leading-tight">Cadastrar Resoluções</h3>
-                <p className="text-slate-500 text-xs font-medium leading-relaxed mb-4">
-                  Cadastre e gerencie o estoque regulatório, resoluções vigentes, atos normativos e atas de audiência da superintendência.
-                </p>
-              </div>
-              <div className="flex items-center gap-1 text-xs font-bold text-blue-600 mt-2">
-                Acessar cadastro <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
-              </div>
-            </motion.div>
+                <div className="flex items-center gap-1 text-xs font-bold text-blue-600 mt-2">
+                  Acessar cadastro <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
+                </div>
+              </motion.div>
 
-            {/* Item 2.2: Painel de Resoluções */}
-            <motion.div 
-              whileHover={{ y: -3 }}
-              onClick={() => setActiveTab("reg_painel")}
-              className="p-6 rounded-2xl border border-indigo-200 hover:border-indigo-300 bg-white cursor-pointer group shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between"
-            >
-              <div>
-                <div className="mb-4 p-3 rounded-xl bg-indigo-50 text-indigo-500 w-max border border-indigo-100 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
-                  <BarChart2 size={24} />
+              {/* Item 2.1.2: Painel de Resoluções */}
+              <motion.div 
+                whileHover={{ y: -3 }}
+                onClick={() => setActiveTab("reg_painel")}
+                className="p-6 rounded-2xl border border-indigo-200 hover:border-indigo-300 bg-white cursor-pointer group shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between"
+              >
+                <div>
+                  <div className="mb-4 p-3 rounded-xl bg-indigo-50 text-indigo-500 w-max border border-indigo-100 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
+                    <BarChart2 size={24} />
+                  </div>
+                  <h3 className="text-base font-bold text-slate-800 mb-1.5 leading-tight">Painel de Resoluções</h3>
+                  <p className="text-slate-500 text-xs font-medium leading-relaxed mb-4">
+                    Visualize estatísticas gerenciais do estoque regulatório, painel de monitoramento de obrigações e relatórios analíticos de resoluções.
+                  </p>
                 </div>
-                <h3 className="text-base font-bold text-slate-800 mb-1.5 leading-tight">Painel de Resoluções</h3>
-                <p className="text-slate-500 text-xs font-medium leading-relaxed mb-4">
-                  Visualize estatísticas gerenciais do estoque regulatório, painel de monitoramento de obrigações e relatórios analíticos de resoluções.
-                </p>
+                <div className="flex items-center gap-1 text-xs font-bold text-indigo-600 mt-2">
+                  Visualizar painel <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
+                </div>
+              </motion.div>
+            </div>
+          </div>
+
+          {/* Sub-Módulo 2.2: Agenda Regulatória */}
+          <div>
+            <div className="flex items-center gap-2 mb-4">
+              <div className="p-1 px-2.5 bg-slate-100 text-slate-500 rounded-lg text-[10px] font-black uppercase tracking-widest border border-slate-200">
+                Sub-Módulo 2.2
               </div>
-              <div className="flex items-center gap-1 text-xs font-bold text-indigo-600 mt-2">
-                Visualizar painel <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
-              </div>
-            </motion.div>
+              <h3 className="text-xs font-black text-slate-600 uppercase tracking-widest">Agenda Regulatória</h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Item 2.2.1: Cadastrar Agenda Regulatória */}
+              <motion.div 
+                whileHover={{ y: -3 }}
+                onClick={() => setActiveTab("reg_agenda")}
+                className="p-6 rounded-2xl border border-slate-200 hover:border-blue-300 bg-white cursor-pointer group shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between"
+              >
+                <div>
+                  <div className="mb-4 p-3 rounded-xl bg-blue-50 text-blue-500 w-max border border-blue-100 group-hover:bg-blue-100 group-hover:text-blue-600 transition-colors">
+                    <BookOpen size={24} />
+                  </div>
+                  <h3 className="text-base font-bold text-slate-800 mb-1.5 leading-tight">Cadastrar Agenda Regulatória</h3>
+                  <p className="text-slate-500 text-xs font-medium leading-relaxed mb-4">
+                    Cadastre e gerencie a agenda regulatória, metas, temas e ações da agência reguladora e monitore seu progresso.
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 text-xs font-bold text-blue-600 mt-2">
+                  Acessar cadastro <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
+                </div>
+              </motion.div>
+
+              {/* Item 2.2.2: Painel da Agenda Regulatória */}
+              <motion.div 
+                whileHover={{ y: -3 }}
+                onClick={() => setActiveTab("reg_agenda_painel")}
+                className="p-6 rounded-2xl border border-indigo-200 hover:border-indigo-300 bg-white cursor-pointer group shadow-sm hover:shadow-md transition-all duration-300 flex flex-col justify-between"
+              >
+                <div>
+                  <div className="mb-4 p-3 rounded-xl bg-indigo-50 text-indigo-500 w-max border border-indigo-100 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
+                    <BarChart2 size={24} />
+                  </div>
+                  <h3 className="text-base font-bold text-slate-800 mb-1.5 leading-tight">Painel da Agenda Regulatória</h3>
+                  <p className="text-slate-500 text-xs font-medium leading-relaxed mb-4">
+                    Acompanhamento estratégico, metas, indicadores gráficos e percentual de entregas dos itens da Agenda Regulatória.
+                  </p>
+                </div>
+                <div className="flex items-center gap-1 text-xs font-bold text-indigo-600 mt-2">
+                  Visualizar painel <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
+                </div>
+              </motion.div>
+            </div>
           </div>
         </div>
       </section>

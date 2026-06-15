@@ -607,6 +607,30 @@ async function runStartupMigration() {
         console.log("Seeding re_resolutions completed successfully!");
       }
 
+      // Ensure re_agendas and re_agenda_tasks tables exist for regulation module (prefix re_)
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS re_agendas (
+          id SERIAL PRIMARY KEY,
+          nome TEXT NOT NULL,
+          tema VARCHAR(255) NOT NULL,
+          status VARCHAR(100) NOT NULL,
+          entrega TEXT
+        );
+      `);
+
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS re_agenda_tasks (
+          id SERIAL PRIMARY KEY,
+          agenda_id INTEGER REFERENCES re_agendas(id) ON DELETE CASCADE,
+          task_id INTEGER REFERENCES pl_tasks(id) ON DELETE CASCADE
+        );
+      `);
+
+      // Add columns if they do not exist
+      await client.query("ALTER TABLE re_agenda_tasks ADD COLUMN IF NOT EXISTS status VARCHAR(100) DEFAULT 'Não Concluída';");
+      await client.query("ALTER TABLE re_agenda_tasks ADD COLUMN IF NOT EXISTS entrega TEXT;");
+      await client.query("ALTER TABLE re_agenda_tasks ADD COLUMN IF NOT EXISTS entrega_link TEXT;");
+
       // Ensure pu_publications table exists for publications module (prefix pu_)
       await client.query(`
         CREATE TABLE IF NOT EXISTS pu_publications (
@@ -2370,6 +2394,177 @@ async function startServer() {
       res.json({ success: true, deletedId: id });
     } catch (error: any) {
       console.error("Erro ao deletar resolução:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  // --- AGENDA REGULATÓRIA ENDPOINTS ---
+  app.get("/api/agendas", async (req, res) => {
+    try {
+      const pool = getDbPool();
+      const result = await pool.query(`
+        SELECT a.id, a.nome, a.tema, a.status, a.entrega,
+               COALESCE(
+                 (SELECT json_agg(json_build_object(
+                    'task_id', at.task_id,
+                    'status', at.status,
+                    'entrega', at.entrega,
+                    'entrega_link', at.entrega_link
+                  )) 
+                  FROM re_agenda_tasks at 
+                  WHERE at.agenda_id = a.id AND at.task_id IS NOT NULL), 
+                 '[]'::json
+               ) as agenda_tasks,
+               COALESCE(
+                 (SELECT json_agg(at.task_id) 
+                  FROM re_agenda_tasks at 
+                  WHERE at.agenda_id = a.id AND at.task_id IS NOT NULL), 
+                 '[]'::json
+               ) as task_ids
+        FROM re_agendas a
+        ORDER BY a.id DESC
+      `);
+      const data = result.rows.map(row => ({
+        ...row,
+        agenda_tasks: Array.isArray(row.agenda_tasks) ? row.agenda_tasks : [],
+        task_ids: Array.isArray(row.task_ids) ? row.task_ids.map(Number) : []
+      }));
+      res.json({ success: true, data });
+    } catch (error: any) {
+      console.error("Erro ao obter agendas regulatórias:", error);
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/agendas", async (req, res) => {
+    const pool = getDbPool();
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const { nome, tema, status, entrega, task_ids, agenda_tasks } = req.body;
+      
+      const insertAgendaResult = await client.query(
+        "INSERT INTO re_agendas (nome, tema, status, entrega) VALUES ($1, $2, $3, $4) RETURNING *",
+        [nome || "", tema || "", status || "Não Concluída", entrega || ""]
+      );
+      const newAgenda = insertAgendaResult.rows[0];
+      
+      const associatedIds: number[] = [];
+      const savedTasks: any[] = [];
+      
+      if (Array.isArray(agenda_tasks)) {
+        for (const item of agenda_tasks) {
+          const tId = parseInt(item.task_id);
+          if (isNaN(tId)) continue;
+          const tStatus = item.status || "Não Concluída";
+          const tEntrega = item.entrega || "";
+          const tEntregaLink = item.entrega_link || "";
+          await client.query(
+            "INSERT INTO re_agenda_tasks (agenda_id, task_id, status, entrega, entrega_link) VALUES ($1, $2, $3, $4, $5)",
+            [newAgenda.id, tId, tStatus, tEntrega, tEntregaLink]
+          );
+          associatedIds.push(tId);
+          savedTasks.push({ task_id: tId, status: tStatus, entrega: tEntrega, entrega_link: tEntregaLink });
+        }
+      } else if (Array.isArray(task_ids) && task_ids.length > 0) {
+        for (const taskId of task_ids) {
+          const tId = parseInt(taskId);
+          if (isNaN(tId)) continue;
+          await client.query(
+            "INSERT INTO re_agenda_tasks (agenda_id, task_id, status, entrega, entrega_link) VALUES ($1, $2, 'Não Concluída', '', '')",
+            [newAgenda.id, tId]
+          );
+          associatedIds.push(tId);
+          savedTasks.push({ task_id: tId, status: "Não Concluída", entrega: "", entrega_link: "" });
+        }
+      }
+      
+      await client.query("COMMIT");
+      newAgenda.task_ids = associatedIds;
+      newAgenda.agenda_tasks = savedTasks;
+      res.json({ success: true, data: newAgenda });
+    } catch (error: any) {
+      await client.query("ROLLBACK");
+      console.error("Erro ao criar agenda regulatória:", error);
+      res.status(500).json({ success: false, error: error.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  app.put("/api/agendas/:id", async (req, res) => {
+    const id = parseInt(req.params.id);
+    const pool = getDbPool();
+    const client = await pool.connect();
+    try {
+      await client.query("BEGIN");
+      const { nome, tema, status, entrega, task_ids, agenda_tasks } = req.body;
+      
+      const updateAgendaResult = await client.query(
+        "UPDATE re_agendas SET nome = $1, tema = $2, status = $3, entrega = $4 WHERE id = $5 RETURNING *",
+        [nome || "", tema || "", status || "Não Concluída", entrega || "", id]
+      );
+      
+      if (updateAgendaResult.rows.length === 0) {
+        await client.query("ROLLBACK");
+        return res.status(404).json({ success: false, error: "Agenda regulatória não encontrada" });
+      }
+      
+      const updatedAgenda = updateAgendaResult.rows[0];
+      
+      await client.query("DELETE FROM re_agenda_tasks WHERE agenda_id = $1", [id]);
+      
+      const associatedIds: number[] = [];
+      const savedTasks: any[] = [];
+      
+      if (Array.isArray(agenda_tasks)) {
+        for (const item of agenda_tasks) {
+          const tId = parseInt(item.task_id);
+          if (isNaN(tId)) continue;
+          const tStatus = item.status || "Não Concluída";
+          const tEntrega = item.entrega || "";
+          const tEntregaLink = item.entrega_link || "";
+          await client.query(
+            "INSERT INTO re_agenda_tasks (agenda_id, task_id, status, entrega, entrega_link) VALUES ($1, $2, $3, $4, $5)",
+            [id, tId, tStatus, tEntrega, tEntregaLink]
+          );
+          associatedIds.push(tId);
+          savedTasks.push({ task_id: tId, status: tStatus, entrega: tEntrega, entrega_link: tEntregaLink });
+        }
+      } else if (Array.isArray(task_ids) && task_ids.length > 0) {
+        for (const taskId of task_ids) {
+          const tId = parseInt(taskId);
+          if (isNaN(tId)) continue;
+          await client.query(
+            "INSERT INTO re_agenda_tasks (agenda_id, task_id, status, entrega, entrega_link) VALUES ($1, $2, 'Não Concluída', '', '')",
+            [id, tId]
+          );
+          associatedIds.push(tId);
+          savedTasks.push({ task_id: tId, status: "Não Concluída", entrega: "", entrega_link: "" });
+        }
+      }
+      
+      await client.query("COMMIT");
+      updatedAgenda.task_ids = associatedIds;
+      updatedAgenda.agenda_tasks = savedTasks;
+      res.json({ success: true, data: updatedAgenda });
+    } catch (error: any) {
+      await client.query("ROLLBACK");
+      console.error("Erro ao atualizar agenda regulatória:", error);
+      res.status(500).json({ success: false, error: error.message });
+    } finally {
+      client.release();
+    }
+  });
+
+  app.delete("/api/agendas/:id", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const pool = getDbPool();
+      await pool.query("DELETE FROM re_agendas WHERE id = $1", [id]);
+      res.json({ success: true, deletedId: id });
+    } catch (error: any) {
+      console.error("Erro ao deletar agenda regulatória:", error);
       res.status(500).json({ success: false, error: error.message });
     }
   });

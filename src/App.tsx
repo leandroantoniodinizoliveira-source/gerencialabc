@@ -91,6 +91,8 @@ import { PlanningTab } from "./components/PlanningTab";
 import { UserManagementTab } from "./components/UserManagementTab";
 import { HomeTab } from "./components/HomeTab";
 import { ResolutionsTab } from "./components/ResolutionsTab";
+import { RegulatoryAgendaTab } from "./components/RegulatoryAgendaTab";
+import { RegulatoryAgendaDashboard } from "./components/RegulatoryAgendaDashboard";
 import { ResolutionsDashboard } from "./components/ResolutionsDashboard";
 import { PublicationsTab } from "./components/PublicationsTab";
 import { PublicationsDashboard } from "./components/PublicationsDashboard";
@@ -398,7 +400,7 @@ export default function App() {
     const saved = localStorage.getItem("adasa-demands");
     return saved ? JSON.parse(saved) : [INITIAL_DEMAND];
   });
-  const [activeTab, setActiveTab] = useState<"home" | "gerencial" | "public_hub" | "edit" | "compare" | "manage" | "analyze" | "templates" | "planning" | "users" | "reg_cadastro" | "reg_painel" | "pub_cadastro" | "pub_painel">(
+  const [activeTab, setActiveTab] = useState<"home" | "gerencial" | "public_hub" | "edit" | "compare" | "manage" | "analyze" | "templates" | "planning" | "users" | "reg_cadastro" | "reg_agenda" | "reg_painel" | "reg_agenda_painel" | "pub_cadastro" | "pub_painel">(
     "home",
   );
   const [activePlanningSubTab, setActivePlanningSubTab] = useState<"tasks" | "dashboard" | "plans" | "areas" | "categories" | "responsibles" | "import" | "models">("dashboard");
@@ -3469,6 +3471,10 @@ const renderSupplyTable = () => {
                     window.location.hash = "#public-pub_painel";
                     setPublicTabName("pub_painel");
                   }}
+                  onOpenRegulatoryAgenda={() => {
+                    window.location.hash = "#public-reg_agenda_painel";
+                    setPublicTabName("reg_agenda_painel");
+                  }}
                   isPublic={true}
                   showOnlyPublic={true}
                 />
@@ -3677,29 +3683,65 @@ const renderSupplyTable = () => {
                 <h4 className="text-xs font-black text-white/50 uppercase tracking-widest mb-2 flex items-center gap-1.5 px-2 mt-2">
                   <FileSpreadsheet size={14} /> Regulação
                 </h4>
-                <div className="space-y-1">
-                  <button
-                    onClick={() => {
-                      setIsMyTasksSelected(false);
-                      setIsMobileMenuOpen(false);
-                      handleTabChange("reg_cadastro");
-                    }}
-                    className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "reg_cadastro" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
-                  >
-                    <FileText size={20} className={activeTab === "reg_cadastro" ? "text-adasa-mid" : "text-white/60"} />
-                    Cadastrar Resoluções
-                  </button>
-                  <button
-                    onClick={() => {
-                      setIsMyTasksSelected(false);
-                      setIsMobileMenuOpen(false);
-                      handleTabChange("reg_painel");
-                    }}
-                    className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "reg_painel" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
-                  >
-                    <BarChart2 size={20} className={activeTab === "reg_painel" ? "text-adasa-mid" : "text-white/60"} />
-                    Painel de Resoluções
-                  </button>
+                
+                <div className="pl-4 border-l border-white/10 ml-3.5 space-y-2 mt-2 mb-4">
+                  <h5 className="text-[11px] font-bold text-white/60 uppercase tracking-wider mb-2 flex items-center gap-1.5 px-1">
+                    <FileText size={12} /> Resoluções
+                  </h5>
+                  <div className="space-y-1">
+                    <button
+                      onClick={() => {
+                        setIsMyTasksSelected(false);
+                        setIsMobileMenuOpen(false);
+                        handleTabChange("reg_cadastro");
+                      }}
+                      className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "reg_cadastro" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                    >
+                      <FileText size={20} className={activeTab === "reg_cadastro" ? "text-adasa-mid" : "text-white/60"} />
+                      Cadastrar Resoluções
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsMyTasksSelected(false);
+                        setIsMobileMenuOpen(false);
+                        handleTabChange("reg_painel");
+                      }}
+                      className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "reg_painel" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                    >
+                      <BarChart2 size={20} className={activeTab === "reg_painel" ? "text-adasa-mid" : "text-white/60"} />
+                      Painel de Resoluções
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pl-4 border-l border-white/10 ml-3.5 space-y-2 mt-2 mb-4">
+                  <h5 className="text-[11px] font-bold text-white/60 uppercase tracking-wider mb-2 flex items-center gap-1.5 px-1">
+                    <BookOpen size={12} /> Agenda Regulatória
+                  </h5>
+                  <div className="space-y-1">
+                    <button
+                      onClick={() => {
+                        setIsMyTasksSelected(false);
+                        setIsMobileMenuOpen(false);
+                        handleTabChange("reg_agenda");
+                      }}
+                      className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "reg_agenda" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                    >
+                      <BookOpen size={20} className={activeTab === "reg_agenda" ? "text-adasa-mid" : "text-white/60"} />
+                      Cadastrar Agenda Regulatória
+                    </button>
+                    <button
+                      onClick={() => {
+                        setIsMyTasksSelected(false);
+                        setIsMobileMenuOpen(false);
+                        handleTabChange("reg_agenda_painel");
+                      }}
+                      className={cn("w-full text-left justify-start px-5 py-3 rounded-2xl flex items-center gap-4 transition-all text-sm font-semibold", activeTab === "reg_agenda_painel" ? "bg-white text-adasa-dark shadow-lg" : "text-white/80 border border-transparent")}
+                    >
+                      <BarChart2 size={20} className={activeTab === "reg_agenda_painel" ? "text-adasa-mid" : "text-white/60"} />
+                      Painel da Agenda Regulatória
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -4128,51 +4170,113 @@ const renderSupplyTable = () => {
                 <FileSpreadsheet size={12} /> Regulação
               </h4>
             )}
-            <div className="space-y-1">
-              <button
-                title={isSidebarCollapsed ? "Cadastrar Resoluções" : undefined}
-                onClick={() => {
-                  setIsMyTasksSelected(false);
-                  handleTabChange("reg_cadastro");
-                }}
-                className={cn(
-                  "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
-                  activeTab === "reg_cadastro"
-                    ? "bg-white/10 text-white shadow-sm border border-white/10"
-                    : "text-white/60 hover:text-white hover:bg-white/5",
-                )}
-              >
-                <FileText
-                  size={16}
+            
+            <div className={cn(isSidebarCollapsed ? "" : "pl-3 border-l border-white/10 ml-3", "space-y-2 mt-2 mb-3")}>
+              {!isSidebarCollapsed && (
+                <h5 className="text-[9px] font-bold text-white/55 uppercase tracking-wider mb-1 flex items-center gap-1.5 px-1">
+                  <FileText size={10} /> Resoluções
+                </h5>
+              )}
+              <div className="space-y-1">
+                <button
+                  title={isSidebarCollapsed ? "Cadastrar Resoluções" : undefined}
+                  onClick={() => {
+                    setIsMyTasksSelected(false);
+                    handleTabChange("reg_cadastro");
+                  }}
                   className={cn(
-                    "flex-shrink-0 transition-colors",
-                    activeTab === "reg_cadastro" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                    activeTab === "reg_cadastro"
+                      ? "bg-white/10 text-white shadow-sm border border-white/10"
+                      : "text-white/60 hover:text-white hover:bg-white/5",
                   )}
-                />
-                {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Resoluções</span>}
-              </button>
-              <button
-                title={isSidebarCollapsed ? "Painel de Resoluções" : undefined}
-                onClick={() => {
-                  setIsMyTasksSelected(false);
-                  handleTabChange("reg_painel");
-                }}
-                className={cn(
-                  "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
-                  activeTab === "reg_painel"
-                    ? "bg-white/10 text-white shadow-sm border border-white/10"
-                    : "text-white/60 hover:text-white hover:bg-white/5",
-                )}
-              >
-                <BarChart2
-                  size={16}
+                >
+                  <FileText
+                    size={16}
+                    className={cn(
+                      "flex-shrink-0 transition-colors",
+                      activeTab === "reg_cadastro" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    )}
+                  />
+                  {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Resoluções</span>}
+                </button>
+                <button
+                  title={isSidebarCollapsed ? "Painel de Resoluções" : undefined}
+                  onClick={() => {
+                    setIsMyTasksSelected(false);
+                    handleTabChange("reg_painel");
+                  }}
                   className={cn(
-                    "flex-shrink-0 transition-colors",
-                    activeTab === "reg_painel" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                    activeTab === "reg_painel"
+                      ? "bg-white/10 text-white shadow-sm border border-white/10"
+                      : "text-white/60 hover:text-white hover:bg-white/5",
                   )}
-                />
-                {!isSidebarCollapsed && <span className="hidden md:inline">Painel de Resoluções</span>}
-              </button>
+                >
+                  <BarChart2
+                    size={16}
+                    className={cn(
+                      "flex-shrink-0 transition-colors",
+                      activeTab === "reg_painel" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    )}
+                  />
+                  {!isSidebarCollapsed && <span className="hidden md:inline">Painel de Resoluções</span>}
+                </button>
+              </div>
+            </div>
+
+            <div className={cn(isSidebarCollapsed ? "" : "pl-3 border-l border-white/10 ml-3", "space-y-2 mt-2 mb-3")}>
+              {!isSidebarCollapsed && (
+                <h5 className="text-[9px] font-bold text-white/55 uppercase tracking-wider mb-1 flex items-center gap-1.5 px-1">
+                  <BookOpen size={10} /> Agenda Regulatória
+                </h5>
+              )}
+              <div className="space-y-1">
+                <button
+                  title={isSidebarCollapsed ? "Cadastrar Agenda Regulatória" : undefined}
+                  onClick={() => {
+                    setIsMyTasksSelected(false);
+                    handleTabChange("reg_agenda");
+                  }}
+                  className={cn(
+                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                    activeTab === "reg_agenda"
+                      ? "bg-white/10 text-white shadow-sm border border-white/10"
+                      : "text-white/60 hover:text-white hover:bg-white/5",
+                  )}
+                >
+                  <BookOpen
+                    size={16}
+                    className={cn(
+                      "flex-shrink-0 transition-colors",
+                      activeTab === "reg_agenda" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    )}
+                  />
+                  {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Agenda Regulatória</span>}
+                </button>
+                <button
+                  title={isSidebarCollapsed ? "Painel da Agenda Regulatória" : undefined}
+                  onClick={() => {
+                    setIsMyTasksSelected(false);
+                    handleTabChange("reg_agenda_painel");
+                  }}
+                  className={cn(
+                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                    activeTab === "reg_agenda_painel"
+                      ? "bg-white/10 text-white shadow-sm border border-white/10"
+                      : "text-white/60 hover:text-white hover:bg-white/5",
+                  )}
+                >
+                  <BarChart2
+                    size={16}
+                    className={cn(
+                      "flex-shrink-0 transition-colors",
+                      activeTab === "reg_agenda_painel" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    )}
+                  />
+                  {!isSidebarCollapsed && <span className="hidden md:inline">Painel da Agenda Regulatória</span>}
+                </button>
+              </div>
             </div>
           </div>
 
@@ -4385,7 +4489,7 @@ const renderSupplyTable = () => {
                          activePlanningSubTab === "categories" ? "Cadastrar Categorias" :
                          activePlanningSubTab === "responsibles" ? "Cadastrar Responsáveis" :
                          activePlanningSubTab === "models" ? "Cadastrar Modelo de Tarefas" : "Importar Tarefas")
-                       : activeTab === "reg_cadastro" ? "Cadastrar Resoluções" : activeTab === "reg_painel" ? "Painel Estratégico de Resoluções" : activeTab === "pub_cadastro" ? "Cadastrar Publicações" : activeTab === "pub_painel" ? "Painel de Publicações" : "Cadastrar Balanço"}
+                       : activeTab === "reg_cadastro" ? "Cadastrar Resoluções" : activeTab === "reg_agenda" ? "Agenda Regulatória" : activeTab === "reg_painel" ? "Painel Estratégico de Resoluções" : activeTab === "reg_agenda_painel" ? "Painel da Agenda Regulatória" : activeTab === "pub_cadastro" ? "Cadastrar Publicações" : activeTab === "pub_painel" ? "Painel de Publicações" : "Cadastrar Balanço"}
             </h1>
             <p className="text-slate-500 text-sm font-medium">
               {activeTab === "home"
@@ -4404,7 +4508,7 @@ const renderSupplyTable = () => {
                           ? "Gerencie as contas de usuários, papéis e níveis de acesso (RBAC)."
                         : activeTab === "planning"
                           ? "Gerencie o cronograma consolidado, planos, áreas e status de execução."
-                          : activeTab === "reg_cadastro" ? "Gestão do acervo de normas, atos legais e resoluções aplicados à regulação do saneamento básico e recursos hídricos." : activeTab === "reg_painel" ? "Estoque Regulatório da Superintendência de Abastecimento de Água e Esgoto" : activeTab === "pub_cadastro" ? "Gestão do acervo bibliográfico, relatórios anuais de atividades, boletins informativos e artigos de pesquisa científica." : activeTab === "pub_painel" ? "Painel analítico gráfico de publicações, volumes históricos, distribuição de documentos e filtro do acervo próximo." : "Gerencie os balanços hídricos e cadastre novas informações."}
+                          : activeTab === "reg_cadastro" ? "Gestão do acervo de normas, atos legais e resoluções aplicados à regulação do saneamento básico e recursos hídricos." : activeTab === "reg_agenda" ? "Cadastro e acompanhamento de metas, temas e ações da agenda regulatória." : activeTab === "reg_painel" ? "Estoque Regulatório da Superintendência de Abastecimento de Água e Esgoto" : activeTab === "reg_agenda_painel" ? "Acompanhamento estratégico, metas, indicadores gráficos e percentual de entregas dos itens da Agenda Regulatória." : activeTab === "pub_cadastro" ? "Gestão do acervo bibliográfico, relatórios anuais de atividades, boletins informativos e artigos de pesquisa científica." : activeTab === "pub_painel" ? "Painel analítico gráfico de publicações, volumes históricos, distribuição de documentos e filtro do acervo próximo." : "Gerencie os balanços hídricos e cadastre novas informações."}
             </p>
           </div>
           <div className="flex flex-col md:flex-row items-center gap-3">
@@ -7801,6 +7905,28 @@ const renderSupplyTable = () => {
             >
               <ResolutionsDashboard showToast={showToast} />
             </motion.div>
+          ) : activeTab === "reg_agenda" ? (
+            <motion.div
+              key="reg_agenda"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="max-w-7xl mx-auto w-full"
+            >
+              <RegulatoryAgendaTab showToast={showToast} currentUser={currentUser} />
+            </motion.div>
+          ) : activeTab === "reg_agenda_painel" ? (
+            <motion.div
+              key="reg_agenda_painel"
+              initial={{ opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.98 }}
+              transition={{ duration: 0.3, ease: "easeOut" }}
+              className="max-w-7xl mx-auto w-full"
+            >
+              <RegulatoryAgendaDashboard showToast={showToast} />
+            </motion.div>
           ) : activeTab === "pub_cadastro" ? (
             <motion.div
               key="pub_cadastro"
@@ -7848,6 +7974,9 @@ const renderSupplyTable = () => {
                 onOpenPublications={() => {
                   handleTabChange("pub_painel");
                 }}
+                onOpenRegulatoryAgenda={() => {
+                  handleTabChange("reg_agenda_painel");
+                }}
                 isPublic={false}
                 showOnlyPublic={false}
               />
@@ -7869,6 +7998,9 @@ const renderSupplyTable = () => {
                 onOpenWaterBalance={() => {}}
                 onOpenPublications={() => {
                   handleTabChange("pub_painel");
+                }}
+                onOpenRegulatoryAgenda={() => {
+                  handleTabChange("reg_agenda_painel");
                 }}
                 isPublic={false}
                 showOnlyPublic={true}
