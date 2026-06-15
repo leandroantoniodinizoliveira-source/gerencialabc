@@ -707,7 +707,7 @@ export function PlanningTab({
   const [timelineTaskId, setTimelineTaskId] = useState<number | null>(null);
   const [viewMode, setViewMode] = useState<"tree" | "table" | "status" | "category" | "area" | "responsible" | "board" | "gantt">("category");
   const [ganttScale, setGanttScale] = useState<"mes" | "trimestre" | "semestre">("mes");
-  const [timelineModalTab, setTimelineModalTab] = useState<"timeline" | "gantt">("timeline");
+  const [timelineModalTab, setTimelineModalTab] = useState<"timeline" | "gantt" | "calc">("timeline");
   const [tableSort, setTableSort] = useState<{ field: string, dir: "asc" | "desc" } | null>({ field: "end", dir: "asc" });
   const [boardGroupBy, setBoardGroupBy] = useState<"status" | "category">("category");
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -5721,6 +5721,13 @@ export function PlanningTab({
                      >
                        Gráfico de Gantt
                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTimelineModalTab("calc")}
+                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 cursor-pointer ${timelineModalTab === "calc" ? "bg-white text-slate-850 shadow-xs border border-slate-200/40" : "text-slate-500 hover:text-slate-800"}`}
+                      >
+                        Cálculo do Progresso
+                      </button>
                    </div>
                  </div>
                  <button onClick={() => setTimelineTaskId(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors"><X size={24} className="text-slate-500 hover:text-slate-800" /></button>
@@ -5926,6 +5933,10 @@ export function PlanningTab({
                       )}
                     </div>
                   </>
+                ) : timelineModalTab === "calc" ? (
+                  <div className="mt-4">
+                    {renderProgressCalc(timelineTaskId, timelineTaskId ? (taskById[timelineTaskId]?.progress ?? 0) : 0)}
+                  </div>
                 ) : (() => {
                   const parseSafeDate = (dateStr: string | null | undefined): Date | null => {
                     if (!dateStr) return null;
@@ -7878,6 +7889,13 @@ export function PlanningTab({
                         >
                           Gráfico de Gantt
                         </button>
+                      <button
+                        type="button"
+                        onClick={() => setTimelineModalTab("calc")}
+                        className={`px-4 py-1.5 rounded-lg text-xs font-bold transition-all duration-200 cursor-pointer ${timelineModalTab === "calc" ? "bg-white text-slate-850 shadow-xs border border-slate-200/40" : "text-slate-500 hover:text-slate-800"}`}
+                      >
+                        Cálculo do Progresso
+                      </button>
                       </div>
                     </div>
                     <button onClick={() => setTimelineTaskId(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
@@ -8117,6 +8135,10 @@ export function PlanningTab({
                 )}
                     </div>
                   </>
+            ) : timelineModalTab === "calc" ? (
+              <div className="mt-4">
+                {renderProgressCalc(timelineTaskId, timelineTaskId ? (taskById[timelineTaskId]?.progress ?? 0) : 0)}
+              </div>
             ) : (() => {
               const parseSafeDate = (dateStr: string | null | undefined): Date | null => {
                 if (!dateStr) return null;
@@ -9487,7 +9509,33 @@ export function PlanningTab({
               )}
               {taskFormTab === "calc" && (
                 <div className="space-y-4">
-                  <div className="space-y-5 max-h-[50vh] overflow-y-auto custom-scrollbar pr-2">
+                  {renderProgressCalc(editingTask.id || 0, editingTask.progress ?? 0)}
+                <div className="flex gap-3 justify-end pt-4 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => setIsFormOpen(false)}
+                      className="px-5 py-2 font-bold text-xs text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
+                    >
+                      Fechar
+                    </button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      </div>
+    </div>
+  );
+
+  // Recursive Tree Node Renderer
+  
+  function renderProgressCalc(targetTaskId: number | null, fallbackProgress: number) {
+    if (!targetTaskId) return null;
+    return (
+      <div className="space-y-5 max-h-[50vh] overflow-y-auto custom-scrollbar pr-2">
                     <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-blue-800 text-sm shadow-sm">
                       <h4 className="font-bold flex items-center gap-2 mb-2"><Activity size={16} /> Cálculo por Pesos Relativos Livres</h4>
                       <p className="mb-2">O <strong>cálculo por pesos relativos livres</strong> permite que você defina a importância de cada subtarefa em relação às outras atribuindo-lhes um valor numérico ("peso"). Este peso não precisa somar 100.</p>
@@ -9499,7 +9547,7 @@ export function PlanningTab({
                     </div>
                     
                     {(() => {
-                      if (!editingTask.id || !childrenMap[editingTask.id] || childrenMap[editingTask.id].length === 0) {
+                      if (!targetTaskId || !childrenMap[targetTaskId] || childrenMap[targetTaskId].length === 0) {
                         return (
                           <div className="space-y-4">
                             <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 text-center">
@@ -9515,7 +9563,7 @@ export function PlanningTab({
                               <div className="bg-white border border-slate-200 p-4 rounded-xl flex items-center gap-2 font-mono text-xs">
                                 <span className="text-slate-500 font-bold">Progresso =</span>
                                 <span className="font-bold text-slate-800">Progresso Definido Manualmente =</span>
-                                <span className="text-base font-black text-emerald-700 bg-emerald-100/40 px-2.5 py-1 rounded-lg">{(editingTask.progress ?? 0)}%</span>
+                                <span className="text-base font-black text-emerald-700 bg-emerald-100/40 px-2.5 py-1 rounded-lg">{(fallbackProgress)}%</span>
                               </div>
                             </div>
                           </div>
@@ -9523,7 +9571,7 @@ export function PlanningTab({
                       }
 
                       // Compute active elements
-                      const subtasks = childrenMap[editingTask.id];
+                      const subtasks = childrenMap[targetTaskId];
                       let totalWeight = 0;
                       let totalCalculated = 0;
                       
@@ -9711,27 +9759,9 @@ export function PlanningTab({
                       );
                     })()}
                   </div>
-                  <div className="flex gap-3 justify-end pt-4 border-t border-slate-100">
-                    <button
-                      type="button"
-                      onClick={() => setIsFormOpen(false)}
-                      className="px-5 py-2 font-bold text-xs text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl transition-colors"
-                    >
-                      Fechar
-                    </button>
-                  </div>
-                </div>
-              )}
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+    );
+  };
 
-      </div>
-    </div>
-  );
-
-  // Recursive Tree Node Renderer
   function renderTaskNode(task: Task, depth: number, forceFlat: boolean = false) {
     const isExpanded = isAnyFilterActive ? (expandedTasks[task.id] !== false) : !!expandedTasks[task.id];
     const taskChildren = forceFlat ? [] : (childrenMap[task.id] || []);
