@@ -30,7 +30,6 @@ import {
   Save,
   FileText,
   Menu,
-  RefreshCw,
   ListTodo,
   Home,
   Shield,
@@ -87,16 +86,17 @@ import { calculateDemand, formatNumber, formatInteger, cn } from "./lib/utils";
 import { RequirePermission, useAuth } from "./lib/auth";
 import { LoginPage } from "./components/LoginPage";
 import { MapTab } from "./components/MapTab";
-import { PlanningTab } from "./components/PlanningTab";
-import { UserManagementTab } from "./components/UserManagementTab";
 import { HomeTab } from "./components/HomeTab";
-import { ResolutionsTab } from "./components/ResolutionsTab";
-import { RegulatoryAgendaTab } from "./components/RegulatoryAgendaTab";
-import { RegulatoryAgendaDashboard } from "./components/RegulatoryAgendaDashboard";
-import { ResolutionsDashboard } from "./components/ResolutionsDashboard";
-import { PublicationsTab } from "./components/PublicationsTab";
-import { PublicationsDashboard } from "./components/PublicationsDashboard";
 import { ManagerialHub } from "./components/ManagerialHub";
+
+// Novas importações de módulos estruturados (Modularização / SRP)
+import { PlanningModule } from "./modules/planning";
+import { WaterBalanceModule } from "./modules/water-balance";
+import { ResolutionsModule } from "./modules/resolutions";
+import { RegulatoryAgendaModule } from "./modules/regulatory-agenda";
+import { PublicationsModule } from "./modules/publications";
+import { UserManagementModule } from "./modules/user-management";
+
 
 const formatSaldoValue = (val: number, type: 'percent' | 'hab' | 'ls', showSuffix = true) => {
   if (val == null || Number.isNaN(val)) return <span style={{ color: '#94a3b8' }}>-</span>;
@@ -188,7 +188,6 @@ function OperationalAdjustmentForm({ system, activeSystems, setOperationalAdjust
       });
       
       if (type === "Transferência") {
-        const targetSystem = activeSystems.find(s => Number(s.id) === Number(targetSystemId));
         newAdjs.push({
           id: targetId,
           systemId: Number(targetSystemId),
@@ -319,16 +318,15 @@ const isSameWb = (itemWbId: number | string | null | undefined, filterWbId: numb
 try {
   const originalFetch = window.fetch;
   if (originalFetch) {
-    const fetchInterceptor = async (...args: any[]) => {
-      const [resource, config] = args;
-      const url = typeof resource === 'string' ? resource : (resource instanceof Request ? resource.url : String(resource));
+    const fetchInterceptor = async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = typeof input === 'string' ? input : (input instanceof Request ? input.url : String(input));
       
       if (url.includes('/api/')) {
-        console.log(`[FETCH DEBUG] Request: ${url}`, config);
+        console.log(`[FETCH DEBUG] Request: ${url}`, init);
       }
       
       try {
-        const response = await originalFetch(...args);
+        const response = await originalFetch(input, init);
         if (!response.ok && url.includes('/api/')) {
           console.error(`[FETCH DEBUG] Error Response: ${url} - Status: ${response.status}`);
           try {
@@ -366,7 +364,7 @@ try {
 }
 
 export default function App() {
-  const { currentUser, roles, checkPermission, logout } = useAuth();
+  const { currentUser, roles, logout } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
   // Public access support to share dashboards without prompting for login
@@ -462,17 +460,6 @@ export default function App() {
   const [categories, setCategories] = useState<any[]>([]);
   const [responsibles, setResponsibles] = useState<any[]>([]);
   
-  // Task management states
-  const [taskFormOpen, setTaskFormOpen] = useState(false);
-  const [taskFormMode, setTaskFormMode] = useState<"create" | "edit">("create");
-  const [editingTaskData, setEditingTaskData] = useState<any>({});
-  const [taskSearch, setTaskSearch] = useState("");
-  const [taskStatusFilter, setTaskStatusFilter] = useState("");
-  const [taskPriorityFilter, setTaskPriorityFilter] = useState("");
-  const [manageSubTabState, setManageSubTabState] = useState<"tasks" | "responsibles">("tasks");
-  const [responsibleFormOpen, setResponsibleFormOpen] = useState(false);
-  const [editingResponsibleData, setEditingResponsibleData] = useState<any>({});
-
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [manageSubTab, setManageSubTab] = useState<
     "list" | "balance" | "systems" | "demand" | "supply"
@@ -581,10 +568,9 @@ export default function App() {
       JSON.stringify(operationalAdjustments),
     );
   }, [operationalAdjustments]);
-  const [selectedDemandId, setSelectedDemandId] = useState<number | string>(
+  const [selectedDemandId] = useState<number | string>(
     INITIAL_DEMAND.id,
   );
-  const [compareDemandIds, setCompareDemandIds] = useState<(number | string)[]>([]);
   const [tableLayout, setTableLayout] = useState<"system" | "year">("year");
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
@@ -600,7 +586,7 @@ export default function App() {
   const [newTemplateName, setNewTemplateName] = useState("");
   const [newTemplateDesc, setNewTemplateDesc] = useState("");
   const [yearRange, setYearRange] = useState({ start: 2017, end: 2053 });
-  const [hiddenYears, setHiddenYears] = useState<number[]>([]);
+  const [hiddenYears] = useState<number[]>([]);
 
   // Derived data
   const toggleExpand = (key: string) => {
@@ -658,6 +644,7 @@ export default function App() {
           if (data.data.tasks) setTasks(data.data.tasks);
           if (data.data.plans) setPlans(data.data.plans);
           if (data.data.areas) setAreas(data.data.areas);
+          if (data.data.categories) setCategories(data.data.categories);
           if (data.data.responsibles) setResponsibles(data.data.responsibles);
           
           if (isManualSync) {
@@ -683,99 +670,7 @@ export default function App() {
     }
   };
 
-  const handleTaskSubmitInApp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const isEdit = taskFormMode === 'edit';
-      const url = isEdit ? `/api/tasks/${editingTaskData.id}` : "/api/tasks";
-      const method = isEdit ? "PUT" : "POST";
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...editingTaskData,
-          progress: editingTaskData.progress ? parseInt(editingTaskData.progress) : 0,
-          planId: editingTaskData.planId ? parseInt(editingTaskData.planId) : null,
-          areaIds: Array.isArray(editingTaskData.areaIds) ? editingTaskData.areaIds.map((id: any) => parseInt(id)) : [],
-          responsibleIds: Array.isArray(editingTaskData.responsibleIds) ? editingTaskData.responsibleIds.map((id: any) => parseInt(id)) : []
-        })
-      });
-      const data = await res.json();
-      if (data.success) {
-        showToast("Éxito", isEdit ? "Tarefa atualizada com sucesso." : "Tarefa cadastrada com sucesso.", "success");
-        setTaskFormOpen(false);
-        fetchCloudData();
-      } else {
-        showToast("Erro", data.error || "Erro ao salvar tarefa.", "error");
-      }
-    } catch (err: any) {
-      showToast("Erro", "Erro ao conectar ao servidor.", "error");
-    }
-  };
 
-  const handleTaskDeleteInApp = async (id: number) => {
-    try {
-      const res = await fetch(`/api/tasks/${id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (data.success) {
-        showToast("Éxito", "Tarefa excluída com sucesso.", "success");
-        fetchCloudData();
-      } else {
-        showToast("Erro", data.error || "Erro ao deletar tarefa.", "error");
-      }
-    } catch (err) {
-      showToast("Erro", "Erro ao conectar ao servidor.", "error");
-    }
-  };
-
-  const handleResponsibleSubmitInApp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    try {
-      const id = editingResponsibleData.id;
-      const isEdit = !!id;
-      const url = isEdit ? `/api/responsibles/${id}` : "/api/responsibles";
-      const method = isEdit ? "PUT" : "POST";
-      const res = await fetch(url, {
-        method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(editingResponsibleData)
-      });
-      const data = await res.json();
-      if (data.success) {
-        if (!isEdit && data.generatedPassword) {
-          setConfirmState({
-            title: "Usuário Criado para o Responsável",
-            message: `O responsável foi cadastrado e integrado com sucesso!\n\nFoi criado um usuário vinculado:\n• Usuário/E-mail: ${editingResponsibleData.email}\n• Senha Padrão de Acesso: ${data.generatedPassword}\n\nPor favor, anote a senha acima para que o responsável consiga realizar o login no sistema.`,
-            type: "alert"
-          });
-          showToast("Sucesso", `Responsável criado! Senha gerada: ${data.generatedPassword}`, "success");
-        } else {
-          showToast("Sucesso", isEdit ? "Responsável atualizado com sucesso." : "Responsável cadastrado com sucesso.", "success");
-        }
-        setResponsibleFormOpen(false);
-        fetchCloudData();
-      } else {
-        showToast("Erro", data.error || "Erro ao salvar responsável.", "error");
-      }
-    } catch (err) {
-      showToast("Erro", "Erro ao conectar ao servidor.", "error");
-    }
-  };
-
-  const handleResponsibleDeleteInApp = async (id: number) => {
-    try {
-      const res = await fetch(`/api/responsibles/${id}`, { method: "DELETE" });
-      const data = await res.json();
-      if (data.success) {
-        showToast("Éxito", "Responsável excluído com sucesso.", "success");
-        fetchCloudData();
-      } else {
-        showToast("Erro", data.error || "Erro ao deletar responsável.", "error");
-      }
-    } catch (err) {
-      showToast("Erro", "Erro ao conectar ao servidor.", "error");
-    }
-  };
 
   useEffect(() => {
     if (currentUser) {
@@ -1150,13 +1045,7 @@ export default function App() {
     setTimeout(() => handleSaveToCloud(true), 150);
   };
 
-  const handleToggleHiddenYear = (year: number) => {
-    setHiddenYears((prev) =>
-      prev.includes(year)
-        ? prev.filter((y) => y !== year)
-        : [...prev, year].sort(),
-    );
-  };
+
 
   const currentDemand = useMemo(
     () => activeDemands.find((s) => s.id === selectedDemandId) || activeDemands[0],
@@ -1200,37 +1089,7 @@ export default function App() {
       });
   }, [currentDemand, activeRegions, hiddenYears]);
 
-  const systemSupplyByYear = useMemo(() => {
-    const table: Record<string, Record<number, number>> = {};
-    const years = (
-      Array.from<number>(new Set<number>(results.map((r) => r.year))) as number[]
-    ).sort((a: number, b: number) => a - b);
 
-    activeSystems.forEach((sys) => {
-      const initialSupply = supplySources
-        .filter((s) => s.systemId === sys.id)
-        .reduce((acc, curr) => acc + curr.operationalFlow, 0);
-
-      const sysAdjustments = activeOperationalAdjustments.filter(
-        (a) => a.systemId === sys.id,
-      );
-
-      table[sys.id] = {};
-      years.forEach((year) => {
-        let currentSupply = initialSupply;
-        sysAdjustments.forEach((adj) => {
-          if (year >= adj.startYear && year <= adj.endYear) {
-            if (adj.type === "Aumento da vazão" || adj.type === "Transferência")
-              currentSupply += adj.flowValue;
-            else if (adj.type === "Redução da vazão")
-              currentSupply -= adj.flowValue;
-          }
-        });
-        table[sys.id][year] = currentSupply;
-      });
-    });
-    return table;
-  }, [systems, supplySources, operationalAdjustments, results]);
 
 
     const [analyzeBalanceId, setAnalyzeBalanceId] = useState<string>("");
@@ -1364,9 +1223,6 @@ export default function App() {
         
         let totalDem = 0;
         let totalPopAtendida = 0;
-        let totalLosses = 0;
-        let totalCons = 0;
-        let count = 0;
         const mods = baseDemand.modifiers;
         baseDemand.entries.filter(e => e.year === year && relevantRegions.includes(e.regionId)).forEach(entry => {
           const pop = entry.population * (1 + mods.population / 100);
@@ -1375,13 +1231,7 @@ export default function App() {
           const loss = mods.losses !== null ? mods.losses / 100 : entry.losses;
           totalDem += calculateDemand(pop, cov, cons, loss);
           totalPopAtendida += pop * cov;
-          totalLosses += loss * 100;
-          totalCons += cons;
-          count++;
         });
-
-        const avgLosses = count > 0 ? totalLosses / count : 0;
-        const avgCons = count > 0 ? totalCons / count : 0;
 
         let totalSupply = 0;
         wbSystems.forEach(sys => {
@@ -1448,9 +1298,6 @@ export default function App() {
       const yearResults = wbSystems.map(sys => {
         let totalDem = 0;
         let totalDemHab = 0;
-        let totalLosses = 0;
-        let totalCons = 0;
-        let count = 0;
         const relevantRegions = regions.filter(r => isSameWb(r.waterBalanceId, bId) && r.systemId === sys.id).map(r => r.id);
         
         const mods = baseDemand.modifiers;
@@ -1461,13 +1308,7 @@ export default function App() {
           const loss = mods.losses !== null ? mods.losses / 100 : entry.losses;
           totalDem += calculateDemand(pop, cov, cons, loss);
           totalDemHab += pop * cov;
-          totalLosses += loss;
-          totalCons += cons;
-          count++;
         });
-
-        const avgLosses = count > 0 ? totalLosses / count : 0;
-        const avgCons = count > 0 ? totalCons / count : 0;
 
         let totalSupply = 0;
         const sysSources = supplySources.filter(s => isSameWb(s.waterBalanceId, bId) && s.systemId === sys.id);
@@ -1649,36 +1490,7 @@ export default function App() {
     }
   }, [selectedWaterBalanceId]);
 
-  const comparisonData = useMemo(() => {
-    const dataByYear: Record<number, any> = {};
-    const selectedWbs = waterBalances.filter(wb => analyzedBalanceIds.includes(wb.id));
 
-    let globalYears = new Set<number>();
-
-    selectedWbs.forEach(wb => {
-      const bId = wb.id;
-      const wbDemands = demands.filter(s => isSameWb(s.waterBalanceId, bId));
-      const baseDemand = wbDemands[0];
-
-      if (!baseDemand) return;
-
-      const years = Array.from<number>(new Set<number>(baseDemand.entries.map(e => e.year))).sort((a: number, b: number) => a - b);
-      years.forEach(y => globalYears.add(y));
-      
-      const mods = baseDemand.modifiers;
-      baseDemand.entries.forEach(entry => {
-        if (!dataByYear[entry.year]) dataByYear[entry.year] = { year: entry.year };
-        const pop = entry.population * (1 + mods.population / 100);
-        const cov = mods.coverage !== null ? mods.coverage / 100 : entry.coverage;
-        const cons = entry.perCapitaConsumption * (1 + mods.perCapitaConsumption / 100);
-        const loss = mods.losses !== null ? mods.losses / 100 : entry.losses;
-        const dem = calculateDemand(pop, cov, cons, loss);
-        dataByYear[entry.year][`Demanda - ${wb.description}`] = (dataByYear[entry.year][`Demanda - ${wb.description}`] || 0) + dem;
-      });
-    });
-
-    return Array.from(globalYears).sort((a: number, b: number) => a - b).map(year => dataByYear[year] || { year });
-  }, [analyzedBalanceIds, waterBalances, demands]);
 
   const analyzeDemandResults = useMemo(() => {
     if (!analyzeBalanceId) return [];
@@ -1940,9 +1752,6 @@ export default function App() {
         
         let totalDem = 0;
         let totalPopAtendida = 0;
-        let totalLosses = 0;
-        let totalCons = 0;
-        let count = 0;
         
         const mods = baseDemand.modifiers;
         baseDemand.entries.filter(e => e.year === year && relevantRegions.includes(e.regionId)).forEach(entry => {
@@ -1952,13 +1761,7 @@ export default function App() {
           const loss = mods.losses !== null ? mods.losses / 100 : entry.losses;
           totalDem += calculateDemand(pop, cov, cons, loss);
           totalPopAtendida += pop * cov;
-          totalLosses += loss * 100;
-          totalCons += cons;
-          count++;
         });
-
-        const avgLosses = count > 0 ? totalLosses / count : 0;
-        const avgCons = count > 0 ? totalCons / count : 0;
 
         let totalSupply = 0;
         wbSystems.forEach(sys => {
@@ -2077,33 +1880,7 @@ export default function App() {
 
 
   // Handlers
-  const handleAddDemand = () => {
-    const maxId = demands.length > 0 ? Math.max(...demands.map((d: any) => Number(d.id) || 0)) : 0;
-    const newId = maxId + 1;
-    const baseDemand = currentDemand || {
-      id: newId,
-      name: "Demanda 1",
-      modifiers: { population: 0, coverage: null, perCapitaConsumption: 0, losses: null },
-      entries: activeRegions.map(r => ({
-        regionId: r.id,
-        year: new Date().getFullYear(),
-        population: 0,
-        coverage: 0,
-        perCapitaConsumption: 0,
-        losses: 0,
-        projectedDemand: 0
-      }))
-    };
-    
-    const newDemand: Demand = {
-      ...baseDemand,
-      id: newId,
-      name: `Demanda ${activeDemands.length + 1}`,
-      waterBalanceId: Number(selectedWaterBalanceId)
-    };
-    setDemands([...demands, newDemand]);
-    setSelectedDemandId(newId);
-  };
+
 
   const handleUpdateEntry = (
     regionId: string,
@@ -2145,13 +1922,7 @@ export default function App() {
     setDemands(updatedDemands);
   };
 
-  const toggleCompare = (id: string) => {
-    if (compareDemandIds.includes(id)) {
-      setCompareDemandIds(compareDemandIds.filter((cid) => cid !== id));
-    } else {
-      setCompareDemandIds([...compareDemandIds, id]);
-    }
-  };
+
 
   const handleDownloadDemanda = () => {
     const baseDemand = activeDemands[0];
@@ -3433,7 +3204,7 @@ const renderSupplyTable = () => {
                       ← Voltar para Painéis Públicos
                     </button>
                   </div>
-                  <ResolutionsDashboard showToast={showToast} />
+                  <ResolutionsModule view="painel" showToast={showToast} />
                 </div>
               ) : publicTabName === "pub_painel" ? (
                 <div className="space-y-6">
@@ -3448,7 +3219,7 @@ const renderSupplyTable = () => {
                       ← Voltar para Painéis Públicos
                     </button>
                   </div>
-                  <PublicationsDashboard showToast={showToast} />
+                  <PublicationsModule view="painel" showToast={showToast} />
                 </div>
               ) : publicTabName === "reg_agenda_painel" ? (
                 <div className="space-y-6">
@@ -3463,7 +3234,7 @@ const renderSupplyTable = () => {
                       ← Voltar para Painéis Públicos
                     </button>
                   </div>
-                  <RegulatoryAgendaDashboard showToast={showToast} />
+                  <RegulatoryAgendaModule view="painel" showToast={showToast} />
                 </div>
               ) : publicTabName === "analyze" || publicTabName === "balanco" ? (
                 <div className="space-y-6">
@@ -4649,8 +4420,9 @@ const renderSupplyTable = () => {
               />
             </motion.div>
           ) : activeTab === "analyze" ? (
-            <motion.div
-              key="analyze"
+            <WaterBalanceModule>
+              <motion.div
+                key="analyze"
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
@@ -5684,7 +5456,6 @@ const renderSupplyTable = () => {
                       {waterBalances
                         .filter((wb) => wb.id === analyzeBalanceId)
                         .map((wb, i) => {
-                          const colors = ["#0091DA", "#1A3E8A", "#008A3F", "#45C4F6", "#f59e0b", "#94a3b8", "#ef4444"];
                           return [
                             <Bar
                               key={`iad-${wb.id}`}
@@ -6127,9 +5898,11 @@ const renderSupplyTable = () => {
                 </div>
               )}
             </motion.div>
+            </WaterBalanceModule>
           ) : activeTab === "compare" ? (
-            <motion.div
-              key="compare"
+            <WaterBalanceModule>
+              <motion.div
+                key="compare"
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
@@ -6461,9 +6234,11 @@ const renderSupplyTable = () => {
                 )}
               </div>
             </motion.div>
+            </WaterBalanceModule>
           ) : activeTab === "manage" ? (
-            <motion.div
-              key="manage"
+            <WaterBalanceModule>
+              <motion.div
+                key="manage"
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
@@ -7715,9 +7490,11 @@ const renderSupplyTable = () => {
                 {manageSubTab === "supply" && supplySubTab === "view" && renderSupplyTable()}
               </div>
             </motion.div>
+            </WaterBalanceModule>
           ) : activeTab === "templates" ? (
-            <motion.div
-              key="templates"
+            <WaterBalanceModule>
+              <motion.div
+                key="templates"
               initial={{ opacity: 0, scale: 0.98 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
@@ -7918,6 +7695,7 @@ const renderSupplyTable = () => {
                 </div>
               </div>
             </motion.div>
+            </WaterBalanceModule>
           ) : activeTab === "users" ? (
             <motion.div
               key="users"
@@ -7927,7 +7705,7 @@ const renderSupplyTable = () => {
               transition={{ duration: 0.3, ease: "easeOut" }}
               className="max-w-7xl mx-auto w-full"
             >
-              <UserManagementTab />
+              <UserManagementModule />
             </motion.div>
           ) : activeTab === "planning" ? (
             <motion.div
@@ -7938,7 +7716,7 @@ const renderSupplyTable = () => {
               transition={{ duration: 0.3, ease: "easeOut" }}
               className="max-w-7xl mx-auto w-full"
             >
-              <PlanningTab 
+              <PlanningModule 
                 tasks={tasks}
                 setTasks={setTasks}
                 showToast={showToast}
@@ -7965,9 +7743,7 @@ const renderSupplyTable = () => {
               transition={{ duration: 0.3, ease: "easeOut" }}
               className="max-w-7xl mx-auto w-full"
             >
-              <React.Suspense fallback={<div className="flex justify-center p-12 text-slate-400">Carregando...</div>}>
-                <ResolutionsTab showToast={showToast} currentUser={currentUser} />
-              </React.Suspense>
+              <ResolutionsModule view="cadastro" showToast={showToast} currentUser={currentUser} />
             </motion.div>
           ) : activeTab === "reg_painel" ? (
             <motion.div
@@ -7978,7 +7754,7 @@ const renderSupplyTable = () => {
               transition={{ duration: 0.3, ease: "easeOut" }}
               className="max-w-7xl mx-auto w-full"
             >
-              <ResolutionsDashboard showToast={showToast} />
+              <ResolutionsModule view="painel" showToast={showToast} />
             </motion.div>
           ) : activeTab === "reg_agenda" ? (
             <motion.div
@@ -7989,7 +7765,7 @@ const renderSupplyTable = () => {
               transition={{ duration: 0.3, ease: "easeOut" }}
               className="max-w-7xl mx-auto w-full"
             >
-              <RegulatoryAgendaTab showToast={showToast} currentUser={currentUser} />
+              <RegulatoryAgendaModule view="agenda" showToast={showToast} currentUser={currentUser} />
             </motion.div>
           ) : activeTab === "reg_agenda_painel" ? (
             <motion.div
@@ -8000,7 +7776,7 @@ const renderSupplyTable = () => {
               transition={{ duration: 0.3, ease: "easeOut" }}
               className="max-w-7xl mx-auto w-full"
             >
-              <RegulatoryAgendaDashboard showToast={showToast} />
+              <RegulatoryAgendaModule view="painel" showToast={showToast} />
             </motion.div>
           ) : activeTab === "pub_cadastro" ? (
             <motion.div
@@ -8011,9 +7787,7 @@ const renderSupplyTable = () => {
               transition={{ duration: 0.3, ease: "easeOut" }}
               className="max-w-7xl mx-auto w-full"
             >
-              <React.Suspense fallback={<div className="flex justify-center p-12 text-slate-400">Carregando...</div>}>
-                <PublicationsTab showToast={showToast} currentUser={currentUser} />
-              </React.Suspense>
+              <PublicationsModule view="cadastro" showToast={showToast} currentUser={currentUser} />
             </motion.div>
           ) : activeTab === "pub_painel" ? (
             <motion.div
@@ -8024,7 +7798,7 @@ const renderSupplyTable = () => {
               transition={{ duration: 0.3, ease: "easeOut" }}
               className="max-w-7xl mx-auto w-full"
             >
-              <PublicationsDashboard showToast={showToast} />
+              <PublicationsModule view="painel" showToast={showToast} />
             </motion.div>
           ) : activeTab === "gerencial" ? (
             <motion.div

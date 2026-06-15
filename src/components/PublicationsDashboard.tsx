@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { ResponsiveContainer, ComposedChart, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid, Line, LabelList } from "recharts";
-import { BookOpen, FileText, Calendar, History, Search, ArrowUpDown, Filter, ExternalLink, Share2, ClipboardList, TrendingUp, Inbox, Image as ImageIcon } from "lucide-react";
+import { BookOpen, FileText, Search, ArrowUpDown, Filter, ExternalLink, Share2, ClipboardList, TrendingUp, Inbox, Image as ImageIcon } from "lucide-react";
 
 // Helper component for Document Thumbnail
 const DocumentThumbnail = ({ tipo, titulo, className, imageUrl }: { tipo?: string, titulo?: string, className?: string, imageUrl?: string }) => {

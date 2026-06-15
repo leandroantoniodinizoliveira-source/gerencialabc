@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useState, useEffect } from "react";
-import { Plus, Edit2, Trash2, Search, X, CheckCircle2, ChevronDown, ChevronUp, BookOpen, Layers, Calendar, ExternalLink } from "lucide-react";
+import { Plus, Edit2, Trash2, Search, X, ChevronDown, ChevronUp, BookOpen, Layers, ExternalLink } from "lucide-react";
 
 interface Task {
   id: number;
@@ -173,7 +173,7 @@ export function RegulatoryAgendaTab({ showToast, currentUser }: RegulatoryAgenda
       } else {
         showToast(json.error || "Erro ao excluir.", "error");
       }
-    } catch (e: any) {
+    } catch {
       showToast("Erro de comunicação.", "error");
     }
   };
@@ -215,7 +215,7 @@ export function RegulatoryAgendaTab({ showToast, currentUser }: RegulatoryAgenda
       } else {
         showToast(json.error || "Erro ao salvar.", "error");
       }
-    } catch (err: any) {
+    } catch {
       showToast("Erro ao conectar com o servidor.", "error");
     }
   };
@@ -335,10 +335,6 @@ export function RegulatoryAgendaTab({ showToast, currentUser }: RegulatoryAgenda
                     const isExpanded = expandedAgendas.includes(agenda.id);
                     // Match tasks corresponding to associated task_ids
                     const associatedTasks = tasks.filter(t => (agenda.task_ids || []).includes(t.id));
-
-                    // Calculate task status percentages
-                    const totalTasks = associatedTasks.length;
-                    const completedTasks = (agenda.agenda_tasks || []).filter(t => t.status === "Concluída").length;
 
                     return (
                       <React.Fragment key={agenda.id}>

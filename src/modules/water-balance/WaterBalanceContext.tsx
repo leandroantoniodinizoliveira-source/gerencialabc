@@ -21,12 +21,12 @@ export const useWaterBalance = () => {
 };
 
 export const WaterBalanceProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const [waterBalances, setWaterBalances] = useState<WaterBalance[]>([]);
-  const [systems, setSystems] = useState<System[]>([]);
-  const [regions, setRegions] = useState<Region[]>([]);
-  const [demands, setDemands] = useState<Demand[]>([]);
-  const [supplySources, setSupplySources] = useState<SupplySource[]>([]);
-  const [operationalAdjustments, setOperationalAdjustments] = useState<OperationalAdjustment[]>([]);
+  const [waterBalances] = useState<WaterBalance[]>([]);
+  const [systems] = useState<System[]>([]);
+  const [regions] = useState<Region[]>([]);
+  const [demands] = useState<Demand[]>([]);
+  const [supplySources] = useState<SupplySource[]>([]);
+  const [operationalAdjustments] = useState<OperationalAdjustment[]>([]);
 
   return (
     <WaterBalanceContext.Provider

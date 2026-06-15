@@ -25,10 +25,10 @@ export const usePlanning = () => {
 // 3. Provider que gerencia a lógica de negócio do Planejamento isoladamente
 export const PlanningProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [plans, setPlans] = useState<Plan[]>([]);
-  const [areas, setAreas] = useState<Area[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [responsibles, setResponsibles] = useState<Responsible[]>([]);
+  const [plans] = useState<Plan[]>([]);
+  const [areas] = useState<Area[]>([]);
+  const [categories] = useState<Category[]>([]);
+  const [responsibles] = useState<Responsible[]>([]);
 
   const addTask = (task: Task) => setTasks((prev) => [...prev, task]);
   const updateTask = (updated: Task) =>

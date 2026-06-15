@@ -912,6 +912,16 @@ async function startServer() {
         const dbTaskAreas = await client.query("SELECT * FROM pl_task_areas");
         const dbTaskResponsibles = await client.query("SELECT * FROM pl_task_responsibles");
         const dbTaskCategories = await client.query("SELECT * FROM pl_task_categories");
+        const dbCategories = await client.query("SELECT * FROM pl_categories ORDER BY id ASC");
+        const dbCategoryAreas = await client.query("SELECT * FROM pl_category_areas");
+
+        const categoryAreasMap: Record<number, number[]> = {};
+        dbCategoryAreas.rows.forEach(r => {
+          const cid = Number(r.category_id);
+          const aid = Number(r.area_id);
+          if (!categoryAreasMap[cid]) categoryAreasMap[cid] = [];
+          categoryAreasMap[cid].push(aid);
+        });
 
         const responsibleAreasMap: Record<number, number[]> = {};
         dbResponsibleAreas.rows.forEach(r => {
@@ -1055,6 +1065,15 @@ async function startServer() {
             role: r.role,
             areaIds: responsibleAreasMap[Number(r.id)] || [],
             userId: r.user_id ? Number(r.user_id) : null
+          })),
+          categories: dbCategories.rows.map(c => ({
+            id: Number(c.id),
+            name: c.name,
+            areaIds: categoryAreasMap[Number(c.id)] || [],
+            createdAt: c.created_at,
+            createdBy: c.created_by,
+            updatedAt: c.updated_at,
+            updatedBy: c.updated_by
           })),
           tasks: dbTasks.rows.map(t => ({
             id: Number(t.id),

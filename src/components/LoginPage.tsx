@@ -4,7 +4,7 @@ import { Lock, Mail, ArrowRight, ShieldAlert, Sparkles, Eye, EyeOff, UserCheck, 
 import { motion, AnimatePresence } from "motion/react";
 
 export function LoginPage() {
-  const { loginWithCredentials, users } = useAuth();
+  const { loginWithCredentials } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);

@@ -402,8 +402,6 @@ export function PlanningTab({
   setResponsiblesProp
 }: PlanningTabProps) {
   const { currentUser } = useAuth();
-  const previousSubTabRef = useRef<string | undefined>(undefined);
-  const hasInitiallySelectedPlanRef = useRef<boolean>(false);
   // Navigation, search & filter state
   const [isDashboardFiltersExpanded, setIsDashboardFiltersExpanded] = useState(true);
   const [isTasksFiltersExpanded, setIsTasksFiltersExpanded] = useState(true);
@@ -5149,7 +5147,6 @@ export function PlanningTab({
                   <tbody className="divide-y divide-slate-100">
                     {visibleGroupedRows.map((row) => {
                       const isExpanded = expandedGroups[row.id] !== undefined ? expandedGroups[row.id] : (isAnyFilterActive ? true : row.depth < 1); // defaults to true for depth < 1
-                      const hasChildren = row.children && row.children.length > 0;
                       
                       // Formatting helper for start/end date
                       const renderDate = (dStr: string | null) => {
@@ -6264,8 +6261,6 @@ export function PlanningTab({
     );
   }
 
-  const configActiveTab = "plans"; // fallback for compiler
-
   return (
     <div className="space-y-6 max-w-7xl mx-auto w-full pb-16">
       {/* Main split work-desk */}
@@ -6821,17 +6816,7 @@ export function PlanningTab({
                            ) : flatTasks.map(task => {
                                const taskChildrenCount = childrenMap[task.id]?.length || 0;
                                const normStatus = normalizeStatus(task.status);
-                               let statusClasses = "bg-slate-100 text-slate-600 border-slate-200";
-                               if (normStatus === "Concluída") statusClasses = "bg-emerald-50 text-emerald-700 border-emerald-200";
-                               else if (normStatus === "Em andamento") statusClasses = "bg-blue-50 text-blue-700 border-blue-200";
-
                                const dlStatus = getDeadlineStatus(task.endDate, task.status);
-                               let dlClasses = "bg-slate-50 text-slate-500 border-slate-200";
-                               if (normStatus !== "Concluída") {
-                                  if (dlStatus === "Atrasada") dlClasses = "bg-rose-500 text-white border-rose-500 shadow-xs";
-                                  else if (dlStatus === "Crítica") dlClasses = "bg-amber-500 text-white border-amber-500 shadow-xs";
-                                  else dlClasses = "bg-emerald-50 text-emerald-800 border-emerald-200";
-                               }
 
                                return (
                                  <tr key={task.id} className="hover:bg-slate-50/50 transition-colors group">

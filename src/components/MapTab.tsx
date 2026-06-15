@@ -70,7 +70,7 @@ export function MapTab({ systemSaldoData, systemSaldoDataAllYears, availableYear
           setGeoData(json);
           // Store in localStorage for rapid access
           localStorage.setItem(`adasa-geojson-${waterBalanceId}`, JSON.stringify(json));
-        } catch (error) {
+        } catch {
           alert('Erro ao processar o arquivo GeoJSON.');
         }
       };
@@ -124,14 +124,14 @@ export function MapTab({ systemSaldoData, systemSaldoDataAllYears, availableYear
         if (savedGeojson) {
           try {
             setGeoData(JSON.parse(savedGeojson));
-          } catch(e) {}
+          } catch {}
         }
       }
     };
     initializeMap();
   }, [waterBalanceId]);
 
-  const getStyle = (feature: any) => {
+  const _getStyle = (feature: any) => {
     const properties = feature.properties || {};
     
     // Find the best string property to use as name
@@ -184,7 +184,6 @@ export function MapTab({ systemSaldoData, systemSaldoDataAllYears, availableYear
       
       // Safest include: check if all words in sysName exist in sName
       const sysWords = normalizedSysName.split(/\s+/).filter(w => w.length > 2);
-      const sWords = normalizedSName.split(/\s+/);
       
       // If sysName has "sul" but sName has "norte", do not match
       if (normalizedSysName.includes('sul') && normalizedSName.includes('norte')) return false;
@@ -332,7 +331,7 @@ export function MapTab({ systemSaldoData, systemSaldoDataAllYears, availableYear
     });
   }, [geoData]);
 
-  const onEachFeature = (feature: any, layer: any) => {
+  const _onEachFeature = (feature: any, layer: any) => {
     const properties = feature.properties || {};
     let foundName = "Desconhecido";
     
@@ -699,7 +698,7 @@ function TransfersOverlay({ geoData, systemSaldoData }: { geoData: any, systemSa
     if (!geoData) return;
     import('leaflet').then((L) => {
       const systemBounds: Record<string, L.LatLngBounds> = {};
-      const layer = L.geoJSON(geoData, {
+      L.geoJSON(geoData, {
         onEachFeature: (feature, layer: any) => {
           const properties = feature.properties || {};
           let foundName = "";
@@ -934,7 +933,6 @@ function SubMap({ geoData, systemSaldoData, year, balanceName }: { geoData: any,
       if (normalizedSName === normalizedSysName) return true;
 
       const sysWords = normalizedSysName.split(/\s+/).filter(w => w.length > 2);
-      const sWords = normalizedSName.split(/\s+/);
       
       if (normalizedSysName.includes('sul') && normalizedSName.includes('norte')) return false;
       if (normalizedSysName.includes('norte') && normalizedSName.includes('sul')) return false;
@@ -1163,7 +1161,7 @@ function MapRestoreView({ geoData }: { geoData: any }) {
               setTimeout(() => {
                 try {
                   map.fitBounds(bounds, { padding: [10, 10] });
-                } catch(err) {}
+                } catch {}
               }, 50);
             }
           } catch (e) {
@@ -1174,7 +1172,7 @@ function MapRestoreView({ geoData }: { geoData: any }) {
         setTimeout(() => {
           try {
             map.setView([-15.793889, -47.882778], 10);
-          } catch (err) {}
+          } catch {}
         }, 50);
       }
     };
@@ -1211,7 +1209,7 @@ function GeoJsonBounds({ data }: { data: any }) {
                   try {
                     map.invalidateSize();
                     map.fitBounds(bounds, { padding: [10, 10] });
-                  } catch(e) {}
+                  } catch {}
                 }, 50);
             };
 

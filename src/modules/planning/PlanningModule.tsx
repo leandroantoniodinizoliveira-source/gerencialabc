@@ -1,37 +1,33 @@
 import React from "react";
 import { PlanningProvider } from "./PlanningContext";
-// Futuramente importar componentes menores, por exemplo:
-// import { TaskList } from "./components/TaskList";
-// import { PlanningDashboard } from "./components/PlanningDashboard";
-import { PlanningTab } from "../../components/PlanningTab"; // Usando o componente legado/existente como casca inicial
+import { PlanningTab } from "../../components/PlanningTab";
 import { Task } from "../../types";
 
 interface PlanningModuleProps {
-  // Passamos as deps que ainda estão no App enquanto a migração não finaliza 100%
-  // O ideal é que estas props sumam e usemos chamadas à API via context/store!
-  activeSubTab?: "tasks" | "dashboard" | "plans" | "areas" | "categories" | "responsibles";
-  legacyTasks?: Task[];
-  legacySetTasks?: any;
+  tasks: Task[];
+  setTasks: React.Dispatch<React.SetStateAction<Task[]>>;
   showToast: (title: string, message: string, type: "success" | "error" | "warning" | "info") => void;
+  activeSubTab?: "tasks" | "dashboard" | "plans" | "areas" | "categories" | "responsibles";
+  setConfirmState: React.Dispatch<React.SetStateAction<any>>;
+  myTasksFilterTrigger: number;
+  isMyTasksSelected: boolean;
+  plansProp: any[];
+  areasProp: any[];
+  categoriesProp: any[];
+  responsiblesProp: any[];
+  setPlansProp: React.Dispatch<React.SetStateAction<any[]>>;
+  setAreasProp: React.Dispatch<React.SetStateAction<any[]>>;
+  setCategoriesProp: React.Dispatch<React.SetStateAction<any[]>>;
+  setResponsiblesProp: React.Dispatch<React.SetStateAction<any[]>>;
 }
 
-export const PlanningModule: React.FC<PlanningModuleProps> = ({ 
-  activeSubTab, 
-  legacyTasks, 
-  legacySetTasks, 
-  showToast 
-}) => {
+export const PlanningModule: React.FC<PlanningModuleProps> = (props) => {
   return (
     <PlanningProvider>
       <div className="planning-module-root w-full h-full">
-        {/* Usando o componente refatorável. Idealmente, ele próprio consumirá o contexto */}
-        <PlanningTab 
-          tasks={legacyTasks || []} 
-          setTasks={legacySetTasks}
-          showToast={showToast}
-          activeSubTab={activeSubTab}
-        />
+        <PlanningTab {...props} />
       </div>
     </PlanningProvider>
   );
 };
+

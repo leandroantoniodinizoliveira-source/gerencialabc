@@ -99,7 +99,7 @@ export const TaskModelManager: React.FC<TaskModelManagerProps> = ({
       let resData;
       try {
         resData = JSON.parse(text);
-      } catch (e) {
+      } catch {
         throw new Error(`Invalid JSON response: ${text.substring(0, 100)}`);
       }
 

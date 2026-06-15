@@ -1,6 +1,6 @@
 import * as React from "react";
 import { useState, useEffect } from "react";
-import { Plus, Edit2, Trash2, ArrowUpRight, Search, X, Upload, CheckCircle2, ChevronDown, ChevronUp, FileSpreadsheet, BookOpen, ExternalLink, Filter, ArrowUpDown, ArrowDown, ArrowUp } from "lucide-react";
+import { Plus, Edit2, Trash2, ArrowUpRight, Search, X, Upload, ChevronDown, ChevronUp, FileSpreadsheet, BookOpen, Filter, ArrowUpDown, ArrowDown, ArrowUp } from "lucide-react";
 
 interface Publication {
   id: number;

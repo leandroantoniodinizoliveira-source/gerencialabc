@@ -22,7 +22,7 @@ export default [
       'no-unused-vars': 'off',
       'unused-imports/no-unused-vars': [
         'error',
-        { 'vars': 'all', 'varsIgnorePattern': '^_', 'args': 'none', 'argsIgnorePattern': '^_' }
+        { 'vars': 'all', 'varsIgnorePattern': '^_', 'args': 'none', 'argsIgnorePattern': '^_', 'caughtErrors': 'none' }
       ]
     }
   }

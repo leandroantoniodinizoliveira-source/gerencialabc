@@ -9,8 +9,7 @@ import {
   PieChart, 
   Pie, 
   Cell, 
-  CartesianGrid, 
-  Legend 
+  CartesianGrid 
 } from "recharts";
 import { 
   BookOpen, 
@@ -23,10 +22,8 @@ import {
   Filter, 
   ExternalLink, 
   Share2, 
-  Layers, 
   Compass, 
   Sparkles,
-  CalendarCheck,
   ChevronDown,
   ChevronRight
 } from "lucide-react";

@@ -1,6 +1,0 @@
-28:  Search,
-242:  const [searchTerm, setSearchTerm] = useState("");
-4809:        {/* Left side: Search filters and Task tree */}
-5046:            {/* Row 3: Search layout */}
-5050:                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-5055:                  onChange={(e) => setSearchTerm(e.target.value)}
