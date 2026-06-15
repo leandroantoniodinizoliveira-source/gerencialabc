@@ -3606,6 +3606,7 @@ const renderSupplyTable = () => {
                   <button
                     onClick={() => {
                       setIsMyTasksSelected(false);
+                      setMyTasksFilterTrigger(prev => prev + 1);
                       setActivePlanningSubTab("tasks");
                       handleTabChange("planning");
                     }}

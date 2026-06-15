@@ -1301,118 +1301,61 @@ export function PlanningTab({
     fetchInit();
   }, []);
 
-  // Controlled State Machine for Loading Filters and Initializing Pages
+  // Resolve initial loading state
   React.useEffect(() => {
-    // 1. If currently fetching / syncing, keep showing the loading state
-    if (isSyncing) {
-      if (!isInitializing) setIsInitializing(true);
-      return;
+    if (!isSyncing && isInitializing) {
+      // Delay slightly to avoid flash if data is just updating
+      const timer = setTimeout(() => {
+        setIsInitializing(false);
+      }, 100);
+      return () => clearTimeout(timer);
     }
+  }, [isSyncing, isInitializing]);
 
-    // 2. If lists are still empty and we are not syncing, we should wait until isSyncing starts or is completed
-    if ((!plans || plans.length === 0) && (!responsibles || responsibles.length === 0)) {
-      if (!isInitializing) setIsInitializing(true);
-      return;
-    }
-
-    // 3. Determine the target filters to be applied
-    let targetPlan: string = planFilter;
-    if (plans && plans.length > 0) {
-      const activeProj = plans.find(p => p.isActive);
-      if (activeProj) {
-        targetPlan = activeProj.id.toString();
-      } else {
-        const sortedPlans = [...plans].sort(sortByCreatedAt);
-        if (sortedPlans.length > 0) {
-          targetPlan = sortedPlans[0].id.toString();
+  // Apply default filters when user navigates specifically from sideways "Minhas Tarefas" or "Cadastrar Atividades"
+  React.useEffect(() => {
+    if (myTasksFilterTrigger && myTasksFilterTrigger > 0) {
+      // 1. Set active plan explicitly
+      if (plans && plans.length > 0) {
+        const activeProj = plans.find(p => p.isActive);
+        if (activeProj) {
+          setPlanFilter(activeProj.id.toString());
+        } else {
+          const sortedPlans = [...plans].sort(sortByCreatedAt);
+          if (sortedPlans.length > 0) {
+            setPlanFilter(sortedPlans[0].id.toString());
+          }
         }
       }
+
+      // 2. Set responsible filter based on 'isMyTasksSelected'
+      if (isMyTasksSelected && currentUser && responsibles && responsibles.length > 0) {
+        const userResp = responsibles.find(r => 
+          (r.userId && Number(r.userId) === Number(currentUser.id)) ||
+          (r.email && currentUser.email && r.email.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) ||
+          (r.name && currentUser.name && r.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim())
+        );
+        if (userResp) {
+          setSelectedResponsibleIds([userResp.id]);
+        } else {
+          showToast("Aviso", "Seu usuário não está vinculado a nenhum responsável técnico cadastrado.", "warning");
+          setSelectedResponsibleIds([]);
+        }
+      } else {
+         setSelectedResponsibleIds([]); // Clear if just "Cadastrar Atividades"
+      }
+
+      // 3. Reset all other filters so user starts fresh
+      setStatusFilter("all");
+      setSituationFilter("all");
+      setPriorityFilter("all");
+      setCategoryFilter("all");
+      setIsProgrammedFilter("all");
+      setSearchTerm("");
+      setSelectedAreaIds([]);
+      setIsTasksFiltersExpanded(true); 
     }
-
-    let targetResponsibleIds: number[] = [];
-    if (isMyTasksSelected && currentUser && responsibles && responsibles.length > 0) {
-      const userResp = responsibles.find(r => 
-        (r.userId && Number(r.userId) === Number(currentUser.id)) ||
-        (r.email && currentUser.email && r.email.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) ||
-        (r.name && currentUser.name && r.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim())
-      );
-      if (userResp) {
-        targetResponsibleIds = [userResp.id];
-      }
-    }
-
-    // Check if what is currently in state matches our expected (target) configuration
-    const isPlanFilterApplied = (planFilter === targetPlan);
-    const isResponsibleFilterApplied = (
-      selectedResponsibleIds.length === targetResponsibleIds.length && 
-      selectedResponsibleIds.every((val, index) => val === targetResponsibleIds[index])
-    );
-    const secondaryFiltersAreCleared = (
-      statusFilter === "all" &&
-      situationFilter === "all" &&
-      priorityFilter === "all" &&
-      categoryFilter === "all" &&
-      isProgrammedFilter === "all" &&
-      searchTerm === "" &&
-      selectedAreaIds.length === 0
-    );
-
-    // 4. If target filters are not yet applied to the React state, let's apply them!
-    if (!isPlanFilterApplied || !isResponsibleFilterApplied || !secondaryFiltersAreCleared) {
-      // Keep/Set initializing to true to show the 'Carregando dados...' screen during state updates
-      if (!isInitializing) {
-        setIsInitializing(true);
-        return; // Return so the state change takes effect first
-      }
-
-      // Apply the core and secondary filters safely
-      if (!isPlanFilterApplied) {
-        setPlanFilter(targetPlan);
-      }
-      if (!isResponsibleFilterApplied) {
-        setSelectedResponsibleIds(targetResponsibleIds);
-      }
-      
-      // Reset secondary filters to default as requested for switching/loading of My Tasks & Register views
-      if (statusFilter !== "all") setStatusFilter("all");
-      if (situationFilter !== "all") setSituationFilter("all");
-      if (priorityFilter !== "all") setPriorityFilter("all");
-      if (categoryFilter !== "all") setCategoryFilter("all");
-      if (isProgrammedFilter !== "all") setIsProgrammedFilter("all");
-      if (searchTerm !== "") setSearchTerm("");
-      if (selectedAreaIds.length > 0) setSelectedAreaIds([]);
-      
-      if (isMyTasksSelected) {
-        setIsTasksFiltersExpanded(true); // Auto-expand for my tasks view clarity
-      }
-    } else {
-      // 5. Once state completely reflects the target configuration, hide the loading screen nicely!
-      if (isInitializing) {
-        // Simple delay to make loading and state application visually smooth and not flicker-heavy
-        const timer = setTimeout(() => {
-          setIsInitializing(false);
-        }, 120);
-        return () => clearTimeout(timer);
-      }
-    }
-  }, [
-    isSyncing,
-    plans,
-    responsibles,
-    currentUser,
-    isMyTasksSelected,
-    myTasksFilterTrigger,
-    planFilter,
-    selectedResponsibleIds,
-    statusFilter,
-    situationFilter,
-    priorityFilter,
-    categoryFilter,
-    isProgrammedFilter,
-    searchTerm,
-    selectedAreaIds,
-    activeSubTab
-  ]);
+  }, [myTasksFilterTrigger]);
 
   // Reset category filter if it becomes invalid due to area selection change
   React.useEffect(() => {
