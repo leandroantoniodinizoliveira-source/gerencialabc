@@ -2,7 +2,6 @@ import "dotenv/config";
 import express from "express";
 import path from "path";
 import fs from "fs";
-import { createServer as createViteServer } from "vite";
 import { Pool } from "pg";
 import { parse } from "csv-parse/sync";
 
@@ -3732,6 +3731,7 @@ export async function startServer(isVercel = false) {
 
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -3740,8 +3740,10 @@ export async function startServer(isVercel = false) {
   } else {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-       if (req.path.startsWith('/api')) return res.status(404).end();
+    app.all('*', (req, res) => {
+       if (req.path.startsWith('/api')) {
+         return res.status(404).json({ success: false, error: "Endpoint da API não encontrado." });
+       }
        res.sendFile(path.join(distPath, 'index.html'));
     });
   }
@@ -3755,7 +3757,9 @@ export async function startServer(isVercel = false) {
 
 if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
   // Only auto-start if not built for Vercel serverless
-  if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.includes('server.cjs') || process.argv[1]?.includes('tsx') || process.argv[1]?.includes('esno')) {
+  const isCjsMain = typeof require !== 'undefined' && require.main === module;
+  const isEsmMain = typeof import.meta !== 'undefined' && import.meta.url === `file://${process.argv[1]}`;
+  if (isCjsMain || isEsmMain || process.argv[1]?.includes('server.cjs') || process.argv[1]?.includes('tsx') || process.argv[1]?.includes('esno')) {
     startServer();
   }
 }
