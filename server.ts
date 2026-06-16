@@ -915,47 +915,25 @@ async function startServer() {
       const pool = getDbPool();
       const client = await pool.connect();
       try {
-        const [
-          dbWaterBalances,
-          dbSystems,
-          dbRegions,
-          dbDemands,
-          dbDemandEntries,
-          dbSupplySources,
-          dbOperationalAdjustments,
-          dbTemplateFiles,
-          dbRiskReferences,
-          dbTasks,
-          dbPlans,
-          dbAreas,
-          dbResponsibles,
-          dbResponsibleAreas,
-          dbTaskAreas,
-          dbTaskResponsibles,
-          dbTaskCategories,
-          dbCategories,
-          dbCategoryAreas
-        ] = await Promise.all([
-          client.query("SELECT * FROM wb_water_balances"),
-          client.query("SELECT * FROM wb_systems"),
-          client.query("SELECT * FROM wb_regions"),
-          client.query("SELECT * FROM wb_demands"),
-          client.query("SELECT * FROM wb_demand_entries"),
-          client.query("SELECT * FROM wb_supply_sources"),
-          client.query("SELECT * FROM wb_operational_adjustments"),
-          client.query("SELECT * FROM wb_template_files"),
-          client.query("SELECT * FROM wb_risk_references ORDER BY id ASC"),
-          client.query("SELECT * FROM pl_tasks ORDER BY id ASC"),
-          client.query("SELECT * FROM pl_plans ORDER BY id ASC"),
-          client.query("SELECT * FROM pl_areas ORDER BY id ASC"),
-          client.query("SELECT * FROM pl_responsibles ORDER BY id ASC"),
-          client.query("SELECT * FROM pl_responsible_areas"),
-          client.query("SELECT * FROM pl_task_areas"),
-          client.query("SELECT * FROM pl_task_responsibles"),
-          client.query("SELECT * FROM pl_task_categories"),
-          client.query("SELECT * FROM pl_categories ORDER BY id ASC"),
-          client.query("SELECT * FROM pl_category_areas")
-        ]);
+        const dbWaterBalances = await client.query("SELECT * FROM wb_water_balances");
+        const dbSystems = await client.query("SELECT * FROM wb_systems");
+        const dbRegions = await client.query("SELECT * FROM wb_regions");
+        const dbDemands = await client.query("SELECT * FROM wb_demands");
+        const dbDemandEntries = await client.query("SELECT * FROM wb_demand_entries");
+        const dbSupplySources = await client.query("SELECT * FROM wb_supply_sources");
+        const dbOperationalAdjustments = await client.query("SELECT * FROM wb_operational_adjustments");
+        const dbTemplateFiles = await client.query("SELECT * FROM wb_template_files");
+        const dbRiskReferences = await client.query("SELECT * FROM wb_risk_references ORDER BY id ASC");
+        const dbTasks = await client.query("SELECT * FROM pl_tasks ORDER BY id ASC");
+        const dbPlans = await client.query("SELECT * FROM pl_plans ORDER BY id ASC");
+        const dbAreas = await client.query("SELECT * FROM pl_areas ORDER BY id ASC");
+        const dbResponsibles = await client.query("SELECT * FROM pl_responsibles ORDER BY id ASC");
+        const dbResponsibleAreas = await client.query("SELECT * FROM pl_responsible_areas");
+        const dbTaskAreas = await client.query("SELECT * FROM pl_task_areas");
+        const dbTaskResponsibles = await client.query("SELECT * FROM pl_task_responsibles");
+        const dbTaskCategories = await client.query("SELECT * FROM pl_task_categories");
+        const dbCategories = await client.query("SELECT * FROM pl_categories ORDER BY id ASC");
+        const dbCategoryAreas = await client.query("SELECT * FROM pl_category_areas");
 
         const categoryAreasMap: Record<number, number[]> = {};
         dbCategoryAreas.rows.forEach(r => {

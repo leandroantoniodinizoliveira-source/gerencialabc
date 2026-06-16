@@ -763,6 +763,7 @@ export function PlanningTab({
   const [isApplyingFilters, setIsApplyingFilters] = useState(false);
   // Quick status sync loader
   const [isSyncing, setIsSyncing] = useState(false);
+  const [hasConsulted, setHasConsulted] = useState(false);
 
   const handleAreaTableSort = (field: string) => {
     setAreaTableSort(prev => {
@@ -1282,60 +1283,46 @@ export function PlanningTab({
   // Apply default filters when user navigates specifically from sideways "Minhas Tarefas" or "Cadastrar Atividades"
   React.useEffect(() => {
     if (myTasksFilterTrigger && myTasksFilterTrigger > 0) {
-      setIsApplyingFilters(true);
-      
-      // Delay applying filters so the browser has time to paint the loading skeleton
-      requestAnimationFrame(() => {
-        setTimeout(() => {
-          React.startTransition(() => {
-            // 1. Set active plan explicitly
-            if (plans && plans.length > 0) {
-              const activeProj = plans.find(p => p.isActive);
-              if (activeProj) {
-                setPlanFilter(activeProj.id.toString());
-              } else {
-                const sortedPlans = [...plans].sort(sortByCreatedAt);
-                if (sortedPlans.length > 0) {
-                  setPlanFilter(sortedPlans[0].id.toString());
-                }
-              }
+      React.startTransition(() => {
+        // 1. Set active plan explicitly
+        if (plans && plans.length > 0) {
+          const activeProj = plans.find(p => p.isActive);
+          if (activeProj) {
+            setPlanFilter(activeProj.id.toString());
+          } else {
+            const sortedPlans = [...plans].sort(sortByCreatedAt);
+            if (sortedPlans.length > 0) {
+              setPlanFilter(sortedPlans[0].id.toString());
             }
+          }
+        }
 
-            // 2. Set responsible filter based on 'isMyTasksSelected'
-            if (isMyTasksSelected && currentUser && responsibles && responsibles.length > 0) {
-              const userResp = responsibles.find(r => 
-                (r.userId && Number(r.userId) === Number(currentUser.id)) ||
-                (r.email && currentUser.email && r.email.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) ||
-                (r.name && currentUser.name && r.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim())
-              );
-              if (userResp) {
-                setSelectedResponsibleIds([userResp.id]);
-              } else {
-                showToast("Aviso", "Seu usuário não está vinculado a nenhum responsável técnico cadastrado.", "warning");
-                setSelectedResponsibleIds([]);
-              }
-            } else {
-              setSelectedResponsibleIds([]); // Clear if just "Cadastrar Atividades"
-            }
+        // 2. Set responsible filter based on 'isMyTasksSelected'
+        if (isMyTasksSelected && currentUser && responsibles && responsibles.length > 0) {
+          const userResp = responsibles.find(r => 
+            (r.userId && Number(r.userId) === Number(currentUser.id)) ||
+            (r.email && currentUser.email && r.email.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) ||
+            (r.name && currentUser.name && r.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim())
+          );
+          if (userResp) {
+            setSelectedResponsibleIds([userResp.id]);
+          } else {
+            showToast("Aviso", "Seu usuário não está vinculado a nenhum responsável técnico cadastrado.", "warning");
+            setSelectedResponsibleIds([]);
+          }
+        } else {
+          setSelectedResponsibleIds([]); // Clear if just "Cadastrar Atividades"
+        }
 
-            // 3. Reset all other filters so user starts fresh
-            setStatusFilter("all");
-            setSituationFilter("all");
-            setPriorityFilter("all");
-            setCategoryFilter("all");
-            setIsProgrammedFilter("all");
-            setSearchTerm("");
-            setSelectedAreaIds([]);
-            setIsTasksFiltersExpanded(true); 
-          });
-
-          // Wait another frame to hide the filters loader
-          requestAnimationFrame(() => {
-             requestAnimationFrame(() => {
-               setIsApplyingFilters(false);
-             });
-          });
-        }, 80);
+        // 3. Reset all other filters so user starts fresh
+        setStatusFilter("all");
+        setSituationFilter("all");
+        setPriorityFilter("all");
+        setCategoryFilter("all");
+        setIsProgrammedFilter("all");
+        setSearchTerm("");
+        setSelectedAreaIds([]);
+        setIsTasksFiltersExpanded(true); 
       });
     }
   }, [myTasksFilterTrigger]);
@@ -6266,25 +6253,6 @@ export function PlanningTab({
               </button>
 
               <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
-                {(planFilter !== "all" || selectedAreaIds.length > 0 || selectedResponsibleIds.length > 0 || statusFilter !== "all" || situationFilter !== "all" || priorityFilter !== "all" || categoryFilter !== "all" || isProgrammedFilter !== "all" || searchTerm !== "") && (
-                  <button
-                    onClick={() => {
-                      setPlanFilter("all");
-                      setSelectedAreaIds([]);
-                      setSelectedResponsibleIds([]);
-                      setStatusFilter("all");
-                      setSituationFilter("all");
-                      setPriorityFilter("all");
-                      setCategoryFilter("all");
-                      setSearchTerm("");
-                      setIsProgrammedFilter("all");
-                    }}
-                    className="text-xs bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-extrabold uppercase tracking-wider px-3.5 py-2.5 rounded-xl transition-all flex items-center gap-1.5 shadow-sm"
-                    title="Limpar todos os filtros ativos"
-                  >
-                    <X size={14} /> Limpar Filtros
-                  </button>
-                )}
                 <button
                   onClick={reloadTasks}
                   disabled={isSyncing}
@@ -6508,11 +6476,44 @@ export function PlanningTab({
               </div>
             </div>
 
+             {/* Consultar / Limpar Buttons */}
+            <div className="flex justify-center items-center gap-4 pt-2">
+                {(planFilter !== "all" || selectedAreaIds.length > 0 || selectedResponsibleIds.length > 0 || statusFilter !== "all" || situationFilter !== "all" || priorityFilter !== "all" || categoryFilter !== "all" || isProgrammedFilter !== "all" || searchTerm !== "") && (
+                  <button
+                    onClick={() => {
+                      setPlanFilter("all");
+                      setSelectedAreaIds([]);
+                      setSelectedResponsibleIds([]);
+                      setStatusFilter("all");
+                      setSituationFilter("all");
+                      setPriorityFilter("all");
+                      setCategoryFilter("all");
+                      setSearchTerm("");
+                      setIsProgrammedFilter("all");
+                    }}
+                    className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 flex items-center gap-2 font-black uppercase tracking-widest px-8 py-3 rounded-xl text-xs transition-all shadow-sm hover:-translate-y-0.5"
+                    title="Limpar todos os filtros ativos"
+                  >
+                    <X size={16} /> Limpar Filtros
+                  </button>
+                )}
+               <button
+                 onClick={() => {
+                   setHasConsulted(true);
+                 }}
+                 className="bg-indigo-600 hover:bg-indigo-700 text-white flex items-center gap-2 font-black uppercase tracking-widest px-8 py-3 rounded-xl text-xs transition-all shadow-md hover:-translate-y-0.5"
+               >
+                 <Search size={16} /> Consultar
+               </button>
+            </div>
+
               </div>
             )}
           </div>
 
-          <div className="bg-white border border-slate-200/80 rounded-[2rem] p-6 shadow-sm space-y-6">
+          {hasConsulted && (
+            <>
+              <div className="bg-white border border-slate-200/80 rounded-[2rem] p-6 shadow-sm space-y-6">
             <div className="mb-2 border-l-4 border-adasa-mid pl-2.5 py-0.5">
               <h3 className="text-xs sm:text-sm font-black text-slate-800 uppercase tracking-widest">
                 Visualização
@@ -8426,6 +8427,8 @@ export function PlanningTab({
       </div>
     )}
         </div>
+          </>
+        )}
       </div>
 
       {/* MODAL: Generate from Model Dialog */}

@@ -692,12 +692,6 @@ export default function App() {
   };
 
   useEffect(() => {
-    if (currentUser && !cloudData && !isCloudDataLoading && !isCloudDataFetching && !isDataLoaded) {
-      queryClient.refetchQueries({ queryKey: ['cloudData'] });
-    }
-  }, [currentUser, cloudData, isCloudDataLoading, isCloudDataFetching, isDataLoaded]);
-
-  useEffect(() => {
     if (isDataLoaded && lastSavedStateStr === null) {
       const payload = { waterBalances, systems, regions, demands, supplySources, operationalAdjustments };
       setLastSavedStateStr(JSON.stringify(payload));
