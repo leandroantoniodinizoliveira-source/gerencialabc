@@ -371,7 +371,15 @@ export default function App() {
   // Health check on startup to verify DB connection
   useEffect(() => {
     fetch("/api/db-status")
-      .then(res => res.json())
+      .then(async res => {
+        const text = await res.text();
+        try {
+          return JSON.parse(text);
+        } catch (e) {
+          console.error("[HEALTH CHECK] Resposta não-JSON do servidor:", text, "Status:", res.status);
+          throw new Error("Invalid JSON response");
+        }
+      })
       .then(data => {
         if (data.success) {
           console.log("[HEALTH CHECK] Banco de dados conectado com sucesso! Status:", data.data);
@@ -649,6 +657,11 @@ export default function App() {
     queryKey: ['cloudData'],
     queryFn: async () => {
       const res = await fetch("/api/load-data");
+      if (!res.ok) {
+        const text = await res.text();
+        console.error("[LOAD DATA] Erro HTTP:", res.status, text);
+        throw new Error(`Erro do servidor: ${res.status}`);
+      }
       const contentType = res.headers.get("content-type");
       if (contentType && contentType.includes("application/json")) {
         const data = await res.json();
@@ -739,6 +752,10 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: bodyStr
       });
+      if (!res.ok) {
+         const text = await res.text();
+         throw new Error(`Erro HTTP: ${res.status} ${text}`);
+      }
       const contentType = res.headers.get("content-type");
       if (contentType && contentType.includes("application/json")) {
         const resData = await res.json();
@@ -820,6 +837,10 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: bodyStr
       });
+      if (!res.ok) {
+         const text = await res.text();
+         throw new Error(`Erro HTTP: ${res.status} ${text}`);
+      }
       const contentType = res.headers.get("content-type");
       if (contentType && contentType.includes("application/json")) {
         const resData = await res.json();
@@ -868,6 +889,10 @@ export default function App() {
         headers: { "Content-Type": "application/json" },
         body: bodyStr
       });
+      if (!res.ok) {
+         const text = await res.text();
+         throw new Error(`Erro HTTP: ${res.status} ${text}`);
+      }
       const contentType = res.headers.get("content-type");
       if (contentType && contentType.includes("application/json")) {
         const resData = await res.json();

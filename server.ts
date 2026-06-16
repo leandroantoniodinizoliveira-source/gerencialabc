@@ -63,7 +63,10 @@ function getDbPool(): Pool {
     dbPool = new Pool({
       connectionString: cleanConnectionString,
       // O banco de dados Neon exige conexões seguras por SSL
-      ssl: { rejectUnauthorized: false }
+      ssl: { rejectUnauthorized: false },
+      max: process.env.VERCEL ? 1 : 10,
+      connectionTimeoutMillis: 5000,
+      idleTimeoutMillis: 30000,
     });
   }
   return dbPool;
@@ -754,7 +757,9 @@ async function runStartupMigration() {
 }
 
 export async function startServer(isVercel = false) {
-  await runStartupMigration();
+  if (!isVercel) {
+    await runStartupMigration();
+  }
 
   const PORT = 3000;
 
@@ -3729,23 +3734,24 @@ export async function startServer(isVercel = false) {
     res.status(err.status || 500).json({ success: false, error: err.message || "Internal Server Error" });
   });
 
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
-    const { createServer: createViteServer } = await import("vite");
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.all('*', (req, res) => {
-       if (req.path.startsWith('/api')) {
-         return res.status(404).json({ success: false, error: "Endpoint da API não encontrado." });
-       }
-       res.sendFile(path.join(distPath, 'index.html'));
-    });
+  if (!isVercel) {
+    if (process.env.NODE_ENV !== "production") {
+      const { createServer: createViteServer } = await import("vite");
+      const vite = await createViteServer({
+        server: { middlewareMode: true },
+        appType: "spa",
+      });
+      app.use(vite.middlewares);
+    } else {
+      const distPath = path.join(process.cwd(), 'dist');
+      app.use(express.static(distPath));
+      app.all('*', (req, res) => {
+         if (req.path.startsWith('/api')) {
+           return res.status(404).json({ success: false, error: "Endpoint da API não encontrado." });
+         }
+         res.sendFile(path.join(distPath, 'index.html'));
+      });
+    }
   }
 
   if (!isVercel) {
