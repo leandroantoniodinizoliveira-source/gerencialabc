@@ -1,4 +1,4 @@
-import { app, startServer } from "../server";
+import { app, startServer } from "../server.js";
 
 let isReady = false;
 let initPromise: Promise<void> | null = null;
