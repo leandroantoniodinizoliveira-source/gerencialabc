@@ -612,11 +612,12 @@ async function runStartupMigration() {
         CREATE TABLE IF NOT EXISTS re_agendas (
           id SERIAL PRIMARY KEY,
           nome TEXT NOT NULL,
-          tema VARCHAR(255) NOT NULL,
-          status VARCHAR(100) NOT NULL,
-          entrega TEXT
+          tema VARCHAR(255) NOT NULL
         );
       `);
+
+      await client.query(`ALTER TABLE re_agendas DROP COLUMN IF EXISTS status CASCADE;`);
+      await client.query(`ALTER TABLE re_agendas DROP COLUMN IF EXISTS entrega CASCADE;`);
 
       await client.query(`
         CREATE TABLE IF NOT EXISTS re_agenda_tasks (
@@ -2422,7 +2423,7 @@ async function startServer() {
     try {
       const pool = getDbPool();
       const result = await pool.query(`
-        SELECT a.id, a.nome, a.tema, a.status, a.entrega,
+        SELECT a.id, a.nome, a.tema,
                COALESCE(
                  (SELECT json_agg(json_build_object(
                     'task_id', at.task_id,
@@ -2460,11 +2461,11 @@ async function startServer() {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      const { nome, tema, status, entrega, task_ids, agenda_tasks } = req.body;
+      const { nome, tema, task_ids, agenda_tasks } = req.body;
       
       const insertAgendaResult = await client.query(
-        "INSERT INTO re_agendas (nome, tema, status, entrega) VALUES ($1, $2, $3, $4) RETURNING *",
-        [nome || "", tema || "", status || "Não Concluída", entrega || ""]
+        "INSERT INTO re_agendas (nome, tema) VALUES ($1, $2) RETURNING *",
+        [nome || "", tema || ""]
       );
       const newAgenda = insertAgendaResult.rows[0];
       
@@ -2517,11 +2518,11 @@ async function startServer() {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
-      const { nome, tema, status, entrega, task_ids, agenda_tasks } = req.body;
+      const { nome, tema, task_ids, agenda_tasks } = req.body;
       
       const updateAgendaResult = await client.query(
-        "UPDATE re_agendas SET nome = $1, tema = $2, status = $3, entrega = $4 WHERE id = $5 RETURNING *",
-        [nome || "", tema || "", status || "Não Concluída", entrega || "", id]
+        "UPDATE re_agendas SET nome = $1, tema = $2 WHERE id = $3 RETURNING *",
+        [nome || "", tema || "", id]
       );
       
       if (updateAgendaResult.rows.length === 0) {

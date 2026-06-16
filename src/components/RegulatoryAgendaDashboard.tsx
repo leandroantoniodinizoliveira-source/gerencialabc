@@ -39,8 +39,6 @@ interface RegulatoryAgenda {
   id: number;
   nome: string;
   tema: string;
-  status: string;
-  entrega: string;
   task_ids: number[];
   agenda_tasks?: {
     task_id: number;

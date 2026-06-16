@@ -13,8 +13,6 @@ interface RegulatoryAgenda {
   id: number;
   nome: string;
   tema: string;
-  status: string;
-  entrega: string;
   task_ids: number[];
   agenda_tasks?: {
     task_id: number;
@@ -37,10 +35,9 @@ export function RegulatoryAgendaTab({ showToast, currentUser }: RegulatoryAgenda
   // Search & Filter state
   const [searchQuery, setSearchQuery] = useState("");
   const [filterTema, setFilterTema] = useState("TODOS");
-  const [filterStatus, setFilterStatus] = useState("TODOS");
 
-  // Expanded agenda list IDs (for showing descriptions / tasks)
-  const [expandedAgendas, setExpandedAgendas] = useState<number[]>([]);
+  // Collapsed agenda list IDs (for hiding descriptions / tasks)
+  const [collapsedAgendas, setCollapsedAgendas] = useState<number[]>([]);
 
   // Modal form states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -48,8 +45,6 @@ export function RegulatoryAgendaTab({ showToast, currentUser }: RegulatoryAgenda
 
   const [formNome, setFormNome] = useState("");
   const [formTema, setFormTema] = useState("QUALIDADE DA PRESTAÇÃO DOS SERVIÇOS");
-  const [formStatus, setFormStatus] = useState("Não Concluída");
-  const [formEntrega, setFormEntrega] = useState("");
   const [selectedTaskIds, setSelectedTaskIds] = useState<number[]>([]);
   const [formAgendaTasks, setFormAgendaTasks] = useState<{ task_id: number; status: string; entrega: string; entrega_link: string }[]>([]);
   const [taskSearchQuery, setTaskSearchQuery] = useState("");
@@ -96,10 +91,10 @@ export function RegulatoryAgendaTab({ showToast, currentUser }: RegulatoryAgenda
   const statuses = ["TODOS", "Concluída", "Não Concluída"];
 
   const toggleAgendaExpand = (id: number) => {
-    if (expandedAgendas.includes(id)) {
-      setExpandedAgendas(expandedAgendas.filter(x => x !== id));
+    if (collapsedAgendas.includes(id)) {
+      setCollapsedAgendas(collapsedAgendas.filter(x => x !== id));
     } else {
-      setExpandedAgendas([...expandedAgendas, id]);
+      setCollapsedAgendas([...collapsedAgendas, id]);
     }
   };
 
@@ -107,8 +102,6 @@ export function RegulatoryAgendaTab({ showToast, currentUser }: RegulatoryAgenda
     setEditingId(null);
     setFormNome("");
     setFormTema("QUALIDADE DA PRESTAÇÃO DOS SERVIÇOS");
-    setFormStatus("Não Concluída");
-    setFormEntrega("");
     setSelectedTaskIds([]);
     setFormAgendaTasks([]);
     setTaskSearchQuery("");
@@ -119,8 +112,6 @@ export function RegulatoryAgendaTab({ showToast, currentUser }: RegulatoryAgenda
     setEditingId(agenda.id);
     setFormNome(agenda.nome);
     setFormTema(agenda.tema);
-    setFormStatus(agenda.status);
-    setFormEntrega(agenda.entrega);
     setSelectedTaskIds(agenda.task_ids || []);
     
     // Set customized task entries
@@ -188,8 +179,6 @@ export function RegulatoryAgendaTab({ showToast, currentUser }: RegulatoryAgenda
     const payload = {
       nome: formNome,
       tema: formTema,
-      status: formStatus,
-      entrega: formEntrega,
       task_ids: selectedTaskIds,
       agenda_tasks: formAgendaTasks
     };
@@ -223,12 +212,10 @@ export function RegulatoryAgendaTab({ showToast, currentUser }: RegulatoryAgenda
   // Filter agendas
   const filteredAgendas = agendas.filter(agenda => {
     const matchesSearch =
-      agenda.nome.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      agenda.entrega.toLowerCase().includes(searchQuery.toLowerCase());
+      agenda.nome.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesTema = filterTema === "TODOS" || agenda.tema === filterTema;
-    const matchesStatus = filterStatus === "TODOS" || agenda.status === filterStatus;
 
-    return matchesSearch && matchesTema && matchesStatus;
+    return matchesSearch && matchesTema;
   });
 
   // Filter tasks shown as options in multi-select form
@@ -260,7 +247,7 @@ export function RegulatoryAgendaTab({ showToast, currentUser }: RegulatoryAgenda
       </div>
 
       {/* Filters bar copying exactly the styling of ResolutionsTab */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6 bg-slate-50 border border-slate-200/80 rounded-2xl p-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 bg-slate-50 border border-slate-200/80 rounded-2xl p-4">
         {/* Search */}
         <div className="relative">
           <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Pesquisar</label>
@@ -269,7 +256,7 @@ export function RegulatoryAgendaTab({ showToast, currentUser }: RegulatoryAgenda
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Pesquisar por nome ou entrega..."
+              placeholder="Pesquisar por nome..."
               className="w-full bg-white border border-slate-200 text-slate-700 placeholder:text-slate-400 text-xs font-semibold rounded-xl pl-9 pr-4 py-2.5 outline-none focus:border-indigo-500 transition-all"
             />
             <Search className="absolute left-3 top-3 text-slate-400" size={16} />
@@ -286,20 +273,6 @@ export function RegulatoryAgendaTab({ showToast, currentUser }: RegulatoryAgenda
           >
             {temas.map(t => (
               <option key={t} value={t}>{t === "TODOS" ? "Tudo (Temas)" : t}</option>
-            ))}
-          </select>
-        </div>
-
-        {/* Status */}
-        <div>
-          <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Status</label>
-          <select
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="w-full bg-white border border-slate-200 text-slate-700 text-xs font-semibold rounded-xl px-3 py-2.5 outline-none focus:border-indigo-500 transition-all cursor-pointer"
-          >
-            {statuses.map(st => (
-              <option key={st} value={st}>{st === "TODOS" ? "Tudo (Status)" : st}</option>
             ))}
           </select>
         </div>
@@ -332,7 +305,7 @@ export function RegulatoryAgendaTab({ showToast, currentUser }: RegulatoryAgenda
                   </tr>
                 ) : (
                   filteredAgendas.map(agenda => {
-                    const isExpanded = expandedAgendas.includes(agenda.id);
+                    const isExpanded = !collapsedAgendas.includes(agenda.id);
                     // Match tasks corresponding to associated task_ids
                     const associatedTasks = tasks.filter(t => (agenda.task_ids || []).includes(t.id));
 
