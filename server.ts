@@ -757,8 +757,10 @@ async function runStartupMigration() {
 }
 
 export async function startServer(isVercel = false) {
-  if (!isVercel) {
+  try {
     await runStartupMigration();
+  } catch (err) {
+    console.error("Erro na migração no Vercel:", err);
   }
 
   const PORT = 3000;
@@ -1128,7 +1130,7 @@ export async function startServer(isVercel = false) {
         client.release();
       }
     } catch (error: any) {
-      if (error && error.message === "A variável DATABASE_URL (Neon PostgreSQL) está ausente no ambiente.") {
+      if (error && error.message && error.message.includes("estão ausentes no ambiente")) {
         return res.status(200).json({ success: false, error: "DATABASE_URL_MISSING", data: null });
       }
       console.error("Erro ao carregar dados:", error);
