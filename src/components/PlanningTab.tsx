@@ -715,7 +715,7 @@ export function PlanningTab({
 
   // Modal/Form State for adding/editing tasks
   const [timelineTaskId, setTimelineTaskId] = useState<number | null>(null);
-  const [viewMode, setViewMode] = useState<"tree" | "table" | "status" | "category" | "area" | "responsible" | "board" | "gantt">("category");
+  const [viewMode, setViewMode] = useState<"tree" | "table" | "status" | "category" | "area" | "responsible" | "board" | "gantt">("board");
   const [ganttScale, setGanttScale] = useState<"mes" | "trimestre" | "semestre">("mes");
   const [timelineModalTab, setTimelineModalTab] = useState<"timeline" | "gantt" | "calc">("timeline");
   const [tableSort, setTableSort] = useState<{ field: string, dir: "asc" | "desc" } | null>({ field: "end", dir: "asc" });
@@ -6561,16 +6561,16 @@ export function PlanningTab({
             <div className="bg-slate-50 border border-slate-200 rounded-2xl p-3 w-full flex items-center justify-center">
               <div className="flex flex-wrap items-center justify-center gap-2 overflow-x-auto pb-1 xl:pb-0 w-full">
                 <button
-                  onClick={() => { setViewMode("category"); setTimelineTaskId(null); }}
-                  className={`flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl transition-all whitespace-nowrap shadow-sm ${viewMode === "category" && timelineTaskId === null ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"}`}
-                >
-                  <Tag size={16} /> Categorias
-                </button>
-                <button
                   onClick={() => { setViewMode("board"); setTimelineTaskId(null); }}
                   className={`flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl transition-all whitespace-nowrap shadow-sm ${viewMode === "board" && timelineTaskId === null ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"}`}
                 >
                   <LayoutGrid size={16} /> Quadro
+                </button>
+                <button
+                  onClick={() => { setViewMode("category"); setTimelineTaskId(null); }}
+                  className={`flex items-center gap-2 px-5 py-2.5 text-xs sm:text-sm font-bold uppercase tracking-wider rounded-xl transition-all whitespace-nowrap shadow-sm ${viewMode === "category" && timelineTaskId === null ? "bg-slate-800 text-white" : "bg-white text-slate-600 hover:bg-slate-100 border border-slate-200"}`}
+                >
+                  <Tag size={16} /> Categorias
                 </button>
                 <button
                   onClick={() => { setViewMode("status"); setTimelineTaskId(null); }}
