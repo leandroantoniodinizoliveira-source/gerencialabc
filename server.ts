@@ -652,6 +652,25 @@ async function runStartupMigration() {
         ALTER TABLE pu_publications ADD COLUMN IF NOT EXISTS imagem_capa TEXT;
       `);
 
+      // Performance Indexes (Task & Water Balance Modules)
+      await client.query("CREATE INDEX IF NOT EXISTS idx_tasks_plan_id ON pl_tasks(plan_id);");
+      await client.query("CREATE INDEX IF NOT EXISTS idx_tasks_depends_on ON pl_tasks(depends_on_task_id);");
+      await client.query("CREATE INDEX IF NOT EXISTS idx_task_areas_area_id ON pl_task_areas(area_id);");
+      await client.query("CREATE INDEX IF NOT EXISTS idx_task_categories_category_id ON pl_task_categories(category_id);");
+      await client.query("CREATE INDEX IF NOT EXISTS idx_task_responsibles_responsible_id ON pl_task_responsibles(responsible_id);");
+      await client.query("CREATE INDEX IF NOT EXISTS idx_model_tasks_model_id ON pl_model_tasks(model_id);");
+      
+      await client.query("CREATE INDEX IF NOT EXISTS idx_wb_systems_wb_id ON wb_systems(water_balance_id);");
+      await client.query("CREATE INDEX IF NOT EXISTS idx_wb_regions_system_id ON wb_regions(system_id);");
+      await client.query("CREATE INDEX IF NOT EXISTS idx_wb_regions_wb_id ON wb_regions(water_balance_id);");
+      await client.query("CREATE INDEX IF NOT EXISTS idx_wb_demands_wb_id ON wb_demands(water_balance_id);");
+      await client.query("CREATE INDEX IF NOT EXISTS idx_wb_demand_entries_demand_id ON wb_demand_entries(demand_id);");
+      await client.query("CREATE INDEX IF NOT EXISTS idx_wb_demand_entries_region_id ON wb_demand_entries(region_id);");
+      await client.query("CREATE INDEX IF NOT EXISTS idx_wb_supply_sources_system_id ON wb_supply_sources(system_id);");
+      await client.query("CREATE INDEX IF NOT EXISTS idx_wb_supply_sources_wb_id ON wb_supply_sources(water_balance_id);");
+      await client.query("CREATE INDEX IF NOT EXISTS idx_wb_op_adjustments_system_id ON wb_operational_adjustments(system_id);");
+      await client.query("CREATE INDEX IF NOT EXISTS idx_wb_op_adjustments_wb_id ON wb_operational_adjustments(water_balance_id);");
+
       const pubCheck = await client.query("SELECT COUNT(*) FROM pu_publications");
       if (parseInt(pubCheck.rows[0].count) === 0) {
         console.log("Seeding pu_publications table with parsed historical rows...");
@@ -896,25 +915,47 @@ async function startServer() {
       const pool = getDbPool();
       const client = await pool.connect();
       try {
-        const dbWaterBalances = await client.query("SELECT * FROM wb_water_balances");
-        const dbSystems = await client.query("SELECT * FROM wb_systems");
-        const dbRegions = await client.query("SELECT * FROM wb_regions");
-        const dbDemands = await client.query("SELECT * FROM wb_demands");
-        const dbDemandEntries = await client.query("SELECT * FROM wb_demand_entries");
-        const dbSupplySources = await client.query("SELECT * FROM wb_supply_sources");
-        const dbOperationalAdjustments = await client.query("SELECT * FROM wb_operational_adjustments");
-        const dbTemplateFiles = await client.query("SELECT * FROM wb_template_files");
-        const dbRiskReferences = await client.query("SELECT * FROM wb_risk_references ORDER BY id ASC");
-        const dbTasks = await client.query("SELECT * FROM pl_tasks ORDER BY id ASC");
-        const dbPlans = await client.query("SELECT * FROM pl_plans ORDER BY id ASC");
-        const dbAreas = await client.query("SELECT * FROM pl_areas ORDER BY id ASC");
-        const dbResponsibles = await client.query("SELECT * FROM pl_responsibles ORDER BY id ASC");
-        const dbResponsibleAreas = await client.query("SELECT * FROM pl_responsible_areas");
-        const dbTaskAreas = await client.query("SELECT * FROM pl_task_areas");
-        const dbTaskResponsibles = await client.query("SELECT * FROM pl_task_responsibles");
-        const dbTaskCategories = await client.query("SELECT * FROM pl_task_categories");
-        const dbCategories = await client.query("SELECT * FROM pl_categories ORDER BY id ASC");
-        const dbCategoryAreas = await client.query("SELECT * FROM pl_category_areas");
+        const [
+          dbWaterBalances,
+          dbSystems,
+          dbRegions,
+          dbDemands,
+          dbDemandEntries,
+          dbSupplySources,
+          dbOperationalAdjustments,
+          dbTemplateFiles,
+          dbRiskReferences,
+          dbTasks,
+          dbPlans,
+          dbAreas,
+          dbResponsibles,
+          dbResponsibleAreas,
+          dbTaskAreas,
+          dbTaskResponsibles,
+          dbTaskCategories,
+          dbCategories,
+          dbCategoryAreas
+        ] = await Promise.all([
+          client.query("SELECT * FROM wb_water_balances"),
+          client.query("SELECT * FROM wb_systems"),
+          client.query("SELECT * FROM wb_regions"),
+          client.query("SELECT * FROM wb_demands"),
+          client.query("SELECT * FROM wb_demand_entries"),
+          client.query("SELECT * FROM wb_supply_sources"),
+          client.query("SELECT * FROM wb_operational_adjustments"),
+          client.query("SELECT * FROM wb_template_files"),
+          client.query("SELECT * FROM wb_risk_references ORDER BY id ASC"),
+          client.query("SELECT * FROM pl_tasks ORDER BY id ASC"),
+          client.query("SELECT * FROM pl_plans ORDER BY id ASC"),
+          client.query("SELECT * FROM pl_areas ORDER BY id ASC"),
+          client.query("SELECT * FROM pl_responsibles ORDER BY id ASC"),
+          client.query("SELECT * FROM pl_responsible_areas"),
+          client.query("SELECT * FROM pl_task_areas"),
+          client.query("SELECT * FROM pl_task_responsibles"),
+          client.query("SELECT * FROM pl_task_categories"),
+          client.query("SELECT * FROM pl_categories ORDER BY id ASC"),
+          client.query("SELECT * FROM pl_category_areas")
+        ]);
 
         const categoryAreasMap: Record<number, number[]> = {};
         dbCategoryAreas.rows.forEach(r => {

@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useMemo, useRef, useEffect } from "react";
+import { useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from "motion/react";
 import {
   FolderKanban,
@@ -58,6 +59,7 @@ import { Task, Plan, Area, Category, Responsible } from "../types";
 import { cn } from "../lib/utils";
 import { useAuth } from "../lib/auth";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, PieChart, Pie, Cell, CartesianGrid, LabelList } from "recharts";
+import { PlanningSkeleton } from "../modules/planning/PlanningSkeleton";
 import { TaskModelManager } from "./TaskModelManager";
  
 interface PlanningTabProps {
@@ -758,6 +760,7 @@ export function PlanningTab({
     return !(hasPlans && hasResponsibles);
   });
   
+  const [isApplyingFilters, setIsApplyingFilters] = useState(false);
   // Quick status sync loader
   const [isSyncing, setIsSyncing] = useState(false);
 
@@ -921,22 +924,6 @@ export function PlanningTab({
       if (Math.abs(topScrollTableRef.current.scrollLeft - contentScrollTableRef.current.scrollLeft) > 1) {
         topScrollTableRef.current.scrollLeft = contentScrollTableRef.current.scrollLeft;
       }
-    }
-  };
-
-  // Reload registries independently of tasks
-  const loadRegistriesOnly = async () => {
-    try {
-      const res = await fetch("/api/tasks");
-      const data = await res.json();
-      if (data.success) {
-        if (data.plans) setPlans(data.plans);
-        if (data.areas) setAreas(data.areas);
-        if (data.categories) setCategories(data.categories);
-        if (data.responsibles) setResponsibles(data.responsibles);
-      }
-    } catch (e) {
-      console.error(e);
     }
   };
 
@@ -1257,34 +1244,13 @@ export function PlanningTab({
     });
   };
 
+  const queryClient = useQueryClient();
+
   // Sync / reload tasks from server
   const reloadTasks = async () => {
     setIsSyncing(true);
     try {
-      const res = await fetch("/api/tasks");
-      const data = await res.json();
-      if (!res.ok || (data.success === false)) {
-         throw new Error(data.error || "Unknown server error");
-      }
-      if (data.success && data.data) {
-        setTasks(data.data);
-        if (data.plans) {
-          setPlans(data.plans);
-          if (setPlansProp) setPlansProp(data.plans);
-        }
-        if (data.areas) {
-          setAreas(data.areas);
-          if (setAreasProp) setAreasProp(data.areas);
-        }
-        if (data.categories) {
-          setCategories(data.categories);
-          if (setCategoriesProp) setCategoriesProp(data.categories);
-        }
-        if (data.responsibles) {
-          setResponsibles(data.responsibles);
-          if (setResponsiblesProp) setResponsiblesProp(data.responsibles);
-        }
-      }
+      await queryClient.refetchQueries({ queryKey: ['cloudData'] });
     } catch (e: any) {
       console.error("Task load error:", e);
       showToast("Erro", `Falha ao recarregar: ${e.message}`, "error");
@@ -1293,18 +1259,14 @@ export function PlanningTab({
     }
   };
 
-  // Mount effect to fetch starting elements
-  React.useEffect(() => {
-    const fetchInit = async () => {
-      const hasPreloadedPlans = !!(plansProp && plansProp.length > 0);
-      const hasPreloadedResponsibles = !!(responsiblesProp && responsiblesProp.length > 0);
-      // Skip fetching over the network if we ALREADY have data from the parent App level props
-      if (!hasPreloadedPlans || !hasPreloadedResponsibles) {
-        await reloadTasks();
-      }
-    };
-    fetchInit();
-  }, []);
+  // Reload registries independently of tasks
+  const loadRegistriesOnly = async () => {
+    try {
+      await queryClient.refetchQueries({ queryKey: ['cloudData'] });
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   // Resolve initial loading state
   React.useEffect(() => {
@@ -1320,45 +1282,61 @@ export function PlanningTab({
   // Apply default filters when user navigates specifically from sideways "Minhas Tarefas" or "Cadastrar Atividades"
   React.useEffect(() => {
     if (myTasksFilterTrigger && myTasksFilterTrigger > 0) {
-      // 1. Set active plan explicitly
-      if (plans && plans.length > 0) {
-        const activeProj = plans.find(p => p.isActive);
-        if (activeProj) {
-          setPlanFilter(activeProj.id.toString());
-        } else {
-          const sortedPlans = [...plans].sort(sortByCreatedAt);
-          if (sortedPlans.length > 0) {
-            setPlanFilter(sortedPlans[0].id.toString());
-          }
-        }
-      }
+      setIsApplyingFilters(true);
+      
+      // Delay applying filters so the browser has time to paint the loading skeleton
+      requestAnimationFrame(() => {
+        setTimeout(() => {
+          React.startTransition(() => {
+            // 1. Set active plan explicitly
+            if (plans && plans.length > 0) {
+              const activeProj = plans.find(p => p.isActive);
+              if (activeProj) {
+                setPlanFilter(activeProj.id.toString());
+              } else {
+                const sortedPlans = [...plans].sort(sortByCreatedAt);
+                if (sortedPlans.length > 0) {
+                  setPlanFilter(sortedPlans[0].id.toString());
+                }
+              }
+            }
 
-      // 2. Set responsible filter based on 'isMyTasksSelected'
-      if (isMyTasksSelected && currentUser && responsibles && responsibles.length > 0) {
-        const userResp = responsibles.find(r => 
-          (r.userId && Number(r.userId) === Number(currentUser.id)) ||
-          (r.email && currentUser.email && r.email.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) ||
-          (r.name && currentUser.name && r.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim())
-        );
-        if (userResp) {
-          setSelectedResponsibleIds([userResp.id]);
-        } else {
-          showToast("Aviso", "Seu usuário não está vinculado a nenhum responsável técnico cadastrado.", "warning");
-          setSelectedResponsibleIds([]);
-        }
-      } else {
-         setSelectedResponsibleIds([]); // Clear if just "Cadastrar Atividades"
-      }
+            // 2. Set responsible filter based on 'isMyTasksSelected'
+            if (isMyTasksSelected && currentUser && responsibles && responsibles.length > 0) {
+              const userResp = responsibles.find(r => 
+                (r.userId && Number(r.userId) === Number(currentUser.id)) ||
+                (r.email && currentUser.email && r.email.toLowerCase().trim() === currentUser.email.toLowerCase().trim()) ||
+                (r.name && currentUser.name && r.name.toLowerCase().trim() === currentUser.name.toLowerCase().trim())
+              );
+              if (userResp) {
+                setSelectedResponsibleIds([userResp.id]);
+              } else {
+                showToast("Aviso", "Seu usuário não está vinculado a nenhum responsável técnico cadastrado.", "warning");
+                setSelectedResponsibleIds([]);
+              }
+            } else {
+              setSelectedResponsibleIds([]); // Clear if just "Cadastrar Atividades"
+            }
 
-      // 3. Reset all other filters so user starts fresh
-      setStatusFilter("all");
-      setSituationFilter("all");
-      setPriorityFilter("all");
-      setCategoryFilter("all");
-      setIsProgrammedFilter("all");
-      setSearchTerm("");
-      setSelectedAreaIds([]);
-      setIsTasksFiltersExpanded(true); 
+            // 3. Reset all other filters so user starts fresh
+            setStatusFilter("all");
+            setSituationFilter("all");
+            setPriorityFilter("all");
+            setCategoryFilter("all");
+            setIsProgrammedFilter("all");
+            setSearchTerm("");
+            setSelectedAreaIds([]);
+            setIsTasksFiltersExpanded(true); 
+          });
+
+          // Wait another frame to hide the filters loader
+          requestAnimationFrame(() => {
+             requestAnimationFrame(() => {
+               setIsApplyingFilters(false);
+             });
+          });
+        }, 80);
+      });
     }
   }, [myTasksFilterTrigger]);
 
@@ -3144,15 +3122,8 @@ export function PlanningTab({
     return `${prefix}${t.title.replace(/^\[.*?\]\s*/, '')}`;
   };
 
-  if (isInitializing) {
-    return (
-      <div className="flex flex-col items-center justify-center py-20 bg-white border border-slate-200/80 rounded-[2rem] shadow-sm mt-8 max-w-7xl mx-auto min-h-[400px]">
-        <RefreshCw size={40} className="text-adasa-mid animate-spin mb-6" />
-        <h3 className="text-xl font-black text-slate-800 uppercase tracking-tight mb-2">Carregando Dados...</h3>
-        <p className="text-sm font-semibold text-slate-500">Filtrando e estruturando informações pelo plano mais recente.</p>
-        <p className="text-xs text-slate-400 mt-2">Por favor, aguarde um instante.</p>
-      </div>
-    );
+  if (isInitializing || isApplyingFilters) {
+    return <PlanningSkeleton />;
   }
 
   if (activeSubTab === "import") {

@@ -128,6 +128,25 @@ CREATE TABLE IF NOT EXISTS pl_tasks (
 );
 
 CREATE INDEX IF NOT EXISTS idx_tasks_parent_id ON pl_tasks(parent_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_plan_id ON pl_tasks(plan_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_depends_on ON pl_tasks(depends_on_task_id);
+
+CREATE INDEX IF NOT EXISTS idx_task_areas_area_id ON pl_task_areas(area_id);
+CREATE INDEX IF NOT EXISTS idx_task_categories_category_id ON pl_task_categories(category_id);
+CREATE INDEX IF NOT EXISTS idx_task_responsibles_responsible_id ON pl_task_responsibles(responsible_id);
+
+CREATE INDEX IF NOT EXISTS idx_model_tasks_model_id ON pl_model_tasks(model_id);
+
+CREATE INDEX IF NOT EXISTS idx_wb_systems_wb_id ON wb_systems(water_balance_id);
+CREATE INDEX IF NOT EXISTS idx_wb_regions_system_id ON wb_regions(system_id);
+CREATE INDEX IF NOT EXISTS idx_wb_regions_wb_id ON wb_regions(water_balance_id);
+CREATE INDEX IF NOT EXISTS idx_wb_demands_wb_id ON wb_demands(water_balance_id);
+CREATE INDEX IF NOT EXISTS idx_wb_demand_entries_demand_id ON wb_demand_entries(demand_id);
+CREATE INDEX IF NOT EXISTS idx_wb_demand_entries_region_id ON wb_demand_entries(region_id);
+CREATE INDEX IF NOT EXISTS idx_wb_supply_sources_system_id ON wb_supply_sources(system_id);
+CREATE INDEX IF NOT EXISTS idx_wb_supply_sources_wb_id ON wb_supply_sources(water_balance_id);
+CREATE INDEX IF NOT EXISTS idx_wb_op_adjustments_system_id ON wb_operational_adjustments(system_id);
+CREATE INDEX IF NOT EXISTS idx_wb_op_adjustments_wb_id ON wb_operational_adjustments(water_balance_id);
 
 CREATE TABLE IF NOT EXISTS pl_areas (
   id SERIAL PRIMARY KEY,

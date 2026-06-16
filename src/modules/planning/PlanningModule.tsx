@@ -1,7 +1,9 @@
-import React from "react";
+import React, { Suspense, lazy } from "react";
 import { PlanningProvider } from "./PlanningContext";
-import { PlanningTab } from "../../components/PlanningTab";
 import { Task } from "../../types";
+import { PlanningSkeleton } from "./PlanningSkeleton";
+
+const PlanningTab = lazy(() => import("../../components/PlanningTab").then(module => ({ default: module.PlanningTab })));
 
 interface PlanningModuleProps {
   tasks: Task[];
@@ -25,7 +27,9 @@ export const PlanningModule: React.FC<PlanningModuleProps> = (props) => {
   return (
     <PlanningProvider>
       <div className="planning-module-root w-full h-full">
-        <PlanningTab {...props} />
+        <Suspense fallback={<PlanningSkeleton />}>
+          <PlanningTab {...props} />
+        </Suspense>
       </div>
     </PlanningProvider>
   );

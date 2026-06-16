@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion, AnimatePresence } from "motion/react";
 import {
   Plus,
@@ -626,57 +627,75 @@ export default function App() {
   const [savedBalanceIds, setSavedBalanceIds] = useState<string[]>([]);
   const [riskReferences, setRiskReferences] = useState<any[]>([]);
 
-  const fetchCloudData = async (isManualSync = false) => {
-    try {
+  const queryClient = useQueryClient();
+
+  const { data: cloudData, isLoading: isCloudDataLoading, isFetching: isCloudDataFetching } = useQuery({
+    queryKey: ['cloudData'],
+    queryFn: async () => {
       const res = await fetch("/api/load-data");
       const contentType = res.headers.get("content-type");
       if (contentType && contentType.includes("application/json")) {
         const data = await res.json();
         if (data.success && data.data) {
-          if (data.data.waterBalances) { setWaterBalances(data.data.waterBalances); setSavedBalanceIds(data.data.waterBalances.map((w: any) => w.id)); }
-          if (data.data.systems) setSystems(data.data.systems);
-          if (data.data.regions) setRegions(data.data.regions);
-          if (data.data.demands) setDemands(data.data.demands);
-          if (data.data.supplySources) setSupplySources(data.data.supplySources);
-          if (data.data.operationalAdjustments) setOperationalAdjustments(data.data.operationalAdjustments);
-          if (data.data.templateFiles) setTemplateFiles(data.data.templateFiles);
-          if (data.data.riskReferences) setRiskReferences(data.data.riskReferences);
-          if (data.data.tasks) setTasks(data.data.tasks);
-          if (data.data.plans) setPlans(data.data.plans);
-          if (data.data.areas) setAreas(data.data.areas);
-          if (data.data.categories) setCategories(data.data.categories);
-          if (data.data.responsibles) setResponsibles(data.data.responsibles);
-          
-          if (isManualSync) {
-            setHasPendingChanges(false);
-            const payload = { 
-              waterBalances: data.data.waterBalances || waterBalances, 
-              systems: data.data.systems || systems, 
-              regions: data.data.regions || regions, 
-              demands: data.data.demands || demands, 
-              supplySources: data.data.supplySources || supplySources, 
-              operationalAdjustments: data.data.operationalAdjustments || operationalAdjustments
-            };
-            setLastSavedStateStr(JSON.stringify(payload));
-          }
+          return data.data;
         }
-      } else {
-        console.error("Recebido formato não-JSON em /api/load-data. A sessão pode ter expirado ou o Vite interceptou. Tente recarregar a página.");
+      }
+      throw new Error("Failed to load data");
+    },
+    enabled: !!currentUser,
+    staleTime: 5 * 60 * 1000, 
+  });
+
+  useEffect(() => {
+    if (cloudData) {
+      if (cloudData.waterBalances) { setWaterBalances(cloudData.waterBalances); setSavedBalanceIds(cloudData.waterBalances.map((w: any) => w.id)); }
+      if (cloudData.systems) setSystems(cloudData.systems);
+      if (cloudData.regions) setRegions(cloudData.regions);
+      if (cloudData.demands) setDemands(cloudData.demands);
+      if (cloudData.supplySources) setSupplySources(cloudData.supplySources);
+      if (cloudData.operationalAdjustments) setOperationalAdjustments(cloudData.operationalAdjustments);
+      if (cloudData.templateFiles) setTemplateFiles(cloudData.templateFiles);
+      if (cloudData.riskReferences) setRiskReferences(cloudData.riskReferences);
+      if (cloudData.tasks) setTasks(cloudData.tasks);
+      if (cloudData.plans) setPlans(cloudData.plans);
+      if (cloudData.areas) setAreas(cloudData.areas);
+      if (cloudData.categories) setCategories(cloudData.categories);
+      if (cloudData.responsibles) setResponsibles(cloudData.responsibles);
+      
+      const payload = { 
+        waterBalances: cloudData.waterBalances || waterBalances, 
+        systems: cloudData.systems || systems, 
+        regions: cloudData.regions || regions, 
+        demands: cloudData.demands || demands, 
+        supplySources: cloudData.supplySources || supplySources, 
+        operationalAdjustments: cloudData.operationalAdjustments || operationalAdjustments
+      };
+      
+      if (!isDataLoaded) {
+          setIsDataLoaded(true);
+          setLastSavedStateStr(JSON.stringify(payload));
+      }
+    }
+  }, [cloudData]);
+
+  const fetchCloudData = async (isManualSync = false) => {
+    try {
+      if (isManualSync) {
+         await queryClient.refetchQueries({ queryKey: ['cloudData'] });
+         setHasPendingChanges(false);
+         const payload = { waterBalances, systems, regions, demands, supplySources, operationalAdjustments };
+         setLastSavedStateStr(JSON.stringify(payload));
       }
     } catch (e) {
-      console.error("Erro ao carregar dados inicias do banco", e);
-    } finally {
-      setIsDataLoaded(true);
+      console.error("Erro ao sincronizar manualmente do banco", e);
     }
   };
 
-
-
   useEffect(() => {
-    if (currentUser) {
-      fetchCloudData();
+    if (currentUser && !cloudData && !isCloudDataLoading && !isCloudDataFetching && !isDataLoaded) {
+      queryClient.refetchQueries({ queryKey: ['cloudData'] });
     }
-  }, [currentUser]);
+  }, [currentUser, cloudData, isCloudDataLoading, isCloudDataFetching, isDataLoaded]);
 
   useEffect(() => {
     if (isDataLoaded && lastSavedStateStr === null) {
