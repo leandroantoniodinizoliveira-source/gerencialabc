@@ -408,6 +408,7 @@ export function PlanningTab({
   const [isDashboardFiltersExpanded, setIsDashboardFiltersExpanded] = useState(true);
   const [isTasksFiltersExpanded, setIsTasksFiltersExpanded] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
+  const [hasSubtasksFilter, setHasSubtasksFilter] = useState(false);
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [situationFilter, setSituationFilter] = useState<string>("all");
   const [priorityFilter, setPriorityFilter] = useState<string>("all");
@@ -430,6 +431,7 @@ export function PlanningTab({
       priorityFilter !== "all" ||
       categoryFilter !== "all" ||
       isProgrammedFilter !== "all" ||
+      hasSubtasksFilter ||
       searchTerm.trim() !== "" ||
       (planFilter !== "all" && planFilter !== "") ||
       selectedAreaIds.length > 0 ||
@@ -442,6 +444,7 @@ export function PlanningTab({
     priorityFilter,
     categoryFilter,
     isProgrammedFilter,
+    hasSubtasksFilter,
     searchTerm,
     planFilter,
     selectedAreaIds,
@@ -760,7 +763,7 @@ export function PlanningTab({
     return !(hasPlans && hasResponsibles);
   });
   
-  const [isApplyingFilters, setIsApplyingFilters] = useState(false);
+  const [isApplyingFilters] = useState(false);
   // Quick status sync loader
   const [isSyncing, setIsSyncing] = useState(false);
   const [hasConsulted, setHasConsulted] = useState(false);
@@ -795,8 +798,16 @@ export function PlanningTab({
         valA = a.startDate || "9999-99-99";
         valB = b.startDate || "9999-99-99";
       } else if (areaTableSort.field === "end") {
-        valA = a.endDate || "9999-99-99";
-        valB = b.endDate || "9999-99-99";
+        const getEffectiveEnd = (tk: Task) => {
+           let sourceTask = tk;
+           if (tk.parentId) {
+               const parent = taskList.find(t => t.id === tk.parentId) || tasks.find(t => t.id === tk.parentId);
+               if (parent) sourceTask = parent;
+           }
+           return sourceTask.endDate || "9999-99-99";
+        };
+        valA = getEffectiveEnd(a);
+        valB = getEffectiveEnd(b);
       } else if (areaTableSort.field === "quarter") {
         const getQ = (tk: Task) => {
           if (!tk.endDate) return 5;
@@ -895,7 +906,7 @@ export function PlanningTab({
   const [tableScrollWidth, setTableScrollWidth] = useState(0);
 
   useEffect(() => {
-    if (viewMode === "table" && contentScrollTableRef.current) {
+    if ((viewMode === "table" || viewMode === "gantt") && contentScrollTableRef.current) {
       const el = contentScrollTableRef.current;
       const updateWidth = () => {
         setTableScrollWidth(el.scrollWidth);
@@ -910,7 +921,7 @@ export function PlanningTab({
         observer.disconnect();
       };
     }
-  }, [viewMode, tasks, categories]);
+  }, [viewMode, tasks, categories, ganttScale, expandedTasks]);
 
   const handleTopTableScroll = () => {
     if (topScrollTableRef.current && contentScrollTableRef.current) {
@@ -1339,6 +1350,12 @@ export function PlanningTab({
 
   // Match keyword in title or description or custom filters
   const matchesFilters = (t: Task): boolean => {
+    if (hasSubtasksFilter) {
+      const hasChildren = tasks.some(child => child.parentId === t.id);
+      const isSubtask = !!t.parentId;
+      if (!hasChildren && !isSubtask) return false;
+    }
+
     // Check keyword
     if (searchTerm.trim()) {
       const query = searchTerm.toLowerCase();
@@ -1465,7 +1482,11 @@ export function PlanningTab({
     
     // Sort children
     Object.keys(cMap).forEach(key => {
-      cMap[Number(key)].sort((a,b) => a.id - b.id);
+      cMap[Number(key)].sort((a,b) => {
+        const d1 = a.endDate ? new Date(a.endDate).getTime() : Infinity;
+        const d2 = b.endDate ? new Date(b.endDate).getTime() : Infinity;
+        return d1 - d2;
+      });
     });
 
     const computeNode = (nodeId: number) => {
@@ -1531,7 +1552,11 @@ export function PlanningTab({
 
   // Root level tasks
   const rootTasks = useMemo(() => {
-    return enhancedTasks.filter(t => !t.parentId).sort((a, b) => a.id - b.id);
+    return enhancedTasks.filter(t => !t.parentId).sort((a, b) => {
+      const d1 = a.endDate ? new Date(a.endDate).getTime() : Infinity;
+      const d2 = b.endDate ? new Date(b.endDate).getTime() : Infinity;
+      return d1 - d2;
+    });
   }, [enhancedTasks]);
 
   // Handle expand / collapse toggles
@@ -6464,21 +6489,32 @@ export function PlanningTab({
             {/* Row 3: Search layout */}
             <div className="flex flex-col gap-1.5">
               <span className="text-[11px] font-black text-slate-400 uppercase tracking-wider">🔍 Buscar por tarefa, descrição ou tags</span>
-              <div className="relative">
-                <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  placeholder="Digite o título, descrição, notas, tipo ou áreas de atuação para filtrar as atividades..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-11 pr-4 py-2.5 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-adasa-mid w-full bg-white text-slate-800 placeholder-slate-400/90 font-medium"
-                />
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <div className="relative flex-1">
+                  <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    type="text"
+                    placeholder="Digite o título, descrição, notas, tipo ou áreas de atuação para filtrar as atividades..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-11 pr-4 py-2.5 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-adasa-mid w-full bg-white text-slate-800 placeholder-slate-400/90 font-medium"
+                  />
+                </div>
+                <label className="flex items-center justify-center gap-2 cursor-pointer bg-slate-50 border border-slate-200 px-4 py-2.5 rounded-xl hover:bg-slate-100 transition-colors sm:w-auto h-full">
+                  <input
+                    type="checkbox"
+                    checked={hasSubtasksFilter}
+                    onChange={(e) => setHasSubtasksFilter(e.target.checked)}
+                    className="w-4 h-4 rounded border-slate-300 text-adasa-mid focus:ring-adasa-mid"
+                  />
+                  <span className="text-xs font-bold text-slate-700 select-none whitespace-nowrap">Tarefas com Subtarefas</span>
+                </label>
               </div>
             </div>
 
-             {/* Consultar / Limpar Buttons */}
+            {/* Consultar / Limpar Buttons */}
             <div className="flex justify-center items-center gap-4 pt-2">
-                {(planFilter !== "all" || selectedAreaIds.length > 0 || selectedResponsibleIds.length > 0 || statusFilter !== "all" || situationFilter !== "all" || priorityFilter !== "all" || categoryFilter !== "all" || isProgrammedFilter !== "all" || searchTerm !== "") && (
+                {(planFilter !== "all" || selectedAreaIds.length > 0 || selectedResponsibleIds.length > 0 || statusFilter !== "all" || situationFilter !== "all" || priorityFilter !== "all" || categoryFilter !== "all" || isProgrammedFilter !== "all" || hasSubtasksFilter || searchTerm !== "") && (
                   <button
                     onClick={() => {
                       setPlanFilter("all");
@@ -6490,6 +6526,7 @@ export function PlanningTab({
                       setCategoryFilter("all");
                       setSearchTerm("");
                       setIsProgrammedFilter("all");
+                      setHasSubtasksFilter(false);
                     }}
                     className="bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 flex items-center gap-2 font-black uppercase tracking-widest px-8 py-3 rounded-xl text-xs transition-all shadow-sm hover:-translate-y-0.5"
                     title="Limpar todos os filtros ativos"
@@ -6693,8 +6730,16 @@ export function PlanningTab({
                           valA = a.startDate || "9999-99-99";
                           valB = b.startDate || "9999-99-99";
                        } else if (tableSort.field === "end") {
-                          valA = a.endDate || "9999-99-99";
-                          valB = b.endDate || "9999-99-99";
+                          const getEffectiveEnd = (tk: Task) => {
+                             let sourceTask = tk;
+                             if (tk.parentId) {
+                                 const parent = flatTasks.find(t => t.id === tk.parentId) || tasks.find(t => t.id === tk.parentId);
+                                 if (parent) sourceTask = parent;
+                             }
+                             return sourceTask.endDate || "9999-99-99";
+                          };
+                          valA = getEffectiveEnd(a);
+                          valB = getEffectiveEnd(b);
                        }
                        
                        if (valA < valB) return tableSort.dir === "asc" ? -1 : 1;
@@ -6737,6 +6782,12 @@ export function PlanningTab({
                                 <div className="flex items-center gap-1.5">Tarefa <SortIcon field="title" /></div>
                               </th>
                               <th className="px-4 py-3 text-center w-24">Timeline</th>
+                              <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none text-center" onClick={() => handleSort("situation")}>
+                                <div className="flex items-center justify-center gap-1.5">Situação <SortIcon field="situation" /></div>
+                              </th>
+                              <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none min-w-[140px]" onClick={() => handleSort("progress")}>
+                                <div className="flex items-center gap-1.5">Progresso <SortIcon field="progress" /></div>
+                              </th>
                               <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none" onClick={() => handleSort("area")}>
                                 <div className="flex items-center gap-1.5">Área <SortIcon field="area" /></div>
                               </th>
@@ -6779,12 +6830,6 @@ export function PlanningTab({
                               <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none text-center" onClick={() => handleSort("updatedAt")}>
                                 <div className="flex items-center justify-center gap-1.5">Atualizado em <SortIcon field="updatedAt" /></div>
                               </th>
-                              <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none text-center" onClick={() => handleSort("situation")}>
-                                <div className="flex items-center justify-center gap-1.5">Situação <SortIcon field="situation" /></div>
-                              </th>
-                              <th className="px-4 py-3 cursor-pointer hover:bg-slate-100 transition-colors select-none min-w-[140px]" onClick={() => handleSort("progress")}>
-                                <div className="flex items-center gap-1.5">Progresso <SortIcon field="progress" /></div>
-                              </th>
                             </tr>
                           </thead>
                          <tbody className="divide-y divide-slate-100">
@@ -6817,6 +6862,33 @@ export function PlanningTab({
                                      >
                                        <Activity size={12} className="text-indigo-600" />
                                      </button>
+                                   </td>
+                                   <td className="px-4 py-3 border-r border-slate-50 text-center">
+                                     {normStatus === "Concluída" ? (
+                                       <div className="inline-flex items-center justify-center text-emerald-500" title="Situação: No Prazo (Concluída)">
+                                         <CheckCircle2 size={16} />
+                                       </div>
+                                     ) : dlStatus === "Atrasada" ? (
+                                       <div className="inline-flex items-center justify-center text-rose-500" title="Situação: Atrasada">
+                                         <AlertCircle size={16} />
+                                       </div>
+                                     ) : dlStatus === "Crítica" ? (
+                                       <div className="inline-flex items-center justify-center text-amber-500" title="Situação: Crítica">
+                                         <AlertTriangle size={16} />
+                                       </div>
+                                     ) : (
+                                       <div className="inline-flex items-center justify-center text-emerald-500" title="Situação: No Prazo">
+                                         <CheckCircle2 size={16} />
+                                       </div>
+                                     )}
+                                   </td>
+                                   <td className="px-4 py-3 border-r border-slate-50 w-[140px] max-w-[140px] min-w-[140px]">
+                                     <div className="space-y-1 w-full">
+                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block flex justify-between">Progresso <span className="text-adasa-mid">{task.progress || 0}%</span></span>
+                                        <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                                          <div className={`h-full ${normalizeStatus(task.status) === "Concluída" ? "bg-emerald-500" : "bg-adasa-mid"} transition-all duration-500`} style={{ width: `${task.progress || 0}%` }} />
+                                        </div>
+                                     </div>
                                    </td>
                                    <td className="px-4 py-3 border-r border-slate-50">
                                      <div className="flex flex-wrap gap-1">
@@ -6898,33 +6970,6 @@ export function PlanningTab({
                                     <td className="px-4 py-3 border-r border-slate-50 text-center text-[10px] text-slate-500 font-medium whitespace-nowrap">
                                       {task.updatedAt ? formatDateTime(task.updatedAt) : "-"}
                                     </td>
-                                    <td className="px-4 py-3 border-r border-slate-50 text-center">
-                                      {normStatus === "Concluída" ? (
-                                        <div className="inline-flex items-center justify-center text-emerald-500" title="Situação: No Prazo (Concluída)">
-                                          <CheckCircle2 size={16} />
-                                        </div>
-                                      ) : dlStatus === "Atrasada" ? (
-                                        <div className="inline-flex items-center justify-center text-rose-500" title="Situação: Atrasada">
-                                          <AlertCircle size={16} />
-                                        </div>
-                                      ) : dlStatus === "Crítica" ? (
-                                        <div className="inline-flex items-center justify-center text-amber-500" title="Situação: Crítica">
-                                          <AlertTriangle size={16} />
-                                        </div>
-                                      ) : (
-                                        <div className="inline-flex items-center justify-center text-emerald-500" title="Situação: No Prazo">
-                                          <CheckCircle2 size={16} />
-                                        </div>
-                                      )}
-                                    </td>
-                                   <td className="px-4 py-3">
-                                     <div className="space-y-1">
-                                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest block flex justify-between">Progresso <span className="text-adasa-mid">{task.progress || 0}%</span></span>
-                                        <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
-                                          <div className={`h-full ${normalizeStatus(task.status) === "Concluída" ? "bg-emerald-500" : "bg-adasa-mid"} transition-all duration-500`} style={{ width: `${task.progress || 0}%` }} />
-                                        </div>
-                                     </div>
-                                   </td>
                                  </tr>
                                );
                            })}
@@ -7073,9 +7118,17 @@ export function PlanningTab({
                       delete groups[key];
                     } else {
                       groups[key].sort((a, b) => {
-                        const dateA = a.endDate ? new Date(a.endDate).getTime() : Infinity;
-                        const dateB = b.endDate ? new Date(b.endDate).getTime() : Infinity;
-                        return dateA - dateB;
+                         const getEffectiveEnd = (tk: Task) => {
+                            let sourceTask = tk;
+                            if (tk.parentId) {
+                                const parent = visibleTasks.find(t => t.id === tk.parentId) || tasks.find(t => t.id === tk.parentId);
+                                if (parent) sourceTask = parent;
+                            }
+                            return sourceTask.endDate ? new Date(sourceTask.endDate).getTime() : Infinity;
+                         };
+                         const dateA = getEffectiveEnd(a);
+                         const dateB = getEffectiveEnd(b);
+                         return dateA - dateB;
                       });
                     }
                   });
@@ -7729,74 +7782,114 @@ export function PlanningTab({
                           Nenhuma atividade disponível para exibição cronológica.
                         </div>
                       ) : (
-                        <div className="border border-slate-200/80 rounded-2xl overflow-hidden flex flex-col bg-white">
-                          <div className="flex bg-slate-50 border-b border-slate-200 text-xs font-black uppercase text-slate-500 tracking-wider font-sans">
-                            <div className="w-1/3 min-w-[240px] px-4 py-3 bg-slate-100/30 border-r border-slate-200">
-                              Atividade / Cronograma
+                        <div className="flex flex-col">
+                          {tableScrollWidth > 0 && (
+                            <div 
+                              ref={topScrollTableRef}
+                              onScroll={handleTopTableScroll}
+                              className="hidden lg:block overflow-x-auto w-full scrollbar-thin bg-slate-50 border border-slate-200/60 p-1.5 rounded-xl mb-1"
+                            >
+                              <div style={{ width: `${tableScrollWidth}px` }} className="h-1 bg-transparent" />
                             </div>
-                            <div className="flex-1 relative flex">
-                              {gridColumns.map(gc => (
-                                <div 
-                                  key={gc.key}
-                                  style={{ width: `${gc.widthPercent}%` }}
-                                  className="px-2 py-3 border-r border-slate-200 last:border-r-0 text-center text-[10px] truncate"
-                                >
-                                  {gc.label}
+                          )}
+                          <div ref={contentScrollTableRef} onScroll={handleContentTableScroll} className="overflow-x-auto rounded-xl border border-slate-200 mt-0 bg-white shadow-sm scrollbar-thin scrollbar-thumb-slate-300">
+                            <div className="flex flex-col min-w-[1100px]">
+                              <div className="flex bg-slate-50 border-b border-slate-200 text-xs font-black uppercase text-slate-500 tracking-wider font-sans">
+                                <div className="w-[450px] min-w-[450px] shrink-0 px-4 py-3 bg-slate-100/30 border-r border-slate-200">
+                                  Atividade / Cronograma
                                 </div>
-                              ))}
-                            </div>
-                          </div>
-                          
-                          <div className="divide-y divide-slate-100 max-h-[500px] overflow-y-auto">
-                            {filteredTasks.map(t => {
-                              const hasDates = t.startDate && t.endDate;
-                              const dateStart = hasDates ? parseSafeDate(t.startDate) : null;
-                              const dateEnd = hasDates ? parseSafeDate(t.endDate) : null;
-                              const statusName = normalizeStatus(t.status);
+                                <div className="flex-1 relative flex min-w-[600px]">
+                                  {gridColumns.map(gc => (
+                                    <div 
+                                      key={gc.key}
+                                      style={{ width: `${gc.widthPercent}%` }}
+                                      className="px-2 py-3 border-r border-slate-200 last:border-r-0 text-center text-[10px] truncate"
+                                    >
+                                      {gc.label}
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
                               
-                              const statusColor = statusName === "Concluída" 
-                                ? "bg-emerald-500 hover:bg-emerald-600" 
-                                : statusName === "Em andamento" 
-                                ? "bg-blue-500 hover:bg-blue-600" 
-                                : "bg-slate-400 hover:bg-slate-500";
-                              
-                              let leftPct = 0;
-                              let widthPct = 0;
-                              
-                              if (dateStart && dateEnd && dateEnd >= dateStart) {
-                                const diffLeft = dateStart.getTime() - startDateLimit.getTime();
-                                leftPct = Math.max(0, Math.min(100, (diffLeft / (1000 * 60 * 60 * 24)) / totalDays * 100));
-                                
-                                const diffWidth = dateEnd.getTime() - dateStart.getTime();
-                                widthPct = Math.max(1, Math.min(100 - leftPct, (diffWidth / (1000 * 60 * 60 * 24)) / totalDays * 100));
-                              }
+                              <div className="divide-y divide-slate-100 max-h-[500px] overflow-y-auto">
+                            {(() => {
+                              const ganttList: { task: Task; depth: number }[] = [];
+                              const buildList = (nodes: Task[], depth: number) => {
+                                nodes.forEach(n => {
+                                  ganttList.push({ task: n, depth });
+                                  const isExpanded = isAnyFilterActive ? (expandedTasks[n.id] !== false) : !!expandedTasks[n.id];
+                                  if (isExpanded) {
+                                    const taskChildren = childrenMap[n.id] || [];
+                                    const visibleChildren = taskChildren.filter(c => childMatchesOrIsPath(c.id));
+                                    if (visibleChildren.length > 0) {
+                                      buildList(visibleChildren, depth + 1);
+                                    }
+                                  }
+                                });
+                              };
+                              const startingRoots = rootTasks.filter(r => childMatchesOrIsPath(r.id));
+                              buildList(startingRoots, 0);
 
-                              return (
-                                <div key={t.id} className="flex transition-colors hover:bg-slate-50/50 group items-stretch min-h-[52px]">
-                                  <div className="w-1/3 min-w-[240px] px-4 py-2 border-r border-slate-200 flex flex-col justify-center text-left bg-slate-50/10">
-                                    <div className="flex items-center gap-1.5 mb-0.5">
-                                      <span className={`w-2 h-2 rounded-full shrink-0 ${statusName === "Concluída" ? "bg-emerald-500" : statusName === "Em andamento" ? "bg-blue-500" : "bg-slate-400"}`} />
-                                      <span className="text-xs font-bold text-slate-850 line-clamp-1 cursor-pointer hover:text-indigo-600 transition-colors" onClick={() => handleEditTask(t)}>
-                                        {getTaskDisplayName(t)}
-                                      </span>
-                                    </div>
-                                    <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[9px] text-slate-400 font-bold uppercase tracking-wider">
-                                      {t.startDate ? <span>Início: {t.startDate.split("T")[0].split("-").reverse().join("/")}</span> : null}
-                                      {t.endDate ? <span>Término: {t.endDate.split("T")[0].split("-").reverse().join("/")}</span> : null}
-                                      {!hasDates && <span className="text-amber-500 font-bold normal-case">Período não definido</span>}
-                                    </div>
-                                  </div>
+                              return ganttList.map(({ task: t, depth }) => {
+                                const hasDates = t.startDate && t.endDate;
+                                const dateStart = hasDates ? parseSafeDate(t.startDate) : null;
+                                const dateEnd = hasDates ? parseSafeDate(t.endDate) : null;
+                                const statusName = normalizeStatus(t.status);
+                                
+                                const statusColor = statusName === "Concluída" 
+                                  ? "bg-emerald-500 hover:bg-emerald-600" 
+                                  : statusName === "Em andamento" 
+                                  ? "bg-blue-500 hover:bg-blue-600" 
+                                  : "bg-slate-400 hover:bg-slate-500";
+                                
+                                let leftPct = 0;
+                                let widthPct = 0;
+                                
+                                if (dateStart && dateEnd && dateEnd >= dateStart) {
+                                  const diffLeft = dateStart.getTime() - startDateLimit.getTime();
+                                  leftPct = Math.max(0, Math.min(100, (diffLeft / (1000 * 60 * 60 * 24)) / totalDays * 100));
                                   
-                                  <div className="flex-1 relative flex bg-white hover:bg-slate-50/20">
-                                    <div className="absolute inset-y-0 left-0 right-0 flex pointer-events-none">
-                                      {gridColumns.map(gc => (
-                                        <div 
-                                          key={`bg-${gc.key}`}
-                                          style={{ width: `${gc.widthPercent}%` }}
-                                          className="h-full border-r border-slate-100 last:border-r-0"
-                                        />
-                                      ))}
+                                  const diffWidth = dateEnd.getTime() - dateStart.getTime();
+                                  widthPct = Math.max(1, Math.min(100 - leftPct, (diffWidth / (1000 * 60 * 60 * 24)) / totalDays * 100));
+                                }
+
+                                const hasSubs = (childrenMap[t.id] || []).length > 0;
+
+                                return (
+                                  <div key={t.id} className="flex transition-colors hover:bg-slate-50/50 group items-stretch min-h-[52px]">
+                                    <div className="w-[450px] min-w-[450px] shrink-0 px-4 py-2 border-r border-slate-200 flex flex-col justify-center text-left bg-slate-50/10" style={{ paddingLeft: `${16 + depth * 24}px` }}>
+                                      <div className="flex items-center gap-1.5 mb-0.5">
+                                        {hasSubs && (
+                                           <div 
+                                             onClick={() => toggleExpand(t.id)}
+                                             className="cursor-pointer w-4 h-4 flex items-center justify-center rounded-sm hover:bg-slate-200 text-slate-500 shrink-0"
+                                           >
+                                             {(isAnyFilterActive ? (expandedTasks[t.id] !== false) : !!expandedTasks[t.id]) ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+                                           </div>
+                                        )}
+                                        {!hasSubs && depth > 0 && <span className="w-4 h-4 shrink-0 border-l border-b border-slate-300 rounded-bl-sm opacity-50 relative -top-1" />}
+                                        <span className={`w-2 h-2 rounded-full shrink-0 ${statusName === "Concluída" ? "bg-emerald-500" : statusName === "Em andamento" ? "bg-blue-500" : "bg-slate-400"}`} />
+                                        <span className={`text-xs font-bold text-slate-850 line-clamp-1 cursor-pointer hover:text-indigo-600 transition-colors ${depth === 0 ? "text-sm" : ""}`} onClick={() => handleEditTask(t)}>
+                                          {getTaskDisplayName(t)}
+                                        </span>
+                                      </div>
+                                      <div className="flex flex-wrap gap-x-2 gap-y-0.5 text-[9px] text-slate-400 font-bold uppercase tracking-wider" style={{ paddingLeft: hasSubs || depth > 0 ? '22px' : '0' }}>
+                                        {t.startDate ? <span>Início: {t.startDate.split("T")[0].split("-").reverse().join("/")}</span> : null}
+                                        {t.endDate ? <span>Término: {t.endDate.split("T")[0].split("-").reverse().join("/")}</span> : null}
+                                        {!hasDates && <span className="text-amber-500 font-bold normal-case">Período não definido</span>}
+                                      </div>
                                     </div>
+                                    
+                                    <div className="flex-1 relative flex bg-white hover:bg-slate-50/20 min-w-[600px]">
+                                      <div className="absolute inset-y-0 left-0 right-0 flex pointer-events-none">
+                                        {gridColumns.map(gc => (
+                                          <div 
+                                            key={`bg-${gc.key}`}
+                                            style={{ width: `${gc.widthPercent}%` }}
+                                            className="h-full border-r border-slate-100 last:border-r-0"
+                                          />
+                                        ))}
+                                      </div>
                                     
                                     {hasDates && dateStart && dateEnd ? (
                                       <div className="w-full h-full relative flex items-center px-1">
@@ -7823,7 +7916,10 @@ export function PlanningTab({
                                   </div>
                                 </div>
                               );
-                            })}
+                            });
+                            })()}
+                          </div>
+                          </div>
                           </div>
                         </div>
                       )}
