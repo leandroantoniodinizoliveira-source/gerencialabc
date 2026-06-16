@@ -2212,10 +2212,16 @@ export async function startServer(isVercel = false) {
       const userId = parseInt(req.params.id);
       const { name, email, password, roleId, status, agency } = req.body;
       const pool = getDbPool();
-      const result = await pool.query(
-        "UPDATE au_users SET name = $1, email = $2, password = $3, role_id = $4, status = $5, agency = $6 WHERE id = $7 RETURNING *",
-        [name, email, password || "1234", roleId || "provider", status || "active", agency || null, userId]
-      );
+      let query;
+      let params;
+      if (password) {
+        query = "UPDATE au_users SET name = $1, email = $2, password = $3, role_id = $4, status = $5, agency = $6 WHERE id = $7 RETURNING *";
+        params = [name, email, password, roleId || "provider", status || "active", agency || null, userId];
+      } else {
+        query = "UPDATE au_users SET name = $1, email = $2, role_id = $3, status = $4, agency = $5 WHERE id = $6 RETURNING *";
+        params = [name, email, roleId || "provider", status || "active", agency || null, userId];
+      }
+      const result = await pool.query(query, params);
       if (result.rows.length === 0) {
         return res.status(404).json({ success: false, error: "Usuário não encontrado" });
       }

@@ -6,7 +6,7 @@ import { useAuth } from "../lib/auth";
 export function UserManagementTab() {
   const { users, roles, currentUser, addUser, updateUser, deleteUser, addRole, updateRole, checkPermission } = useAuth();
   const [activeTab, setActiveTab] = useState<"users" | "roles">("users");
-  const [isEditingUser, setIsEditingUser] = useState<Partial<AppUser> | null>(null);
+  const [isEditingUser, setIsEditingUser] = useState<Partial<AppUser & { password?: string }> | null>(null);
   const [isEditingRole, setIsEditingRole] = useState<Partial<UserRole> | null>(null);
 
   const canEdit = checkPermission("users", "edit");
@@ -22,9 +22,9 @@ export function UserManagementTab() {
       return;
     }
     if (isEditingUser.id) {
-      updateUser(isEditingUser.id, isEditingUser);
+      updateUser(isEditingUser.id, isEditingUser as any);
     } else {
-      addUser(isEditingUser as Omit<AppUser, 'id'>);
+      addUser(isEditingUser as any);
     }
     setIsEditingUser(null);
   };
@@ -251,6 +251,10 @@ export function UserManagementTab() {
                <div className="space-y-1">
                  <label className="text-xs font-bold text-slate-500 uppercase">E-mail / Login</label>
                  <input type="email" value={isEditingUser.email || ''} onChange={e => setIsEditingUser({...isEditingUser, email: e.target.value})} className="w-full p-2.5 text-sm border border-slate-200 rounded-lg outline-none focus:border-indigo-500" />
+               </div>
+               <div className="space-y-1">
+                 <label className="text-xs font-bold text-slate-500 uppercase">Senha</label>
+                 <input type="password" value={isEditingUser.password || ''} onChange={e => setIsEditingUser({...isEditingUser, password: e.target.value})} placeholder={isEditingUser.id ? "Digite para alterar a senha" : "Senha do usuário"} className="w-full p-2.5 text-sm border border-slate-200 rounded-lg outline-none focus:border-indigo-500" />
                </div>
                <div className="space-y-1">
                  <label className="text-xs font-bold text-slate-500 uppercase">Papel</label>

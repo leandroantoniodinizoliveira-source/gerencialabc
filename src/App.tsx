@@ -49,7 +49,8 @@ import {
   FileSpreadsheet,
   BookOpen,
   Globe,
-  FolderKanban
+  FolderKanban,
+  Key
 } from "lucide-react";
 import {
   LineChart,
@@ -97,6 +98,7 @@ import { ResolutionsModule } from "./modules/resolutions";
 import { RegulatoryAgendaModule } from "./modules/regulatory-agenda";
 import { PublicationsModule } from "./modules/publications";
 import { UserManagementModule } from "./modules/user-management";
+import { ChangePasswordModal } from "./components/ChangePasswordModal";
 
 
 const formatSaldoValue = (val: number, type: 'percent' | 'hab' | 'ls', showSuffix = true) => {
@@ -494,6 +496,7 @@ export default function App() {
   const [templateFiles, setTemplateFiles] = useState<{ id: number | string, name: string, description: string, url: string }[]>([]);
   const [demandSubTab, setDemandSubTab] = useState<"edit" | "view">("edit");
   const [supplySubTab, setSupplySubTab] = useState<"edit" | "view">("edit");
+  const [isChangePasswordModalOpen, setIsChangePasswordModalOpen] = useState(false);
   
   const [confirmState, setConfirmState] = useState<{ title?: string; message: string; type?: "confirm" | "alert"; onConfirm?: () => void } | null>(null);
   
@@ -3709,7 +3712,7 @@ const renderSupplyTable = () => {
                 </div>
               </div>
 
-              <RequirePermission moduleId="users" action="view">
+             {currentUser?.roleId === 'admin' && (
                 <div>
                   <h4 className="text-xs font-black text-white/50 uppercase tracking-widest mb-2 flex items-center gap-1.5 px-2 mt-2">
                     <Shield size={14} /> Gestão de Usuários
@@ -3724,7 +3727,7 @@ const renderSupplyTable = () => {
                     </button>
                   </div>
                 </div>
-              </RequirePermission>
+              )}
 
               <div className="border-t border-white/10 pt-4 mt-4 shrink-0">
                 <button
@@ -4320,7 +4323,7 @@ const renderSupplyTable = () => {
             </div>
           </div>
 
-          <RequirePermission moduleId="users" action="view">
+          {currentUser?.roleId === 'admin' && (
             <div>
               {!isSidebarCollapsed && (
                 <h4 className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-1 flex items-center gap-1.5 px-2">
@@ -4349,7 +4352,7 @@ const renderSupplyTable = () => {
                 </button>
               </div>
             </div>
-          </RequirePermission>
+          )}
         </nav>
       </aside>
 
@@ -4438,6 +4441,18 @@ const renderSupplyTable = () => {
                         <p className="text-xs font-bold text-slate-800 truncate mt-0.5">{currentUser?.email}</p>
                       </div>
                       <div className="p-1">
+                        <button
+                          onClick={() => {
+                            setUserMenuOpen(false);
+                            setIsChangePasswordModalOpen(true);
+                          }}
+                          className="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 rounded-xl text-xs font-bold transition-colors text-left text-slate-700"
+                        >
+                          <Key size={14} className="text-slate-400" />
+                          Alterar Senha
+                        </button>
+                      </div>
+                      <div className="p-1 border-t border-slate-100">
                         <button
                           onClick={() => {
                             setUserMenuOpen(false);
@@ -7911,6 +7926,12 @@ const renderSupplyTable = () => {
             </motion.div>
           ) : null}
         </AnimatePresence>
+        
+        <ChangePasswordModal 
+          isOpen={isChangePasswordModalOpen}
+          onClose={() => setIsChangePasswordModalOpen(false)}
+          showToast={showToast}
+        />
       </main>
 
 
