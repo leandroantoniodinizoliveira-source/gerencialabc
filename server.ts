@@ -757,7 +757,7 @@ async function runStartupMigration() {
 export async function startServer(isVercel = false) {
   await runStartupMigration();
 
-  const PORT = process.env.PORT || 3000;
+  const PORT = 3000;
 
   // For parsing application/json. Increase limit for large GeoJSONs
   app.use(express.json({ limit: "50mb" }));

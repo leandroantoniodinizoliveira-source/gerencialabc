@@ -368,6 +368,22 @@ export default function App() {
   const { currentUser, roles, logout } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
 
+  // Health check on startup to verify DB connection
+  useEffect(() => {
+    fetch("/api/db-status")
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          console.log("[HEALTH CHECK] Banco de dados conectado com sucesso! Status:", data.data);
+        } else {
+          console.warn("[HEALTH CHECK] Falha ao conectar no banco de dados:", data.error);
+        }
+      })
+      .catch(err => {
+        console.error("[HEALTH CHECK] Erro na requisição de verificação do banco de dados:", err);
+      });
+  }, []);
+
   // Public access support to share dashboards without prompting for login
   const [isPublicMode, setIsPublicMode] = useState(() => {
     const params = new URLSearchParams(window.location.search);
