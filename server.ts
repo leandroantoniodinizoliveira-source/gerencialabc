@@ -334,9 +334,17 @@ async function runStartupMigration() {
         CREATE TABLE IF NOT EXISTS pl_category_areas (
           category_id INTEGER REFERENCES pl_categories(id) ON DELETE CASCADE,
           area_id INTEGER REFERENCES pl_areas(id) ON DELETE CASCADE,
+          order_index INTEGER DEFAULT 0,
           PRIMARY KEY (category_id, area_id)
         );
       `);
+
+      // Add order_index if it doesn't exist
+      try {
+        await client.query(`ALTER TABLE pl_category_areas ADD COLUMN order_index INTEGER DEFAULT 0;`);
+      } catch (err) {
+        // column likely exists
+      }
 
       await client.query(`
         CREATE TABLE IF NOT EXISTS pl_task_categories (
@@ -939,14 +947,17 @@ export async function startServer(isVercel = false) {
         const dbTaskResponsibles = await client.query("SELECT * FROM pl_task_responsibles");
         const dbTaskCategories = await client.query("SELECT * FROM pl_task_categories");
         const dbCategories = await client.query("SELECT * FROM pl_categories ORDER BY id ASC");
-        const dbCategoryAreas = await client.query("SELECT * FROM pl_category_areas");
+        const dbCategoryAreas = await client.query("SELECT * FROM pl_category_areas ORDER BY order_index ASC, category_id ASC");
 
         const categoryAreasMap: Record<number, number[]> = {};
+        const areaCategoriesMap: Record<number, number[]> = {};
         dbCategoryAreas.rows.forEach(r => {
           const cid = Number(r.category_id);
           const aid = Number(r.area_id);
           if (!categoryAreasMap[cid]) categoryAreasMap[cid] = [];
           categoryAreasMap[cid].push(aid);
+          if (!areaCategoriesMap[aid]) areaCategoriesMap[aid] = [];
+          areaCategoriesMap[aid].push(cid);
         });
 
         const responsibleAreasMap: Record<number, number[]> = {};
@@ -1082,6 +1093,7 @@ export async function startServer(isVercel = false) {
             id: Number(a.id),
             name: a.name,
             abbreviation: a.abbreviation,
+            categoryIds: areaCategoriesMap[Number(a.id)] || [],
             planId: null
           })),
           responsibles: dbResponsibles.rows.map(r => ({
@@ -1960,13 +1972,27 @@ export async function startServer(isVercel = false) {
   // REST endpoints for areas
   app.post("/api/areas", async (req, res) => {
     try {
-      const { name, abbreviation, updatedBy, createdBy } = req.body;
+      const { name, abbreviation, categoryIds, updatedBy, createdBy } = req.body;
       const pool = getDbPool();
-      const result = await pool.query(
-        "INSERT INTO pl_areas (name, abbreviation, created_at, created_by, updated_at, updated_by) VALUES ($1, $2, NOW(), $3, NOW(), $4) RETURNING *",
-        [name || "Área Sem Nome", abbreviation || "", createdBy || "SGI Pro", updatedBy || "SGI Pro"]
-      );
-      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name, abbreviation: result.rows[0].abbreviation, planId: null, createdAt: result.rows[0].created_at, createdBy: result.rows[0].created_by, updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
+      let result;
+      try {
+        await pool.query("BEGIN");
+        result = await pool.query(
+          "INSERT INTO pl_areas (name, abbreviation, created_at, created_by, updated_at, updated_by) VALUES ($1, $2, NOW(), $3, NOW(), $4) RETURNING *",
+          [name || "Área Sem Nome", abbreviation || "", createdBy || "SGI Pro", updatedBy || "SGI Pro"]
+        );
+        const areaId = result.rows[0].id;
+        if (Array.isArray(categoryIds)) {
+          for (let i = 0; i < categoryIds.length; i++) {
+            await pool.query("INSERT INTO pl_category_areas (category_id, area_id, order_index) VALUES ($1, $2, $3) ON CONFLICT (category_id, area_id) DO UPDATE SET order_index = $3", [categoryIds[i], areaId, i]);
+          }
+        }
+        await pool.query("COMMIT");
+      } catch (err) {
+        await pool.query("ROLLBACK");
+        throw err;
+      }
+      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name, abbreviation: result.rows[0].abbreviation, categoryIds: categoryIds || [], planId: null, createdAt: result.rows[0].created_at, createdBy: result.rows[0].created_by, updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
     } catch (error: any) {
       console.error("Erro ao criar área:", error);
       res.status(500).json({ success: false, error: error.message });
@@ -1976,16 +2002,31 @@ export async function startServer(isVercel = false) {
   app.put("/api/areas/:id", async (req, res) => {
     try {
       const areaId = parseInt(req.params.id);
-      const { name, abbreviation, updatedBy } = req.body;
+      const { name, abbreviation, categoryIds, updatedBy } = req.body;
       const pool = getDbPool();
-      const result = await pool.query(
-        "UPDATE pl_areas SET name = $1, abbreviation = $2, updated_at = NOW(), updated_by = $3 WHERE id = $4 RETURNING *",
-        [name, abbreviation || "", updatedBy || "SGI Pro", areaId]
-      );
-      if (result.rows.length === 0) {
-        return res.status(404).json({ success: false, error: "Área não encontrada" });
+      let result;
+      try {
+        await pool.query("BEGIN");
+        result = await pool.query(
+          "UPDATE pl_areas SET name = $1, abbreviation = $2, updated_at = NOW(), updated_by = $3 WHERE id = $4 RETURNING *",
+          [name, abbreviation || "", updatedBy || "SGI Pro", areaId]
+        );
+        if (result.rows.length === 0) {
+          await pool.query("ROLLBACK");
+          return res.status(404).json({ success: false, error: "Área não encontrada" });
+        }
+        if (Array.isArray(categoryIds)) {
+          await pool.query("DELETE FROM pl_category_areas WHERE area_id = $1", [areaId]);
+          for (let i = 0; i < categoryIds.length; i++) {
+            await pool.query("INSERT INTO pl_category_areas (category_id, area_id, order_index) VALUES ($1, $2, $3)", [categoryIds[i], areaId, i]);
+          }
+        }
+        await pool.query("COMMIT");
+      } catch (err) {
+        await pool.query("ROLLBACK");
+        throw err;
       }
-      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name, abbreviation: result.rows[0].abbreviation, planId: null, createdAt: result.rows[0].created_at, createdBy: result.rows[0].created_by, updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
+      res.json({ success: true, data: { id: Number(result.rows[0].id), name: result.rows[0].name, abbreviation: result.rows[0].abbreviation, categoryIds: categoryIds || [], planId: null, createdAt: result.rows[0].created_at, createdBy: result.rows[0].created_by, updatedAt: result.rows[0].updated_at, updatedBy: result.rows[0].updated_by } });
     } catch (error: any) {
       console.error("Erro ao atualizar área:", error);
       res.status(500).json({ success: false, error: error.message });
@@ -2305,7 +2346,9 @@ export async function startServer(isVercel = false) {
         
         if (Array.isArray(areaIds) && areaIds.length > 0) {
           for (const aId of areaIds) {
-            await pool.query("INSERT INTO pl_category_areas (category_id, area_id) VALUES ($1, $2)", [createdId, aId]);
+            const maxOrderRes = await pool.query("SELECT COALESCE(MAX(order_index), -1) + 1 as next_order FROM pl_category_areas WHERE area_id = $1", [aId]);
+            const nextOrder = maxOrderRes.rows[0].next_order;
+            await pool.query("INSERT INTO pl_category_areas (category_id, area_id, order_index) VALUES ($1, $2, $3)", [createdId, aId, nextOrder]);
           }
         }
         await pool.query("COMMIT");
@@ -2349,10 +2392,20 @@ export async function startServer(isVercel = false) {
           return res.status(404).json({ success: false, error: "Categoria não encontrada" });
         }
         
+        // Keep existing order index
+        const existingOrderRes = await pool.query("SELECT area_id, order_index FROM pl_category_areas WHERE category_id = $1", [catId]);
+        const existingOrders = new Map<number, number>();
+        existingOrderRes.rows.forEach(r => existingOrders.set(Number(r.area_id), Number(r.order_index)));
+        
         await pool.query("DELETE FROM pl_category_areas WHERE category_id = $1", [catId]);
         if (Array.isArray(areaIds) && areaIds.length > 0) {
           for (const aId of areaIds) {
-            await pool.query("INSERT INTO pl_category_areas (category_id, area_id) VALUES ($1, $2)", [catId, aId]);
+            let orderIdx = existingOrders.get(aId);
+            if (orderIdx === undefined) {
+              const maxOrderRes = await pool.query("SELECT COALESCE(MAX(order_index), -1) + 1 as next_order FROM pl_category_areas WHERE area_id = $1", [aId]);
+              orderIdx = maxOrderRes.rows[0].next_order;
+            }
+            await pool.query("INSERT INTO pl_category_areas (category_id, area_id, order_index) VALUES ($1, $2, $3)", [catId, aId, orderIdx]);
           }
         }
         await pool.query("COMMIT");
@@ -2805,15 +2858,18 @@ export async function startServer(isVercel = false) {
         const dbTaskResponsibles = await client.query("SELECT * FROM pl_task_responsibles");
         const dbTaskCategories = await client.query("SELECT * FROM pl_task_categories");
         const dbCategories = await client.query("SELECT * FROM pl_categories ORDER BY id ASC");
-        const dbCategoryAreas = await client.query("SELECT * FROM pl_category_areas");
+        const dbCategoryAreas = await client.query("SELECT * FROM pl_category_areas ORDER BY order_index ASC, category_id ASC");
         const dbResponsibleAreas = await client.query("SELECT * FROM pl_responsible_areas");
 
         const categoryAreasMap: Record<number, number[]> = {};
+        const areaCategoriesMap: Record<number, number[]> = {};
         dbCategoryAreas.rows.forEach(r => {
           const cid = Number(r.category_id);
           const aid = Number(r.area_id);
           if (!categoryAreasMap[cid]) categoryAreasMap[cid] = [];
           categoryAreasMap[cid].push(aid);
+          if (!areaCategoriesMap[aid]) areaCategoriesMap[aid] = [];
+          areaCategoriesMap[aid].push(cid);
         });
 
         const responsibleAreasMap: Record<number, number[]> = {};
@@ -2891,6 +2947,7 @@ export async function startServer(isVercel = false) {
             id: Number(a.id),
             name: a.name,
             abbreviation: a.abbreviation,
+            categoryIds: areaCategoriesMap[Number(a.id)] || [],
             planId: null,
             createdAt: a.created_at,
             createdBy: a.created_by,

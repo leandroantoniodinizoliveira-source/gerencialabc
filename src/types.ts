@@ -169,6 +169,7 @@ export interface Area {
   id: number;
   name: string;
   abbreviation?: string;
+  categoryIds?: number[];
   createdAt?: string | null;
   createdBy?: string | null;
   updatedAt?: string | null;

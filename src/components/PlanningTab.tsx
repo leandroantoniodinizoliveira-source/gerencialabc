@@ -697,6 +697,7 @@ export function PlanningTab({
   const [regRole, setRegRole] = useState("");
   const [regUpdatedBy, setRegUpdatedBy] = useState("");
   const [regAreaIds, setRegAreaIds] = useState<number[]>([]);
+  const [regCategoryIds, setRegCategoryIds] = useState<number[]>([]);
   const [editingRegId, setEditingRegId] = useState<number | null>(null);
 
   // UI tree expand/collapse state (keyed by task.id)
@@ -1032,6 +1033,7 @@ export function PlanningTab({
         body: JSON.stringify({ 
           name: regName, 
           abbreviation: regAbbreviation.substring(0, 4).toUpperCase(), 
+          categoryIds: regCategoryIds,
           createdBy: userSignature,
           updatedBy: userSignature 
         })
@@ -1041,6 +1043,7 @@ export function PlanningTab({
         showToast("Sucesso", isEdit ? "Área atualizada." : "Área cadastrada com sucesso.", "success");
         setRegName("");
         setRegAbbreviation("");
+        setRegCategoryIds([]);
         setEditingRegId(null);
         setIsRegModalOpen(false);
         await loadRegistriesOnly();
@@ -1558,6 +1561,37 @@ export function PlanningTab({
       return d1 - d2;
     });
   }, [enhancedTasks]);
+
+  const orderedCategoriesForDisplay = useMemo(() => {
+    let sortedCategories = [...categories];
+    if (selectedAreaIds.length > 0) {
+      const orderMap = new Map<number, number>();
+      let nextIdx = 0;
+      selectedAreaIds.forEach(areaId => {
+        const areaObj = areas.find(a => a.id === areaId);
+        if (areaObj && areaObj.categoryIds) {
+          areaObj.categoryIds.forEach(catId => {
+            if (!orderMap.has(catId)) {
+              orderMap.set(catId, nextIdx++);
+            }
+          });
+        }
+      });
+      if (orderMap.size > 0) {
+        sortedCategories.sort((a, b) => {
+          const orderA = orderMap.has(a.id) ? orderMap.get(a.id)! : 99999;
+          const orderB = orderMap.has(b.id) ? orderMap.get(b.id)! : 99999;
+          if (orderA !== orderB) return orderA - orderB;
+          return a.name.localeCompare(b.name);
+        });
+      } else {
+        sortedCategories.sort((a, b) => a.name.localeCompare(b.name));
+      }
+    } else {
+      sortedCategories.sort((a, b) => a.name.localeCompare(b.name));
+    }
+    return sortedCategories;
+  }, [categories, areas, selectedAreaIds]);
 
   // Handle expand / collapse toggles
   const toggleExpand = (id: number) => {
@@ -3168,6 +3202,7 @@ export function PlanningTab({
               setRegEmail("");
               setRegRole("");
               setRegAreaIds([]);
+              setRegCategoryIds([]);
               setEditingRegId(null);
               setIsRegModalOpen(true);
               setRegUpdatedBy(currentUser?.name || currentUser?.email || "");
@@ -3191,6 +3226,7 @@ export function PlanningTab({
                   setRegDesc(""); 
                   setRegIsActive(false);
                   setRegAreaIds([]); 
+                  setRegCategoryIds([]);
                   setRegEmail(""); 
                   setRegRole(""); 
                 }} 
@@ -3239,6 +3275,72 @@ export function PlanningTab({
                   <div className="space-y-1.5">
                     <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Sigla (4 dígitos)</label>
                     <input type="text" required maxLength={4} value={regAbbreviation} onChange={(e) => setRegAbbreviation(e.target.value.toUpperCase())} placeholder="Ex: REGE" className="w-full border-2 border-slate-200 rounded-xl px-4 py-3 text-xs font-semibold text-slate-700 focus:border-adasa-mid outline-none transition-all placeholder:text-slate-400" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center justify-between">
+                      <span>Categorias Vinculadas & Ordenação</span>
+                    </label>
+                    <div className="border border-slate-200 rounded-xl bg-slate-50 overflow-hidden flex flex-col h-[280px]">
+                      {categories.length === 0 ? (
+                        <div className="flex-1 flex items-center justify-center text-xs text-slate-400 font-medium px-4 text-center">Nenhuma categoria cadastrada.</div>
+                      ) : (
+                        <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+                          {(() => {
+                            const selectedCatList = regCategoryIds.map(id => categories.find(c => c.id === id)).filter(Boolean) as typeof categories;
+                            const unselectedList = categories.filter(c => !regCategoryIds.includes(c.id));
+                            
+                            return (
+                              <>
+                                {selectedCatList.map((cat, index) => (
+                                  <div key={cat.id} className="flex items-center gap-3 p-2 bg-white rounded-lg border border-slate-200 shadow-sm group">
+                                    <div className="flex flex-col gap-0.5 opacity-40 group-hover:opacity-100 transition-opacity">
+                                      <button type="button" onClick={() => {
+                                        if (index > 0) {
+                                          const newArr = [...regCategoryIds];
+                                          [newArr[index - 1], newArr[index]] = [newArr[index], newArr[index - 1]];
+                                          setRegCategoryIds(newArr);
+                                        }
+                                      }} className="text-slate-400 hover:text-adasa-mid transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled={index === 0}><ChevronUp size={14} /></button>
+                                      <button type="button" onClick={() => {
+                                        if (index < regCategoryIds.length - 1) {
+                                          const newArr = [...regCategoryIds];
+                                          [newArr[index + 1], newArr[index]] = [newArr[index], newArr[index + 1]];
+                                          setRegCategoryIds(newArr);
+                                        }
+                                      }} className="text-slate-400 hover:text-adasa-mid transition-colors disabled:opacity-30 disabled:cursor-not-allowed" disabled={index === regCategoryIds.length - 1}><ChevronDown size={14} /></button>
+                                    </div>
+                                    <label className="flex flex-1 items-center gap-2 cursor-pointer">
+                                      <input 
+                                        type="checkbox" 
+                                        checked={true}
+                                        onChange={() => setRegCategoryIds(regCategoryIds.filter(id => id !== cat.id))}
+                                        className="w-4 h-4 text-adasa-mid bg-slate-100 border-slate-300 rounded focus:ring-adasa-mid focus:ring-2"
+                                      />
+                                      <span className="text-xs font-bold text-slate-800">{cat.name}</span>
+                                    </label>
+                                  </div>
+                                ))}
+                                {selectedCatList.length > 0 && unselectedList.length > 0 && <div className="h-px bg-slate-200 my-2 mx-1" />}
+                                {unselectedList.map(cat => (
+                                  <div key={cat.id} className="flex items-center gap-3 p-2 bg-transparent rounded-lg opacity-70 hover:opacity-100 transition-opacity">
+                                    <div className="w-5" />
+                                    <label className="flex flex-1 items-center gap-2 cursor-pointer">
+                                      <input 
+                                        type="checkbox" 
+                                        checked={false}
+                                        onChange={() => setRegCategoryIds([...regCategoryIds, cat.id])}
+                                        className="w-4 h-4 text-adasa-mid border-slate-300 rounded focus:ring-adasa-mid focus:ring-2"
+                                      />
+                                      <span className="text-xs font-semibold text-slate-600">{cat.name}</span>
+                                    </label>
+                                  </div>
+                                ))}
+                              </>
+                            );
+                          })()}
+                        </div>
+                      )}
+                    </div>
                   </div>
                   <button type="submit" className="w-full py-3.5 mt-2 font-black text-xs text-white bg-adasa-mid hover:bg-adasa-dark rounded-xl transition shadow-md">{editingRegId !== null ? "Salvar Alterações" : "Cadastrar Área"}</button>
                 </form>
@@ -3453,7 +3555,7 @@ export function PlanningTab({
                         </td>
                         <td className="px-5 py-3 align-middle text-right">
                           <div className="flex gap-1 justify-end">
-                             <button onClick={() => { setEditingRegId(a.id); setRegName(a.name); setRegAbbreviation(a.abbreviation || ""); setIsRegModalOpen(true); }} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Editar"><Edit2 size={16} /></button>
+                             <button onClick={() => { setEditingRegId(a.id); setRegName(a.name); setRegAbbreviation(a.abbreviation || ""); setRegCategoryIds(a.categoryIds || []); setIsRegModalOpen(true); }} className="p-2 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors" title="Editar"><Edit2 size={16} /></button>
                              <button onClick={() => handleAreaDelete(a.id)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors" title="Excluir"><Trash2 size={16} /></button>
                           </div>
                         </td>
@@ -7015,8 +7117,7 @@ export function PlanningTab({
                  );
               })()}
               {viewMode === "category" && (() => {
-                 const sortedCategories = [...categories].sort((a, b) => a.name.localeCompare(b.name));
-                 const cats = [...sortedCategories, { id: -1, name: "Sem categoria", color: "", description: "" }];
+                 const cats = [...orderedCategoriesForDisplay, { id: -1, name: "Sem categoria", color: "", description: "" }];
                  return (
                    <div className="space-y-4 mt-2">
                      {cats.map(cat => {
@@ -7088,8 +7189,7 @@ export function PlanningTab({
                     groups["Em andamento"] = visibleTasks.filter(t => normalizeStatus(t.status) === "Em andamento");
                     groups["Concluída"] = visibleTasks.filter(t => normalizeStatus(t.status) === "Concluída");
                   } else {
-                    const sortedCategories = [...categories].sort((a, b) => a.name.localeCompare(b.name));
-                    sortedCategories.forEach(cat => {
+                    orderedCategoriesForDisplay.forEach(cat => {
                       groups[cat.name] = [];
                     });
                     groups["Sem Categoria"] = [];
