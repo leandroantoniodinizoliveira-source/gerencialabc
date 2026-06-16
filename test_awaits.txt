@@ -1,0 +1,368 @@
+75:  const res = await client.query(
+81:    await client.query(
+88:    const parentRes = await client.query("SELECT parent_id FROM pl_tasks WHERE id = $1", [parentId]);
+90:      await rollUpTask(client, parentRes.rows[0].parent_id);
+122:  await client.query(
+129:  const parentRes = await client.query("SELECT parent_id FROM pl_tasks WHERE id = $1", [parentId]);
+131:    await rollUpTask(client, parentRes.rows[0].parent_id);
+136:  const childrenRes = await client.query("SELECT id FROM pl_tasks WHERE parent_id = $1", [parentTaskId]);
+141:    await client.query("DELETE FROM pl_task_areas WHERE task_id = $1", [childId]);
+144:        await client.query("INSERT INTO pl_task_areas (task_id, area_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [childId, aid]);
+149:    await client.query("DELETE FROM pl_task_categories WHERE task_id = $1", [childId]);
+152:        await client.query("INSERT INTO pl_task_categories (task_id, category_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [childId, cid]);
+157:    await cascadeAreasAndCategories(client, childId, areaIds, categoryIds);
+165:    const client = await pool.connect();
+167:      await client.query("BEGIN");
+169:      await client.query(`
+181:      await client.query(`
+190:      await client.query(`
+201:      await client.query(`
+214:      await client.query(`
+227:      await client.query(`
+242:      await client.query(`
+256:      await client.query(`
+265:      await client.query(`
+273:      await client.query(`
+282:      const riskCountRes = await client.query("SELECT COUNT(*) FROM wb_risk_references");
+284:        await client.query(`
+292:      await client.query(`
+311:      await client.query("ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS sei_process TEXT;");
+313:      await client.query("CREATE INDEX IF NOT EXISTS idx_tasks_parent_id ON pl_tasks(parent_id);");
+315:      await client.query(`
+323:      await client.query(`
+330:      await client.query(`
+338:      await client.query(`
+346:      await client.query(`
+355:      await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS plan_id INTEGER REFERENCES pl_plans(id) ON DELETE SET NULL;`);
+359:        await client.query(`
+373:      await client.query(`
+385:      const userCountRes = await client.query("SELECT COUNT(*) FROM au_users");
+387:        await client.query(`
+395:      await client.query(`
+406:        await client.query("ALTER TABLE pl_responsibles ADD COLUMN IF NOT EXISTS user_id INTEGER REFERENCES au_users(id) ON DELETE SET NULL;");
+413:        const respsRes = await client.query("SELECT id, name, user_id FROM pl_responsibles");
+427:              const checkByName = await client.query("SELECT id FROM au_users WHERE LOWER(name) = LOWER($1)", [nameClean]);
+430:                await client.query("UPDATE pl_responsibles SET user_id = $1 WHERE id = $2", [uId, resp.id]);
+437:                  const checkExist = await client.query("SELECT id FROM au_users WHERE LOWER(email) = LOWER($1)", [uniqueEmail]);
+447:                const insertUserRes = await client.query(
+452:                await client.query("UPDATE pl_responsibles SET user_id = $1 WHERE id = $2", [uId, resp.id]);
+462:      await client.query(`
+470:      await client.query(`
+478:      await client.query(`
+488:      await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS depends_on_task_id INTEGER REFERENCES pl_tasks(id) ON DELETE SET NULL;`);
+491:      await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
+492:      await client.query(`ALTER TABLE pl_plans ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
+493:      await client.query(`ALTER TABLE pl_plans ADD COLUMN IF NOT EXISTS created_at TIMESTAMP, ADD COLUMN IF NOT EXISTS created_by VARCHAR(255);`);
+494:      await client.query(`ALTER TABLE pl_plans ADD COLUMN IF NOT EXISTS is_active BOOLEAN DEFAULT FALSE;`);
+495:      await client.query(`ALTER TABLE pl_areas ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
+496:      await client.query(`ALTER TABLE pl_areas ADD COLUMN IF NOT EXISTS created_at TIMESTAMP, ADD COLUMN IF NOT EXISTS created_by VARCHAR(255);`);
+497:      await client.query(`ALTER TABLE pl_responsibles ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
+498:      await client.query(`ALTER TABLE pl_responsibles ADD COLUMN IF NOT EXISTS created_at TIMESTAMP, ADD COLUMN IF NOT EXISTS created_by VARCHAR(255);`);
+499:      await client.query(`ALTER TABLE pl_categories ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP, ADD COLUMN IF NOT EXISTS updated_by VARCHAR(255);`);
+500:      await client.query(`ALTER TABLE pl_categories ADD COLUMN IF NOT EXISTS created_at TIMESTAMP, ADD COLUMN IF NOT EXISTS created_by VARCHAR(255);`);
+501:      await client.query(`ALTER TABLE pl_areas ALTER COLUMN abbreviation TYPE VARCHAR(4);`);
+502:      await client.query("UPDATE pl_areas SET abbreviation = 'CORA' WHERE abbreviation = 'CO';");
+505:      await client.query(`ALTER TABLE pl_tasks ADD COLUMN IF NOT EXISTS weight REAL DEFAULT 1.0;`);
+508:      await client.query(`
+517:      await client.query(`
+531:      await client.query(`
+549:      await client.query(`
+553:      const resCheck = await client.query("SELECT COUNT(*) FROM re_resolutions");
+602:          await client.query(
+611:      await client.query(`
+619:      await client.query(`ALTER TABLE re_agendas DROP COLUMN IF EXISTS status CASCADE;`);
+620:      await client.query(`ALTER TABLE re_agendas DROP COLUMN IF EXISTS entrega CASCADE;`);
+622:      await client.query(`
+631:      await client.query("ALTER TABLE re_agenda_tasks ADD COLUMN IF NOT EXISTS status VARCHAR(100) DEFAULT 'Não Concluída';");
+632:      await client.query("ALTER TABLE re_agenda_tasks ADD COLUMN IF NOT EXISTS entrega TEXT;");
+633:      await client.query("ALTER TABLE re_agenda_tasks ADD COLUMN IF NOT EXISTS entrega_link TEXT;");
+636:      await client.query(`
+651:      await client.query(`
+656:      await client.query("CREATE INDEX IF NOT EXISTS idx_tasks_plan_id ON pl_tasks(plan_id);");
+657:      await client.query("CREATE INDEX IF NOT EXISTS idx_tasks_depends_on ON pl_tasks(depends_on_task_id);");
+658:      await client.query("CREATE INDEX IF NOT EXISTS idx_task_areas_area_id ON pl_task_areas(area_id);");
+659:      await client.query("CREATE INDEX IF NOT EXISTS idx_task_categories_category_id ON pl_task_categories(category_id);");
+660:      await client.query("CREATE INDEX IF NOT EXISTS idx_task_responsibles_responsible_id ON pl_task_responsibles(responsible_id);");
+661:      await client.query("CREATE INDEX IF NOT EXISTS idx_model_tasks_model_id ON pl_model_tasks(model_id);");
+663:      await client.query("CREATE INDEX IF NOT EXISTS idx_wb_systems_wb_id ON wb_systems(water_balance_id);");
+664:      await client.query("CREATE INDEX IF NOT EXISTS idx_wb_regions_system_id ON wb_regions(system_id);");
+665:      await client.query("CREATE INDEX IF NOT EXISTS idx_wb_regions_wb_id ON wb_regions(water_balance_id);");
+666:      await client.query("CREATE INDEX IF NOT EXISTS idx_wb_demands_wb_id ON wb_demands(water_balance_id);");
+667:      await client.query("CREATE INDEX IF NOT EXISTS idx_wb_demand_entries_demand_id ON wb_demand_entries(demand_id);");
+668:      await client.query("CREATE INDEX IF NOT EXISTS idx_wb_demand_entries_region_id ON wb_demand_entries(region_id);");
+669:      await client.query("CREATE INDEX IF NOT EXISTS idx_wb_supply_sources_system_id ON wb_supply_sources(system_id);");
+670:      await client.query("CREATE INDEX IF NOT EXISTS idx_wb_supply_sources_wb_id ON wb_supply_sources(water_balance_id);");
+671:      await client.query("CREATE INDEX IF NOT EXISTS idx_wb_op_adjustments_system_id ON wb_operational_adjustments(system_id);");
+672:      await client.query("CREATE INDEX IF NOT EXISTS idx_wb_op_adjustments_wb_id ON wb_operational_adjustments(water_balance_id);");
+674:      const pubCheck = await client.query("SELECT COUNT(*) FROM pu_publications");
+735:          await client.query(
+743:      await client.query("COMMIT");
+746:      await client.query("ROLLBACK");
+757:  await runStartupMigration();
+783:      const client = await pool.connect();
+785:        await client.query(
+808:      const client = await pool.connect();
+811:        await client.query("BEGIN");
+813:        await client.query("TRUNCATE TABLE wb_template_files CASCADE");
+842:          await client.query(
+849:        await client.query(
+853:        await client.query("COMMIT");
+856:        await client.query("ROLLBACK");
+876:      const client = await pool.connect();
+878:        const result = await client.query(
+900:      const client = await pool.connect();
+902:        const result = await client.query("SELECT NOW() as current_time, current_database() as database, version() as version");
+916:      const client = await pool.connect();
+918:        const dbWaterBalances = await client.query("SELECT * FROM wb_water_balances");
+919:        const dbSystems = await client.query("SELECT * FROM wb_systems");
+920:        const dbRegions = await client.query("SELECT * FROM wb_regions");
+921:        const dbDemands = await client.query("SELECT * FROM wb_demands");
+922:        const dbDemandEntries = await client.query("SELECT * FROM wb_demand_entries");
+923:        const dbSupplySources = await client.query("SELECT * FROM wb_supply_sources");
+924:        const dbOperationalAdjustments = await client.query("SELECT * FROM wb_operational_adjustments");
+925:        const dbTemplateFiles = await client.query("SELECT * FROM wb_template_files");
+926:        const dbRiskReferences = await client.query("SELECT * FROM wb_risk_references ORDER BY id ASC");
+927:        const dbTasks = await client.query("SELECT * FROM pl_tasks ORDER BY id ASC");
+928:        const dbPlans = await client.query("SELECT * FROM pl_plans ORDER BY id ASC");
+929:        const dbAreas = await client.query("SELECT * FROM pl_areas ORDER BY id ASC");
+930:        const dbResponsibles = await client.query("SELECT * FROM pl_responsibles ORDER BY id ASC");
+931:        const dbResponsibleAreas = await client.query("SELECT * FROM pl_responsible_areas");
+932:        const dbTaskAreas = await client.query("SELECT * FROM pl_task_areas");
+933:        const dbTaskResponsibles = await client.query("SELECT * FROM pl_task_responsibles");
+934:        const dbTaskCategories = await client.query("SELECT * FROM pl_task_categories");
+935:        const dbCategories = await client.query("SELECT * FROM pl_categories ORDER BY id ASC");
+936:        const dbCategoryAreas = await client.query("SELECT * FROM pl_category_areas");
+1142:      const client = await pool.connect();
+1144:        await client.query("BEGIN");
+1146:        await client.query("TRUNCATE TABLE wb_demand_entries, wb_operational_adjustments, wb_supply_sources, wb_demands, wb_regions, wb_systems, wb_water_balances CASCADE");
+1167:          await client.query(
+1195:          await client.query(
+1222:          await client.query(
+1253:          await client.query(
+1303:            await client.query(query, chunkValues);
+1327:          await client.query(
+1362:          await client.query(
+1378:              await client.query(
+1387:        await client.query("SELECT setval(pg_get_serial_sequence('wb_water_balances', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM wb_water_balances");
+1388:        await client.query("SELECT setval(pg_get_serial_sequence('wb_systems', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM wb_systems");
+1389:        await client.query("SELECT setval(pg_get_serial_sequence('wb_regions', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM wb_regions");
+1390:        await client.query("SELECT setval(pg_get_serial_sequence('wb_demands', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM wb_demands");
+1391:        await client.query("SELECT setval(pg_get_serial_sequence('wb_supply_sources', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM wb_supply_sources");
+1392:        await client.query("SELECT setval(pg_get_serial_sequence('wb_operational_adjustments', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM wb_operational_adjustments");
+1394:        await client.query("COMMIT");
+1397:        await client.query("ROLLBACK");
+1415:      const client = await pool.connect();
+1418:        await client.query("BEGIN");
+1444:            await client.query(`
+1457:            await client.query(`DELETE FROM wb_water_balances WHERE id NOT IN (${keepIds.map((_, idx) => '$' + (idx + 1) + '::integer').join(', ')})`, keepIds);
+1459:            await client.query(`DELETE FROM wb_water_balances`);
+1485:            await client.query(`
+1516:            await client.query(`
+1529:            await client.query(`DELETE FROM wb_regions WHERE id NOT IN (${regKeepIds.map((_, idx) => '$' + (idx + 1) + '::integer').join(', ')})`, regKeepIds);
+1531:            await client.query(`DELETE FROM wb_regions`);
+1535:            await client.query(`DELETE FROM wb_systems WHERE id NOT IN (${sysKeepIds.map((_, idx) => '$' + (idx + 1) + '::integer').join(', ')})`, sysKeepIds);
+1537:            await client.query(`DELETE FROM wb_systems`);
+1568:            await client.query(`
+1583:            await client.query(`DELETE FROM wb_demand_entries WHERE demand_id IN (${scKeepIds.join(", ")})`);
+1616:              await client.query(`
+1625:            await client.query(`DELETE FROM wb_demands WHERE id NOT IN (${scKeepIds.join(", ")})`);
+1627:            await client.query(`DELETE FROM wb_demands`);
+1659:            await client.query(`
+1675:            await client.query(`DELETE FROM wb_supply_sources WHERE id NOT IN (${supKeepIds.map((_, idx) => '$' + (idx + 1) + '::integer').join(', ')})`, supKeepIds);
+1677:            await client.query(`DELETE FROM wb_supply_sources`);
+1704:            await client.query(`
+1728:            await client.query(`
+1737:            await client.query(`DELETE FROM wb_operational_adjustments WHERE id NOT IN (${adjKeepIds.map((_, idx) => '$' + (idx + 1) + '::integer').join(', ')})`, adjKeepIds);
+1739:            await client.query(`DELETE FROM wb_operational_adjustments`);
+1744:        await client.query("SELECT setval(pg_get_serial_sequence('wb_water_balances', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM wb_water_balances");
+1745:        await client.query("SELECT setval(pg_get_serial_sequence('wb_systems', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM wb_systems");
+1746:        await client.query("SELECT setval(pg_get_serial_sequence('wb_regions', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM wb_regions");
+1747:        await client.query("SELECT setval(pg_get_serial_sequence('wb_demands', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM wb_demands");
+1748:        await client.query("SELECT setval(pg_get_serial_sequence('wb_supply_sources', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM wb_supply_sources");
+1749:        await client.query("SELECT setval(pg_get_serial_sequence('wb_operational_adjustments', 'id'), COALESCE(max(id), 1), max(id) IS NOT NULL) FROM wb_operational_adjustments");
+1751:        await client.query("COMMIT");
+1754:        await client.query("ROLLBACK");
+1770:      const client = await pool.connect();
+1772:        const dbInfoRes = await client.query("SELECT version() as version, current_database() as database");
+1773:        const columnsRes = await client.query(`
+1779:        const fksRes = await client.query(`
+1796:        const plansCount = await client.query("SELECT COUNT(*) FROM pl_plans");
+1797:        const areasCount = await client.query("SELECT COUNT(*) FROM pl_areas");
+1798:        const taskAreasCount = await client.query("SELECT COUNT(*) FROM pl_task_areas");
+1840:        const result = await pool.query(
+1845:          const insertRes = await pool.query(
+1877:        const result = await pool.query(
+1907:        await pool.query("UPDATE pl_plans SET is_active = FALSE");
+1909:      const result = await pool.query(
+1926:        await pool.query("UPDATE pl_plans SET is_active = FALSE");
+1928:      const result = await pool.query(
+1946:      await pool.query("DELETE FROM pl_plans WHERE id = $1", [planId]);
+1959:      const result = await pool.query(
+1975:      const result = await pool.query(
+1993:      await pool.query("DELETE FROM pl_areas WHERE id = $1", [areaId]);
+2010:        await pool.query("BEGIN");
+2017:          const uRes = await pool.query("SELECT id FROM au_users WHERE LOWER(email) = LOWER($1)", [normalizedEmail]);
+2023:            const insertUserRes = await pool.query(
+2031:        const result = await pool.query(
+2040:            await pool.query("INSERT INTO pl_responsible_areas (responsible_id, area_id) VALUES ($1, $2)", [createdId, aId]);
+2043:        await pool.query("COMMIT");
+2045:        await pool.query("ROLLBACK");
+2077:        await pool.query("BEGIN");
+2078:        result = await pool.query(
+2083:          await pool.query("ROLLBACK");
+2087:        await pool.query("DELETE FROM pl_responsible_areas WHERE responsible_id = $1", [respId]);
+2090:            await pool.query("INSERT INTO pl_responsible_areas (responsible_id, area_id) VALUES ($1, $2)", [respId, aId]);
+2093:        await pool.query("COMMIT");
+2095:        await pool.query("ROLLBACK");
+2109:      await pool.query("DELETE FROM pl_responsibles WHERE id = $1", [respId]);
+2124:      const result = await pool.query(
+2158:      const result = await pool.query("SELECT id, name, email, password, role_id, status, agency FROM au_users ORDER BY id ASC");
+2181:      const result = await pool.query(
+2209:      const result = await pool.query(
+2239:      await pool.query("DELETE FROM au_users WHERE id = $1", [userId]);
+2251:      const result = await pool.query("SELECT id, name, created_at, created_by, updated_at, updated_by FROM pl_categories ORDER BY id ASC");
+2252:      const mapping = await pool.query("SELECT category_id, area_id FROM pl_category_areas");
+2286:        await pool.query("BEGIN");
+2287:        const result = await pool.query(
+2296:            await pool.query("INSERT INTO pl_category_areas (category_id, area_id) VALUES ($1, $2)", [createdId, aId]);
+2299:        await pool.query("COMMIT");
+2301:        await pool.query("ROLLBACK");
+2330:        await pool.query("BEGIN");
+2331:        result = await pool.query(
+2336:          await pool.query("ROLLBACK");
+2340:        await pool.query("DELETE FROM pl_category_areas WHERE category_id = $1", [catId]);
+2343:            await pool.query("INSERT INTO pl_category_areas (category_id, area_id) VALUES ($1, $2)", [catId, aId]);
+2346:        await pool.query("COMMIT");
+2348:        await pool.query("ROLLBACK");
+2374:      await pool.query("DELETE FROM pl_categories WHERE id = $1", [catId]);
+2386:      const result = await pool.query("SELECT * FROM re_resolutions ORDER BY numero DESC, ano DESC");
+2398:      const result = await pool.query(
+2414:      const result = await pool.query(
+2432:      await pool.query("DELETE FROM re_resolutions WHERE id = $1", [id]);
+2444:      const result = await pool.query(`
+2480:    const client = await pool.connect();
+2482:      await client.query("BEGIN");
+2485:      const insertAgendaResult = await client.query(
+2501:          await client.query(
+2512:          await client.query(
+2521:      await client.query("COMMIT");
+2526:      await client.query("ROLLBACK");
+2537:    const client = await pool.connect();
+2539:      await client.query("BEGIN");
+2542:      const updateAgendaResult = await client.query(
+2548:        await client.query("ROLLBACK");
+2554:      await client.query("DELETE FROM re_agenda_tasks WHERE agenda_id = $1", [id]);
+2566:          await client.query(
+2577:          await client.query(
+2586:      await client.query("COMMIT");
+2591:      await client.query("ROLLBACK");
+2603:      await pool.query("DELETE FROM re_agendas WHERE id = $1", [id]);
+2642:          await pool.query(
+2661:      const result = await pool.query("SELECT * FROM pu_publications ORDER BY id DESC");
+2673:      const result = await pool.query(
+2689:      const result = await pool.query(
+2707:      const result = await pool.query("DELETE FROM pu_publications WHERE id = $1 RETURNING id", [id]);
+2756:            await pool.query(
+2775:      const client = await pool.connect();
+2777:        const result = await client.query(`
+2789:        const dbPlans = await client.query("SELECT * FROM pl_plans ORDER BY id ASC");
+2790:        const dbAreas = await client.query("SELECT * FROM pl_areas ORDER BY id ASC");
+2791:        const dbResponsibles = await client.query("SELECT * FROM pl_responsibles ORDER BY id ASC");
+2792:        const dbTaskAreas = await client.query("SELECT * FROM pl_task_areas");
+2793:        const dbTaskResponsibles = await client.query("SELECT * FROM pl_task_responsibles");
+2794:        const dbTaskCategories = await client.query("SELECT * FROM pl_task_categories");
+2795:        const dbCategories = await client.query("SELECT * FROM pl_categories ORDER BY id ASC");
+2796:        const dbCategoryAreas = await client.query("SELECT * FROM pl_category_areas");
+2797:        const dbResponsibleAreas = await client.query("SELECT * FROM pl_responsible_areas");
+2938:      const client = await pool.connect();
+2940:        await client.query("BEGIN");
+2951:           const planRes = await client.query("SELECT id FROM pl_plans WHERE name = $1", [planName]);
+2955:              const insertRes = await client.query("INSERT INTO pl_plans (name, updated_at, updated_by) VALUES ($1, NOW(), 'Importação') RETURNING id", [planName]);
+2969:                    const catRes = await client.query("SELECT id FROM pl_categories WHERE name = $1", [catName]);
+2973:                        const insRes = await client.query("INSERT INTO pl_categories (name, updated_at, updated_by) VALUES ($1, NOW(), 'Importação') RETURNING id", [catName]);
+2977:                        await client.query("INSERT INTO pl_category_areas (category_id, area_id) VALUES ($1, $2)", [catNameToId[catName], areaId]);
+2988:                    const rRes = await client.query("SELECT id FROM pl_responsibles WHERE name = $1", [rName]);
+2992:                        const insR = await client.query("INSERT INTO pl_responsibles (name, email, role, updated_at, updated_by) VALUES ($1, '', '', NOW(), 'Importação') RETURNING id", [rName]);
+3042:            const insTask = await client.query(`
+3057:            await client.query("INSERT INTO pl_task_areas (task_id, area_id) VALUES ($1, $2)", [newTaskId, areaId]);
+3060:                await client.query("INSERT INTO pl_task_categories (task_id, category_id) VALUES ($1, $2)", [newTaskId, catId]);
+3064:                await client.query("INSERT INTO pl_task_responsibles (task_id, responsible_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [newTaskId, rId]);
+3068:        await client.query("COMMIT");
+3071:        await client.query("ROLLBACK");
+3087:      const client = await pool.connect();
+3089:        await client.query("BEGIN");
+3096:            const parentAreasRes = await client.query("SELECT area_id FROM pl_task_areas WHERE task_id = $1", [parseInt(parentId)]);
+3100:            const parentCatsRes = await client.query("SELECT category_id FROM pl_task_categories WHERE task_id = $1", [parseInt(parentId)]);
+3107:        const result = await client.query(
+3137:            await client.query("INSERT INTO pl_task_areas (task_id, area_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [createdTaskId, aid]);
+3144:            await client.query("INSERT INTO pl_task_responsibles (task_id, responsible_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [createdTaskId, rid]);
+3151:            await client.query("INSERT INTO pl_task_categories (task_id, category_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [createdTaskId, cid]);
+3158:          const respNamesRes = await client.query("SELECT name FROM pl_responsibles WHERE id = ANY($1::integer[])", [responsibleIds]);
+3162:          await client.query("UPDATE pl_tasks SET assigned_to = $1 WHERE id = $2", [finalAssignedTo, createdTaskId]);
+3166:          await rollUpTask(client, createdTask.parent_id);
+3169:        await client.query("COMMIT");
+3194:        await client.query("ROLLBACK");
+3210:      const client = await pool.connect();
+3212:        await client.query("BEGIN");
+3214:        const currentTaskRes = await client.query("SELECT parent_id, start_date, end_date, progress, status, depends_on_task_id FROM pl_tasks WHERE id = $1", [taskId]);
+3216:          await client.query("ROLLBACK");
+3221:        const childrenCheck = await client.query("SELECT COUNT(*) FROM pl_tasks WHERE parent_id = $1", [taskId]);
+3239:            const parentAreasRes = await client.query("SELECT area_id FROM pl_task_areas WHERE task_id = $1", [parseInt(parentId, 10)]);
+3243:            const parentCatsRes = await client.query("SELECT category_id FROM pl_task_categories WHERE task_id = $1", [parseInt(parentId, 10)]);
+3250:        const result = await client.query(
+3279:        await client.query("DELETE FROM pl_task_areas WHERE task_id = $1", [taskId]);
+3282:            await client.query("INSERT INTO pl_task_areas (task_id, area_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [taskId, aid]);
+3287:        await client.query("DELETE FROM pl_task_responsibles WHERE task_id = $1", [taskId]);
+3290:            await client.query("INSERT INTO pl_task_responsibles (task_id, responsible_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [taskId, rid]);
+3295:        await client.query("DELETE FROM pl_task_categories WHERE task_id = $1", [taskId]);
+3298:            await client.query("INSERT INTO pl_task_categories (task_id, category_id) VALUES ($1, $2) ON CONFLICT DO NOTHING", [taskId, cid]);
+3305:          const respNamesRes = await client.query("SELECT name FROM pl_responsibles WHERE id = ANY($1::integer[])", [responsibleIds]);
+3309:          await client.query("UPDATE pl_tasks SET assigned_to = $1 WHERE id = $2", [finalAssignedTo, taskId]);
+3313:        await cascadeAreasAndCategories(client, taskId, finalAreaIds, finalCategoryIds);
+3316:          await rollUpTask(client, taskId);
+3320:          await rollUpTask(client, updatedTask.parent_id);
+3323:          await rollUpTask(client, oldParentId);
+3326:        await client.query("COMMIT");
+3351:        await client.query("ROLLBACK");
+3366:      const client = await pool.connect();
+3368:        await client.query("BEGIN");
+3370:        const taskRes = await client.query("SELECT parent_id FROM pl_tasks WHERE id = $1", [taskId]);
+3372:          await client.query("ROLLBACK");
+3377:        await client.query("DELETE FROM pl_tasks WHERE id = $1", [taskId]);
+3380:          await rollUpTask(client, parentId);
+3383:        await client.query("COMMIT");
+3386:        await client.query("ROLLBACK");
+3401:      const client = await pool.connect();
+3403:        await client.query("BEGIN");
+3404:        const result = await client.query("DELETE FROM pl_tasks");
+3409:        await client.query("COMMIT");
+3413:        await client.query("ROLLBACK");
+3429:      const modelsRes = await pool.query("SELECT id, name, created_at, created_by FROM pl_task_models ORDER BY id ASC");
+3430:      const itemsRes = await pool.query("SELECT id, model_id, name, duration_days, weight, sequence_order FROM pl_model_tasks ORDER BY model_id ASC, sequence_order ASC, id ASC");
+3465:      const client = await pool.connect();
+3467:         await client.query("BEGIN");
+3468:         const modelRes = await client.query(
+3478:             const itemRes = await client.query(
+3492:         await client.query("COMMIT");
+3504:         await client.query("ROLLBACK");
+3520:      const client = await pool.connect();
+3522:         await client.query("BEGIN");
+3523:         const modelRes = await client.query(
+3528:           await client.query("ROLLBACK");
+3533:         await client.query("DELETE FROM pl_model_tasks WHERE model_id = $1", [modelId]);
+3538:             const itemRes = await client.query(
+3552:         await client.query("COMMIT");
+3564:         await client.query("ROLLBACK");
+3579:      await pool.query("DELETE FROM pl_task_models WHERE id = $1", [modelId]);
+3608:      const client = await pool.connect();
+3610:        await client.query("BEGIN");
+3613:        const itemsRes = await client.query(
+3619:          await client.query("ROLLBACK");
+3649:          const taskInsertRes = await client.query(
+3681:              await client.query(
+3691:              await client.query(
+3701:              await client.query(
+3710:          await rollUpTask(client, parseInt(parentId));
+3713:        await client.query("COMMIT");
+3716:        await client.query("ROLLBACK");
+3735:    const vite = await createViteServer({

@@ -6,6 +6,7 @@ import { createServer as createViteServer } from "vite";
 import { Pool } from "pg";
 import { parse } from "csv-parse/sync";
 
+export const app = express();
 let dbPool: Pool | null = null;
 
 function parseSafeInt(val: any): number | null {
@@ -753,11 +754,10 @@ async function runStartupMigration() {
   }
 }
 
-async function startServer() {
+export async function startServer(isVercel = false) {
   await runStartupMigration();
 
-  const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT || 3000;
 
   // For parsing application/json. Increase limit for large GeoJSONs
   app.use(express.json({ limit: "50mb" }));
@@ -3746,9 +3746,16 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`Server running on http://localhost:${PORT}`);
-  });
+  if (!isVercel) {
+    app.listen(PORT as number, "0.0.0.0", () => {
+      console.log(`Server running on http://localhost:${PORT}`);
+    });
+  }
 }
 
-startServer();
+if (process.env.NODE_ENV !== "production" || !process.env.VERCEL) {
+  // Only auto-start if not built for Vercel serverless
+  if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.includes('server.cjs') || process.argv[1]?.includes('tsx') || process.argv[1]?.includes('esno')) {
+    startServer();
+  }
+}
