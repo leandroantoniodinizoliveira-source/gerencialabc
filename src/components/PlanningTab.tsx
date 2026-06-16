@@ -541,13 +541,16 @@ export function PlanningTab({
     const options: React.ReactNode[] = [];
     options.push(<option key="root" value="">[Nível Raiz do Plano]</option>);
 
+    const MAX_LEN = 80;
+
     if (parentTaskSearch.trim() !== "") {
       const searchLower = parentTaskSearch.toLowerCase();
       const matchingTasks = tasks.filter(t => t.title.toLowerCase().includes(searchLower));
       matchingTasks.forEach(t => {
+        const titleText = t.title.length > MAX_LEN ? t.title.substring(0, MAX_LEN) + "..." : t.title;
         options.push(
           <option key={t.id} value={t.id}>
-            {t.title} (ID: {t.id})
+            {titleText} (ID: {t.id})
           </option>
         );
       });
@@ -555,9 +558,13 @@ export function PlanningTab({
       const rootTasks = tasks.filter(t => !t.parentId);
       const traverse = (t: Task, depth: number) => {
         const prefix = "— ".repeat(depth);
+        const prefixLen = prefix.length;
+        const availableLen = Math.max(20, MAX_LEN - prefixLen);
+        const titleText = t.title.length > availableLen ? t.title.substring(0, availableLen) + "..." : t.title;
+        
         options.push(
           <option key={t.id} value={t.id}>
-            {prefix}{t.title}
+            {prefix}{titleText}
           </option>
         );
         const kids = tasks.filter(child => child.parentId === t.id);
@@ -8507,7 +8514,7 @@ export function PlanningTab({
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5 leading-relaxed">
                   {/* Left Column: Dates, parent, plan, options */}
-                  <div className="space-y-4">
+                  <div className="space-y-4 min-w-0">
                     <span className="text-[10px] font-black text-adasa-mid uppercase tracking-widest block leading-none border-b border-slate-100 pb-2">1. Configurações de Escopo e Prazos</span>
 
                     {/* Start Date */}
@@ -8547,7 +8554,7 @@ export function PlanningTab({
                     </div>
 
                     {/* Parent task option for nested workflows */}
-                    <div className="space-y-1.5 mt-2">
+                    <div className="space-y-1.5 mt-2 min-w-0">
                       <label className="block text-[10px] font-black text-slate-400 uppercase tracking-wider flex items-center gap-1.5" title="Indique uma atividade mãe caso queira que o modelo seja aninhado como tarefas filhas de outra tarefa">
                         <Layers size={14} className="text-emerald-500 shrink-0" />
                         Gerar como subatividades de (Opcional)
@@ -8623,7 +8630,7 @@ export function PlanningTab({
                   </div>
 
                   {/* Right Column: areas, responsibles, categories tags */}
-                  <div className="space-y-4">
+                  <div className="space-y-4 min-w-0">
                     <span className="text-[10px] font-black text-adasa-mid uppercase tracking-widest block leading-none border-b border-slate-100 pb-2">2. Vinculação de Atributos Compartilhados</span>
 
                     {/* Priority select */}
