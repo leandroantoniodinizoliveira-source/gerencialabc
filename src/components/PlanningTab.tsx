@@ -3183,7 +3183,7 @@ export function PlanningTab({
   if (activeSubTab !== "tasks" && activeSubTab !== "dashboard") {
     const configActiveTab = activeSubTab;
     return (
-      <div className="max-w-7xl mx-auto w-full bg-white rounded-3xl p-8 shadow-sm border border-slate-200 text-left flex flex-col relative h-[80vh]">
+      <div className="w-full bg-white rounded-3xl p-8 shadow-sm border border-slate-200 text-left flex flex-col relative h-[80vh]">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100 flex-shrink-0">
           <div>
             <h3 className="text-2xl font-black text-slate-800 tracking-tight">
@@ -3725,7 +3725,7 @@ export function PlanningTab({
 
   if (activeSubTab === "dashboard") {
     return (
-      <div className="space-y-6 max-w-7xl mx-auto w-full pb-16 text-left">
+      <div className="space-y-6 w-full pb-16 text-left">
         {/* Info Header */}
         <div className="bg-adasa-dark rounded-3xl p-6 md:p-8 text-white relative overflow-hidden shadow-lg border border-slate-800">
           <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl"></div>
@@ -6354,7 +6354,7 @@ export function PlanningTab({
   }
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto w-full pb-16">
+    <div className="space-y-6 w-full pb-16">
       {/* Main split work-desk */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         <div className="lg:col-span-12 space-y-3">
@@ -7184,6 +7184,23 @@ export function PlanningTab({
                   const visibleTasks = enhancedTasks.filter(t => matchesFilters(t));
                   const groups: Record<string, Task[]> = {};
 
+                  let statsByStatus = {
+                    "Não iniciada": 0,
+                    "Em andamento": 0,
+                    "Concluída": 0
+                  };
+
+                  visibleTasks.forEach(t => {
+                    const normStatus = normalizeStatus(t.status);
+                    if (statsByStatus[normStatus as keyof typeof statsByStatus] !== undefined) {
+                      statsByStatus[normStatus as keyof typeof statsByStatus]++;
+                    }
+                  });
+
+                  let overallTotal = visibleTasks.length;
+                  let overallCompleted = statsByStatus["Concluída"];
+                  let overallPercent = overallTotal > 0 ? Math.round((overallCompleted / overallTotal) * 100) : 0;
+
                   if (boardGroupBy === "status") {
                     groups["Não iniciada"] = visibleTasks.filter(t => normalizeStatus(t.status) === "Não iniciada");
                     groups["Em andamento"] = visibleTasks.filter(t => normalizeStatus(t.status) === "Em andamento");
@@ -7244,6 +7261,67 @@ export function PlanningTab({
 
                   return (
                     <div className="flex flex-col w-full font-sans">
+                      {/* Estatísticas e Progresso */}
+                      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-4">
+                        <div className="col-span-1 lg:col-span-2 bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex flex-col">
+                           <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                             <CheckCircle2 size={12} className="text-emerald-500" /> Progresso de Conclusão {selectedAreaIds.length > 0 ? "(Por Área Filtrada)" : "(Visão Geral)"}
+                           </h4>
+                           {selectedAreaIds.length > 0 ? (
+                             <div className="flex flex-col gap-3 max-h-[140px] overflow-y-auto pr-2 rounded-xl custom-scrollbar">
+                               {selectedAreaIds.map(aid => {
+                                 const areaObj = areas.find(a => a.id === aid);
+                                 const areaName = areaObj ? (areaObj.abbreviation || areaObj.name) : `Área ${aid}`;
+                                 const tasksInArea = visibleTasks.filter(t => t.areaIds?.includes(aid));
+                                 const total = tasksInArea.length;
+                                 const completed = tasksInArea.filter(t => normalizeStatus(t.status) === "Concluída").length;
+                                 const percent = total > 0 ? Math.round((completed / total) * 100) : 0;
+                                 return (
+                                   <div key={aid} className="flex flex-col gap-1.5 shrink-0 mb-1">
+                                      <div className="flex justify-between items-center text-xs">
+                                        <span className="font-bold text-slate-700 truncate" title={areaObj?.name}>{areaName}</span>
+                                        <span className="font-extrabold text-indigo-600 shrink-0">{percent}% <span className="text-[10px] text-slate-400 font-medium">({completed}/{total})</span></span>
+                                      </div>
+                                      <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden">
+                                        <div className="h-full bg-indigo-500 transition-all duration-500" style={{ width: `${percent}%` }} />
+                                      </div>
+                                   </div>
+                                 )
+                               })}
+                             </div>
+                           ) : (
+                             <div className="flex flex-col gap-1.5 mt-1 justify-center flex-1">
+                                <div className="flex justify-between items-center text-xs">
+                                  <span className="font-bold text-slate-700">Todas as Áreas (Quadro Atual)</span>
+                                  <span className="font-extrabold text-indigo-600">{overallPercent}% <span className="text-[10px] text-slate-400 font-medium">({overallCompleted}/{overallTotal})</span></span>
+                                </div>
+                                <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden">
+                                  <div className="h-full bg-indigo-500 transition-all duration-500" style={{ width: `${overallPercent}%` }} />
+                                </div>
+                             </div>
+                           )}
+                        </div>
+                        <div className="col-span-1 bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm flex flex-col justify-center">
+                           <h4 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-1.5">
+                             <LayoutGrid size={12} className="text-indigo-500" /> Tarefas por Status
+                           </h4>
+                           <div className="grid grid-cols-3 gap-2">
+                             <div className="bg-slate-50 rounded-xl p-2.5 flex flex-col items-center justify-center border border-slate-100 shadow-xs">
+                               <span className="text-xl font-black text-slate-700 leading-none">{statsByStatus["Não iniciada"]}</span>
+                               <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest text-center mt-1.5">Não Inic.</span>
+                             </div>
+                             <div className="bg-amber-50/50 rounded-xl p-2.5 flex flex-col items-center justify-center border border-amber-100 shadow-xs">
+                               <span className="text-xl font-black text-amber-700 leading-none">{statsByStatus["Em andamento"]}</span>
+                               <span className="text-[9px] font-bold text-amber-700/70 uppercase tracking-widest text-center mt-1.5">Em And.</span>
+                             </div>
+                             <div className="bg-emerald-50/50 rounded-xl p-2.5 flex flex-col items-center justify-center border border-emerald-100 shadow-xs">
+                               <span className="text-xl font-black text-emerald-700 leading-none">{statsByStatus["Concluída"]}</span>
+                               <span className="text-[9px] font-bold text-emerald-700/70 uppercase tracking-widest text-center mt-1.5">Concl.</span>
+                             </div>
+                           </div>
+                        </div>
+                      </div>
+
                       {/* Subheader and Group controls for Board */}
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4 bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5">
                         <div className="flex items-center gap-2">
@@ -7338,7 +7416,7 @@ export function PlanningTab({
                               </div>
 
                               {/* Card List scrollable */}
-                              <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-thin">
+                              <div className="flex-1 overflow-y-scroll space-y-4 pr-2 kanban-scrollbar">
                                 {colTasks.length === 0 ? (
                                   <div className="text-center p-8 text-xs font-semibold text-slate-400 border border-dashed border-slate-200 rounded-xl bg-white/40">
                                     Nenhuma atividade

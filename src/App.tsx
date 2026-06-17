@@ -3185,7 +3185,7 @@ const renderSupplyTable = () => {
         </header>
 
         {/* Portal Body */}
-        <main className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full">
+        <main className="flex-1 p-4 md:p-8 w-full">
           <AnimatePresence mode="wait">
             <motion.div
               key={publicTabName || "gerencial"}
@@ -7568,7 +7568,7 @@ const renderSupplyTable = () => {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
               transition={{ duration: 0.3, ease: "easeOut" }}
-              className="max-w-6xl mx-auto w-full"
+              className="w-full"
             >
               <div className="bg-white rounded-[2rem] border border-slate-200 p-8 shadow-sm">
                 <div className="flex justify-between items-center mb-6">
@@ -7772,7 +7772,7 @@ const renderSupplyTable = () => {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
               transition={{ duration: 0.3, ease: "easeOut" }}
-              className="max-w-7xl mx-auto w-full"
+              className="w-full"
             >
               <UserManagementModule />
             </motion.div>
@@ -7783,7 +7783,7 @@ const renderSupplyTable = () => {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
               transition={{ duration: 0.3, ease: "easeOut" }}
-              className="max-w-7xl mx-auto w-full"
+              className="w-full"
             >
               <PlanningModule 
                 tasks={tasks}
@@ -7810,7 +7810,7 @@ const renderSupplyTable = () => {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
               transition={{ duration: 0.3, ease: "easeOut" }}
-              className="max-w-7xl mx-auto w-full"
+              className="w-full"
             >
               <ResolutionsModule view="cadastro" showToast={showToast} currentUser={currentUser} />
             </motion.div>
@@ -7821,7 +7821,7 @@ const renderSupplyTable = () => {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
               transition={{ duration: 0.3, ease: "easeOut" }}
-              className="max-w-7xl mx-auto w-full"
+              className="w-full"
             >
               <ResolutionsModule view="painel" showToast={showToast} />
             </motion.div>
@@ -7832,7 +7832,7 @@ const renderSupplyTable = () => {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
               transition={{ duration: 0.3, ease: "easeOut" }}
-              className="max-w-7xl mx-auto w-full"
+              className="w-full"
             >
               <RegulatoryAgendaModule view="agenda" showToast={showToast} currentUser={currentUser} />
             </motion.div>
@@ -7843,7 +7843,7 @@ const renderSupplyTable = () => {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
               transition={{ duration: 0.3, ease: "easeOut" }}
-              className="max-w-7xl mx-auto w-full"
+              className="w-full"
             >
               <RegulatoryAgendaModule view="painel" showToast={showToast} />
             </motion.div>
@@ -7854,7 +7854,7 @@ const renderSupplyTable = () => {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
               transition={{ duration: 0.3, ease: "easeOut" }}
-              className="max-w-7xl mx-auto w-full"
+              className="w-full"
             >
               <PublicationsModule view="cadastro" showToast={showToast} currentUser={currentUser} />
             </motion.div>
@@ -7865,7 +7865,7 @@ const renderSupplyTable = () => {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
               transition={{ duration: 0.3, ease: "easeOut" }}
-              className="max-w-7xl mx-auto w-full"
+              className="w-full"
             >
               <PublicationsModule view="painel" showToast={showToast} />
             </motion.div>
@@ -7876,7 +7876,7 @@ const renderSupplyTable = () => {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
               transition={{ duration: 0.3, ease: "easeOut" }}
-              className="max-w-7xl mx-auto w-full space-y-6"
+              className="w-full space-y-6"
             >
               <ManagerialHub 
                 onOpenPlanning={() => {
@@ -7906,7 +7906,7 @@ const renderSupplyTable = () => {
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.98 }}
               transition={{ duration: 0.3, ease: "easeOut" }}
-              className="max-w-7xl mx-auto w-full space-y-6"
+              className="w-full space-y-6"
             >
               <ManagerialHub 
                 onOpenPlanning={() => {}}

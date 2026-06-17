@@ -37,7 +37,7 @@ export function HomeTab({ setActiveTab, setActivePlanningSubTab, tasks, areas, o
   };
 
   return (
-    <div className="space-y-10 max-w-5xl mx-auto pb-16">
+    <div className="space-y-10 w-full pb-16">
       {/* Dynamic Header Promo Banner */}
       <div className="bg-adasa-dark rounded-3xl p-8 sm:p-12 text-white shadow-xl relative overflow-hidden border border-slate-700/30">
         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-white/5 blur-3xl"></div>

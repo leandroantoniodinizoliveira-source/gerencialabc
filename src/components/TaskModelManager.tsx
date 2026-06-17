@@ -288,7 +288,7 @@ export const TaskModelManager: React.FC<TaskModelManagerProps> = ({
   };
 
   return (
-    <div className="max-w-7xl mx-auto w-full bg-white rounded-3xl p-8 shadow-sm border border-slate-200 text-left flex flex-col relative h-[80vh]">
+    <div className="w-full bg-white rounded-3xl p-8 shadow-sm border border-slate-200 text-left flex flex-col relative h-[80vh]">
       {/* Header following Cadastro de Categorias layout */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-100 flex-shrink-0">
         <div>

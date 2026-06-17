@@ -276,7 +276,7 @@ export function RegulatoryAgendaDashboard({ showToast }: RegulatoryAgendaDashboa
 
   if (isLoading) {
     return (
-      <div className="flex-1 flex flex-col items-center justify-center py-20 bg-white border border-slate-200/80 rounded-[2rem] shadow-sm mt-8 max-w-7xl mx-auto min-h-[500px]">
+      <div className="flex-1 flex flex-col items-center justify-center py-20 bg-white border border-slate-200/80 rounded-[2rem] shadow-sm mt-8 w-full min-h-[500px]">
         <div className="w-12 h-12 border-4 border-adasa-mid border-t-transparent rounded-full animate-spin mb-4"></div>
         <h4 className="text-sm font-black text-slate-700 uppercase tracking-wider">Carregando Indicadores...</h4>
         <p className="text-xs text-slate-400 mt-1">Sincronizando status das ações regulatórias.</p>
@@ -285,7 +285,7 @@ export function RegulatoryAgendaDashboard({ showToast }: RegulatoryAgendaDashboa
   }
 
   return (
-    <div className="max-w-7xl mx-auto w-full bg-slate-50 rounded-3xl p-6 md:p-8 border border-slate-200 text-left flex flex-col gap-6">
+    <div className="w-full bg-slate-50 rounded-3xl p-6 md:p-8 border border-slate-200 text-left flex flex-col gap-6">
       {/* Header element */}
       <div className="bg-gradient-to-r from-adasa-dark to-[#133170] rounded-3xl p-6 md:p-8 text-white relative overflow-hidden shadow-lg border border-adasa-mid/20 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>

@@ -319,7 +319,7 @@ export function ResolutionsTab({ showToast, currentUser }: ResolutionsTabProps) 
   });
 
   return (
-    <div className="max-w-7xl mx-auto w-full bg-white rounded-3xl p-8 shadow-sm border border-slate-200 text-left flex flex-col relative min-h-[80vh]">
+    <div className="w-full bg-white rounded-3xl p-8 shadow-sm border border-slate-200 text-left flex flex-col relative min-h-[80vh]">
       {/* Header section similar to Cadastro de Categorias */}
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-6 pb-6 border-b border-slate-100">
         <div>

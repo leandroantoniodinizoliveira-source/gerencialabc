@@ -6,8 +6,6 @@ import {
   FileText,
   Droplets,
   BookOpen,
-  Copy,
-  Check,
   Globe
 } from "lucide-react";
 import { motion } from "motion/react";
@@ -31,18 +29,8 @@ export function ManagerialHub({
   isPublic = false,
   showOnlyPublic = false
 }: ManagerialHubProps) {
-  const [copied, setCopied] = React.useState(false);
-
-  const handleCopyLink = () => {
-    const shareUrl = `${window.location.origin}${window.location.pathname}?public=publico_hub`;
-    navigator.clipboard.writeText(shareUrl).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    });
-  };
-
   return (
-    <div className="space-y-10 max-w-5xl mx-auto pb-16">
+    <div className="space-y-10 w-full pb-16">
       {/* Dynamic Header Promo Banner */}
       <div className="bg-gradient-to-r from-blue-900 to-blue-800 rounded-3xl p-8 sm:p-12 text-white shadow-xl relative overflow-hidden border border-slate-700/30">
         <div className="absolute top-0 right-0 -mr-20 -mt-20 w-64 h-64 rounded-full bg-white/5 blur-3xl"></div>
@@ -81,26 +69,6 @@ export function ManagerialHub({
                 ? "Portal aberto de transparência para consulta ao estoque regulatório e acervo de publicações técnicas da Superintendência de Abastecimento de Água e Esgoto."
                 : "Central de monitoramento e coordenação das atividades finalísticas e regulatórias da ADASA para superintendentes e técnicos."}
             </p>
-          </div>
-
-          {/* Action button to share the public link */}
-          <div className="flex-shrink-0">
-            <button
-              onClick={handleCopyLink}
-              className="flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white border border-white/20 rounded-2xl px-5 py-3 text-xs font-bold transition-all shadow-md active:scale-95"
-            >
-              {copied ? (
-                <>
-                  <Check size={14} className="text-emerald-400" />
-                  <span>Link Copiado!</span>
-                </>
-              ) : (
-                <>
-                  <Copy size={14} />
-                  <span>Copiar Link Público</span>
-                </>
-              )}
-            </button>
           </div>
         </div>
       </div>

@@ -287,7 +287,7 @@ export function PublicationsTab({ showToast, currentUser }: PublicationsTabProps
   });
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6" id="publications-tab-root">
+    <div className="space-y-6 w-full px-4 sm:px-6 lg:px-8 py-6" id="publications-tab-root">
       {/* Header Banner */}
       <div className="bg-gradient-to-r from-blue-700 via-indigo-700 to-indigo-800 rounded-3xl p-6 md:p-8 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-2">
