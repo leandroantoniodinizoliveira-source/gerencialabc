@@ -109,6 +109,18 @@ export interface CalculationResult extends DemandEntry {
   projectedDemand: number; // L/s
 }
 
+export interface AppNotification {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: 'info' | 'warning' | 'alert' | 'success';
+  read: boolean;
+  createdAt: string;
+  link?: string;
+  relatedTaskId?: number;
+}
+
 export interface TaskComment {
   id: string;
   author: string;

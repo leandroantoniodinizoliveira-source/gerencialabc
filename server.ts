@@ -76,7 +76,7 @@ async function rollUpTask(client: any, parentId: number | null) {
   if (!parentId) return;
 
   const res = await client.query(
-    "SELECT start_date, end_date, progress FROM pl_tasks WHERE parent_id = $1",
+    "SELECT start_date, end_date, progress, weight FROM pl_tasks WHERE parent_id = $1",
     [parentId]
   );
   
@@ -97,8 +97,8 @@ async function rollUpTask(client: any, parentId: number | null) {
 
   let minStart: Date | null = null;
   let maxEnd: Date | null = null;
-  let totalProgress = 0;
-  let validChildrenCount = 0;
+  let totalWeightedProgress = 0;
+  let totalWeight = 0;
 
   for (const row of res.rows) {
     if (row.start_date) {
@@ -109,11 +109,16 @@ async function rollUpTask(client: any, parentId: number | null) {
       const d = new Date(row.end_date);
       if (!maxEnd || d > maxEnd) maxEnd = d;
     }
-    totalProgress += Number(row.progress) || 0;
-    validChildrenCount++;
+    
+    // Fallback to 1 if weight is undefined or zero (if they really want to ignore, they can use 0, but usually we fallback to 1)
+    let w = Number(row.weight);
+    if (isNaN(w) || w < 0) w = 1.0; 
+    
+    totalWeightedProgress += (Number(row.progress) || 0) * w;
+    totalWeight += w;
   }
 
-  const avgProgress = validChildrenCount > 0 ? Math.round(totalProgress / validChildrenCount) : 0;
+  const avgProgress = totalWeight > 0 ? Math.round(totalWeightedProgress / totalWeight) : 0;
   
   let status = "Não iniciada";
   if (avgProgress === 100) {
@@ -1131,6 +1136,7 @@ export async function startServer(isVercel = false) {
             dependsOnTaskId: t.depends_on_task_id ? Number(t.depends_on_task_id) : null,
             updatedAt: t.updated_at,
             updatedBy: t.updated_by,
+            weight: t.weight !== undefined && t.weight !== null ? Number(t.weight) : 1,
             areaIds: taskAreasMap[Number(t.id)] || [],
             responsibleIds: taskResponsiblesMap[Number(t.id)] || [],
             categoryIds: taskCategoriesMap[Number(t.id)] || []
@@ -3172,7 +3178,8 @@ export async function startServer(isVercel = false) {
             }
         }
         
-        const finalWeight = parseFloat(req.body.weight as any);
+        const reqWeight = parseInt(req.body.weight as any, 10);
+        const finalWeight = isNaN(reqWeight) ? 1 : reqWeight;
         const result = await client.query(
           `INSERT INTO pl_tasks (title, description, start_date, end_date, status, parent_id, progress, priority, category, assigned_to, notes, plan_id, depends_on_task_id, updated_at, updated_by, sei_process, weight)
            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), $14, $15, $16)
@@ -3315,7 +3322,8 @@ export async function startServer(isVercel = false) {
             }
         }
 
-        const finalWeight = parseFloat(req.body.weight as any);
+        const reqWeight = parseInt(req.body.weight as any, 10);
+        const finalWeight = isNaN(reqWeight) ? 1 : reqWeight;
         const result = await client.query(
           `UPDATE pl_tasks 
            SET title = $1, description = $2, start_date = $3, end_date = $4, status = $5, progress = $6, priority = $7, category = $8, assigned_to = $9, notes = $10, parent_id = $11, plan_id = $12, depends_on_task_id = $13, updated_at = NOW(), updated_by = $14, sei_process = $16, weight = $17

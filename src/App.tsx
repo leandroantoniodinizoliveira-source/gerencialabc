@@ -50,7 +50,11 @@ import {
   BookOpen,
   Globe,
   FolderKanban,
-  Key
+  Key,
+  Bell,
+  Send,
+  CornerDownRight,
+  CheckCheck
 } from "lucide-react";
 import {
   LineChart,
@@ -369,6 +373,119 @@ try {
 export default function App() {
   const { currentUser, roles, logout } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [notificationsMenuOpen, setNotificationsMenuOpen] = useState(false);
+  const [notificationFilter, setNotificationFilter] = useState("all");
+  const [replyingNotifId, setReplyingNotifId] = useState<string | null>(null);
+  const [replyContent, setReplyContent] = useState("");
+  const [notifications, setNotifications] = useState<any[]>(() => {
+    try {
+      const saved = localStorage.getItem("adasa_notifications");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem("adasa_notifications", JSON.stringify(notifications));
+  }, [notifications]);
+
+  const groupedNotifications = useMemo(() => {
+    const sorted = [...notifications].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const grouped: any[] = [];
+
+    for (const notif of sorted) {
+      if (notif.title.startsWith("Novo Comentário:")) {
+        const last = grouped[grouped.length - 1];
+        if (last && last.title === notif.title && last.relatedTaskId === notif.relatedTaskId && last.read === notif.read && last.type === notif.type) {
+          if (!last.groupedMessages) {
+            last.groupedMessages = [last.message];
+          }
+          last.groupedMessages.push(notif.message);
+          continue;
+        }
+      }
+      grouped.push({ ...notif, groupedMessages: [notif.message] });
+    }
+    return grouped;
+  }, [notifications]);
+
+  const filteredNotifications = useMemo(() => {
+    return groupedNotifications.filter(notif => {
+      if (notificationFilter === "all") return true;
+      if (notificationFilter === "comment") return notif.title.startsWith("Novo Comentário");
+      if (notificationFilter === "alert") return notif.type === "alert" || notif.type === "warning";
+      if (notificationFilter === "info") return notif.type === "info" && !notif.title.startsWith("Novo Comentário");
+      if (notificationFilter === "success") return notif.type === "success";
+      return true;
+    });
+  }, [groupedNotifications, notificationFilter]);
+
+  useEffect(() => {
+    const handleNotify = (e: CustomEvent) => {
+      const detail = e.detail;
+      const newNotif = {
+        id: crypto.randomUUID(),
+        userId: currentUser?.id || "system",
+        title: detail.title,
+        message: detail.message,
+        type: detail.type || "info",
+        read: false,
+        createdAt: new Date().toISOString(),
+        relatedTaskId: detail.relatedTaskId
+      };
+      setNotifications(prev => [newNotif, ...prev]);
+    };
+
+    window.addEventListener("adasa_notify" as any, handleNotify);
+    return () => window.removeEventListener("adasa_notify" as any, handleNotify);
+  }, [currentUser]);
+
+  const handleQuickReply = async (notifId: string, taskId: number) => {
+    if (!replyContent.trim()) return;
+
+    try {
+      const resTasks = await fetch("/api/tasks");
+      if (resTasks.ok) {
+        const { data: allTasks } = await resTasks.json();
+        const targetTask = allTasks.find((t: any) => t.id === taskId);
+        if (targetTask) {
+          const comment = {
+            id: Math.random().toString(36).substr(2, 9),
+            author: currentUser?.name || "Administrador",
+            content: replyContent.trim(),
+            createdAt: new Date().toISOString()
+          };
+          const updatedTask = {
+            ...targetTask,
+            comments: [...(targetTask.comments || []), comment]
+          };
+          
+          const putRes = await fetch(`/api/tasks/${taskId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updatedTask)
+          });
+          
+          if (putRes.ok) {
+            setTasks(prev => prev.map(t => t.id === taskId ? {
+              ...t, 
+              comments: [...(t.comments || []), comment]
+            } : t));
+            showToast("Sucesso", "Resposta enviada!", "success");
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Erro ao enviar resposta:", e);
+      showToast("Erro", "Erro ao responder comentário", "error");
+    } finally {
+      setNotifications(prev => prev.map(n => n.id === notifId ? {...n, read: true} : n));
+      setReplyingNotifId(null);
+      setReplyContent("");
+    }
+  };
+
 
   // Health check on startup to verify DB connection
   useEffect(() => {
@@ -4407,8 +4524,188 @@ const renderSupplyTable = () => {
           </div>
           <div className="flex flex-col md:flex-row items-center gap-3">
             <div className="relative z-50 hidden md:block">
+              <button
+                onClick={() => {
+                  setNotificationsMenuOpen(!notificationsMenuOpen);
+                  setUserMenuOpen(false);
+                }}
+                className="relative p-2.5 bg-white rounded-2xl border border-slate-200 shadow-sm transition-all hover:border-adasa-mid hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-adasa-mid/20"
+              >
+                <Bell size={20} className="text-slate-600" />
+                {notifications.filter(n => !n.read).length > 0 && (
+                  <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white"></span>
+                )}
+              </button>
+
+              <AnimatePresence>
+                {notificationsMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-40" onClick={() => setNotificationsMenuOpen(false)} />
+                    <motion.div
+                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 mt-2 w-80 sm:w-96 bg-white rounded-2xl border border-slate-200 shadow-xl z-50 flex flex-col max-h-[85vh] overflow-hidden"
+                    >
+                      <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between bg-slate-50/50 shrink-0">
+                        <p className="text-xs font-black uppercase text-slate-800 tracking-wider">Minhas Notificações</p>
+                        {notifications.length > 0 && notifications.some(n => !n.read) && (
+                          <button 
+                            onClick={() => setNotifications(notifications.map(n => ({...n, read: true})))}
+                            className="text-[10px] font-bold text-indigo-600 hover:text-indigo-800 uppercase tracking-widest flex items-center gap-1 transition-colors"
+                          >
+                            <CheckCheck size={12} />
+                            Marcar tudo como lido
+                          </button>
+                        )}
+                      </div>
+
+                      {notifications.length > 0 && (
+                        <div className="bg-white border-b border-slate-100 p-2 flex gap-1 overflow-x-auto custom-scrollbar shrink-0">
+                          {[
+                            { id: "all", label: "Todas" },
+                            { id: "comment", label: "Comentários" },
+                            { id: "alert", label: "Alertas" },
+                            { id: "info", label: "Info" }
+                          ].map(filter => (
+                            <button
+                              key={filter.id}
+                              onClick={() => setNotificationFilter(filter.id)}
+                              className={cn(
+                                "px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap shrink-0 transition-colors outline-none",
+                                notificationFilter === filter.id 
+                                  ? "bg-indigo-100 text-indigo-700" 
+                                  : "text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+                              )}
+                            >
+                              {filter.label}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                      
+                      <div className="overflow-y-auto flex-1 p-2 custom-scrollbar">
+                        {notifications.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+                            <Bell size={32} className="text-slate-200 mb-3" />
+                            <p className="text-sm font-semibold text-slate-500">Nenhuma notificação</p>
+                            <p className="text-xs text-slate-400 mt-1">Você não possui notificações no momento.</p>
+                          </div>
+                        ) : filteredNotifications.length === 0 ? (
+                          <div className="flex flex-col items-center justify-center py-10 px-4 text-center">
+                            <Bell size={32} className="text-slate-200 mb-3 opacity-50" />
+                            <p className="text-sm font-semibold text-slate-500">Nenhuma notificação encontrada</p>
+                            <p className="text-xs text-slate-400 mt-1">Nenhuma notificação atende ao filtro selecionado.</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-1">
+                            {filteredNotifications.map(notif => (
+                              <motion.div 
+                                layout
+                                key={notif.id} 
+                                initial={{ opacity: 0, scale: 0.95, x: 20 }}
+                                animate={{ opacity: 1, scale: 1, x: 0 }}
+                                transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                                className={cn(
+                                  "relative p-3 rounded-xl transition-colors text-left flex flex-col gap-2 overflow-hidden",
+                                  notif.read ? "bg-transparent hover:bg-slate-50" : "bg-indigo-50/60 hover:bg-indigo-50 border border-indigo-100/50"
+                                )}
+                              >
+                                {!notif.read && (
+                                  <motion.div
+                                    className="absolute inset-0 bg-indigo-300/10 pointer-events-none"
+                                    animate={{ opacity: [0, 1, 0] }}
+                                    transition={{ duration: 2, repeat: Infinity, ease: "easeInOut" }}
+                                  />
+                                )}
+                                <div className="flex gap-3 relative z-10">
+                                  <div className="mt-0.5">
+                                    {notif.type === "alert" || notif.type === "warning" ? (
+                                      <AlertTriangle size={16} className={notif.type === "alert" ? "text-rose-500" : "text-amber-500"} />
+                                    ) : notif.type === "success" ? (
+                                      <Check size={16} className="text-emerald-500" />
+                                    ) : (
+                                      <Info size={16} className="text-indigo-500" />
+                                    )}
+                                  </div>
+                                  <div className="flex-1 min-w-0">
+                                    <p className={cn("text-xs leading-snug", notif.read ? "text-slate-700 font-semibold" : "text-slate-900 font-bold")}>
+                                      {notif.title}
+                                    </p>
+                                    <div className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+                                      {notif.groupedMessages && notif.groupedMessages.length > 1 ? (
+                                        <>
+                                          <p className="font-semibold text-indigo-900/70 mb-1">{notif.groupedMessages.length} novos comentários recebidos.</p>
+                                          <p className="line-clamp-2 pl-2 border-l-2 border-slate-200 italic">{notif.groupedMessages[0]}</p>
+                                        </>
+                                      ) : (
+                                        <p className="line-clamp-2">{notif.message}</p>
+                                      )}
+                                    </div>
+                                    <p className="text-[9px] text-slate-400 font-medium uppercase tracking-widest mt-2 block">
+                                      {new Date(notif.createdAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })}
+                                    </p>
+                                  </div>
+                                  {!notif.read && (
+                                    <div className="w-2 h-2 rounded-full bg-indigo-500 shrink-0 self-center"></div>
+                                  )}
+                                </div>
+                                
+                                {notif.title.startsWith("Novo Comentário") && notif.relatedTaskId && (
+                                  <div className="pl-7 pr-1 mt-1">
+                                    {replyingNotifId === notif.id ? (
+                                      <div className="flex bg-white border border-slate-200 rounded-lg shadow-sm focus-within:border-indigo-500 focus-within:ring-1 focus-within:ring-indigo-500 transition-all overflow-hidden">
+                                        <input
+                                          autoFocus
+                                          type="text"
+                                          value={replyContent}
+                                          onChange={(e) => setReplyContent(e.target.value)}
+                                          placeholder="Escreva sua resposta..."
+                                          className="flex-1 text-[11px] text-slate-700 bg-transparent border-none focus:ring-0 px-3 py-2"
+                                          onKeyDown={(e) => {
+                                            if (e.key === 'Enter') handleQuickReply(notif.id, notif.relatedTaskId);
+                                          }}
+                                        />
+                                        <button
+                                          onClick={() => handleQuickReply(notif.id, notif.relatedTaskId)}
+                                          disabled={!replyContent.trim()}
+                                          className="px-3 bg-slate-50 text-indigo-600 hover:text-indigo-800 disabled:text-slate-300 disabled:bg-slate-50 border-l border-slate-100 flex items-center justify-center transition-colors"
+                                        >
+                                          <Send size={12} className="ml-0.5" />
+                                        </button>
+                                      </div>
+                                    ) : (
+                                      <button 
+                                        onClick={() => {
+                                          setReplyingNotifId(notif.id);
+                                          setReplyContent("");
+                                        }}
+                                        className="flex items-center gap-1.5 text-[10px] font-bold text-indigo-600 hover:text-indigo-800 transition-colors bg-white hover:bg-slate-50 border border-slate-200 px-2.5 py-1.5 rounded-lg shadow-sm"
+                                      >
+                                        <CornerDownRight size={10} />
+                                        Responder
+                                      </button>
+                                    )}
+                                  </div>
+                                )}
+                              </motion.div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </motion.div>
+                  </>
+                )}
+              </AnimatePresence>
+            </div>
+
+            <div className="relative z-50 hidden md:block">
               <button 
-                onClick={() => setUserMenuOpen(!userMenuOpen)}
+                onClick={() => {
+                  setUserMenuOpen(!userMenuOpen);
+                  setNotificationsMenuOpen(false);
+                }}
                 className="flex items-center gap-3 bg-white px-4 py-2 rounded-2xl border border-slate-200 shadow-sm transition-all hover:border-adasa-mid hover:bg-slate-50 cursor-pointer text-left focus:outline-none focus:ring-2 focus:ring-adasa-mid/20"
               >
                 <div className="text-right">

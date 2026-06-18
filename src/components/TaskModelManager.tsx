@@ -489,15 +489,15 @@ export const TaskModelManager: React.FC<TaskModelManagerProps> = ({
                       <label className="text-[10px] font-black text-indigo-700 uppercase tracking-wider block">Peso</label>
                       <input
                         type="number"
-                        step="0.01"
-                        min="0.1"
+                        step="1"
+                        min="1"
                         value={newItemWeight}
                         onChange={(e) => {
                           const val = e.target.value;
                           if (val === "") {
                             setNewItemWeight("");
                           } else {
-                            const parsed = parseFloat(val);
+                            const parsed = parseInt(val, 10);
                             setNewItemWeight(isNaN(parsed) ? "" : parsed);
                           }
                         }}
@@ -554,15 +554,15 @@ export const TaskModelManager: React.FC<TaskModelManagerProps> = ({
                                   <label className="text-[10px] text-slate-400 font-extrabold uppercase">Peso</label>
                                   <input
                                     type="number"
-                                    step="0.01"
-                                    min="0.1"
+                                    step="1"
+                                    min="1"
                                     value={editingItemForm.weight}
                                     onChange={(e) => {
                                       const val = e.target.value;
                                       if (val === "") {
                                         setEditingItemForm({ ...editingItemForm, weight: "" });
                                       } else {
-                                        const parsed = parseFloat(val);
+                                        const parsed = parseInt(val, 10);
                                         setEditingItemForm({ ...editingItemForm, weight: isNaN(parsed) ? "" : parsed });
                                       }
                                     }}
