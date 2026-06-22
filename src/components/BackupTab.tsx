@@ -38,8 +38,12 @@ export function BackupTab({ showToast }: { showToast: any }) {
          console.warn("Autenticação com Google cancelada pelo usuário.");
          return;
       }
-      console.error(err);
-      showToast("Erro", "Falha na autenticação do Google Drive.", "error");
+      console.error("Firebase Login Error:", err);
+      if (err.code === 'auth/unauthorized-domain') {
+        showToast("Erro", "O domínio do Vercel não está autorizado no Firebase. Adicione-o em Authentication > Settings > Authorized domains.", "error");
+      } else {
+        showToast("Erro", `Falha na autenticação: ${err.message}`, "error");
+      }
     }
   };
 
