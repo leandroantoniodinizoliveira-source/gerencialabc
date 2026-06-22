@@ -988,11 +988,11 @@ export async function startServer(isVercel = false) {
     }
   });
 
-  cron.schedule('0 0 * * *', async () => {
-    console.log("Iniciando rotina de backup diário às 00:00 para o Google Drive...");
+  async function performDriveBackup() {
+    console.log("Iniciando rotina de backup para o Google Drive...");
     if (!driveBackupConfig.folderId || !driveBackupConfig.accessToken) {
       console.error("Backup cancelado: Configuração do Google Drive não definida ou token expirado.");
-      return;
+      return { success: false, error: "Configuração do Google Drive não definida ou token expirado." };
     }
     try {
       const pool = getDbPool();
@@ -1037,12 +1037,30 @@ export async function startServer(isVercel = false) {
       });
       
       if (!res.ok) {
-        console.error("Erro no upload do backup ao drive:", await res.text());
+        const errorText = await res.text();
+        console.error("Erro no upload do backup ao drive:", errorText);
+        return { success: false, error: errorText };
       } else {
-        console.log("Backup diário enviado com sucesso ao Google Drive:", await res.json());
+        const successData = await res.json();
+        console.log("Backup enviado com sucesso ao Google Drive:", successData);
+        return { success: true, data: successData };
       }
-    } catch(err) {
+    } catch(err: any) {
       console.error("Erro na rotina de backup diário:", err);
+      return { success: false, error: err.message };
+    }
+  }
+
+  cron.schedule('0 0 * * *', async () => {
+    await performDriveBackup();
+  });
+
+  app.post("/api/backup/trigger-drive", async (req, res) => {
+    const result = await performDriveBackup();
+    if (result.success) {
+      res.json(result);
+    } else {
+      res.status(500).json(result);
     }
   });
 

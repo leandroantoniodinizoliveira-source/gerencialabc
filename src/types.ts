@@ -4,7 +4,12 @@
  */
 
 export type ActionType = 'view' | 'create' | 'edit' | 'delete';
-export type ModuleId = 'planning' | 'water_balances' | 'systems' | 'supply_sources' | 'demands' | 'dashboard' | 'users';
+export type ModuleId = 
+  | 'planning_dashboard' | 'planning_tasks' | 'planning_plans' | 'planning_areas' | 'planning_categories' | 'planning_responsibles' | 'planning_models'
+  | 'water_balances' | 'systems' | 'supply_sources' | 'demands' | 'explore' | 'analyze' | 'templates'
+  | 'reg_cadastro' | 'reg_painel' | 'reg_agenda' | 'reg_agenda_painel'
+  | 'pub_cadastro' | 'pub_painel'
+  | 'dashboard' | 'geo' | 'users' | 'backup';
 
 export interface AppPermission {
   moduleId: ModuleId;

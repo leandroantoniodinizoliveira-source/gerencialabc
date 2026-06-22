@@ -373,7 +373,7 @@ try {
 }
 
 export default function App() {
-  const { currentUser, roles, logout } = useAuth();
+  const { currentUser, roles, logout, checkPermission } = useAuth();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [notificationsMenuOpen, setNotificationsMenuOpen] = useState(false);
   const [notificationFilter, setNotificationFilter] = useState("all");
@@ -3973,214 +3973,232 @@ const renderSupplyTable = () => {
               </h4>
             )}
             <div className="space-y-1">
-              <button
-                title={isSidebarCollapsed ? "Minhas Tarefas" : undefined}
-                onClick={() => {
-                  setIsMyTasksSelected(true);
-                  setMyTasksFilterTrigger(prev => prev + 1);
-                  setActivePlanningSubTab("tasks");
-                  handleTabChange("planning");
-                }}
-                className={cn(
-                  "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
-                  activeTab === "planning" && activePlanningSubTab === "tasks" && isMyTasksSelected
-                    ? "bg-white/10 text-white shadow-sm border border-white/10"
-                    : "text-white/60 hover:text-white hover:bg-white/5",
-                )}
-              >
-                <CalendarCheck
-                  size={16}
+              {checkPermission('planning_dashboard', 'view') && (
+                <button
+                  title={isSidebarCollapsed ? "Minhas Tarefas" : undefined}
+                  onClick={() => {
+                    setIsMyTasksSelected(true);
+                    setMyTasksFilterTrigger(prev => prev + 1);
+                    setActivePlanningSubTab("tasks");
+                    handleTabChange("planning");
+                  }}
                   className={cn(
-                    "flex-shrink-0 transition-colors",
-                    activeTab === "planning" && activePlanningSubTab === "tasks" && isMyTasksSelected ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                    activeTab === "planning" && activePlanningSubTab === "tasks" && isMyTasksSelected
+                      ? "bg-white/10 text-white shadow-sm border border-white/10"
+                      : "text-white/60 hover:text-white hover:bg-white/5",
                   )}
-                />
-                {!isSidebarCollapsed && <span className="hidden md:inline">Minhas Tarefas</span>}
-              </button>
-              <button
-                title={isSidebarCollapsed ? "Cadastrar Atividades" : undefined}
-                onClick={() => {
-                  setIsMyTasksSelected(false);
-                  setActivePlanningSubTab("tasks");
-                  handleTabChange("planning");
-                }}
-                className={cn(
-                  "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
-                  activeTab === "planning" && activePlanningSubTab === "tasks" && !isMyTasksSelected
-                    ? "bg-white/10 text-white shadow-sm border border-white/10"
-                    : "text-white/60 hover:text-white hover:bg-white/5",
-                )}
-              >
-                <ListTodo
-                  size={16}
+                >
+                  <CalendarCheck
+                    size={16}
+                    className={cn(
+                      "flex-shrink-0 transition-colors",
+                      activeTab === "planning" && activePlanningSubTab === "tasks" && isMyTasksSelected ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    )}
+                  />
+                  {!isSidebarCollapsed && <span className="hidden md:inline">Minhas Tarefas</span>}
+                </button>
+              )}
+              {checkPermission('planning_tasks', 'view') && (
+                <button
+                  title={isSidebarCollapsed ? "Cadastrar Atividades" : undefined}
+                  onClick={() => {
+                    setIsMyTasksSelected(false);
+                    setActivePlanningSubTab("tasks");
+                    handleTabChange("planning");
+                  }}
                   className={cn(
-                    "flex-shrink-0 transition-colors",
-                    activeTab === "planning" && activePlanningSubTab === "tasks" && !isMyTasksSelected ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                    activeTab === "planning" && activePlanningSubTab === "tasks" && !isMyTasksSelected
+                      ? "bg-white/10 text-white shadow-sm border border-white/10"
+                      : "text-white/60 hover:text-white hover:bg-white/5",
                   )}
-                />
-                {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Atividades</span>}
-              </button>
-              <button
-                title={isSidebarCollapsed ? "Painel de Atividades" : undefined}
-                onClick={() => {
-                  setIsMyTasksSelected(false);
-                  setActivePlanningSubTab("dashboard");
-                  handleTabChange("planning");
-                }}
-                className={cn(
-                  "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
-                  activeTab === "planning" && activePlanningSubTab === "dashboard"
-                    ? "bg-white/10 text-white shadow-sm border border-white/10"
-                    : "text-white/60 hover:text-white hover:bg-white/5",
-                )}
-              >
-                <LayoutDashboard
-                  size={16}
+                >
+                  <ListTodo
+                    size={16}
+                    className={cn(
+                      "flex-shrink-0 transition-colors",
+                      activeTab === "planning" && activePlanningSubTab === "tasks" && !isMyTasksSelected ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    )}
+                  />
+                  {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Atividades</span>}
+                </button>
+              )}
+              {checkPermission('planning_dashboard', 'view') && (
+                <button
+                  title={isSidebarCollapsed ? "Painel de Atividades" : undefined}
+                  onClick={() => {
+                    setIsMyTasksSelected(false);
+                    setActivePlanningSubTab("dashboard");
+                    handleTabChange("planning");
+                  }}
                   className={cn(
-                    "flex-shrink-0 transition-colors",
-                    activeTab === "planning" && activePlanningSubTab === "dashboard" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                    activeTab === "planning" && activePlanningSubTab === "dashboard"
+                      ? "bg-white/10 text-white shadow-sm border border-white/10"
+                      : "text-white/60 hover:text-white hover:bg-white/5",
                   )}
-                />
-                {!isSidebarCollapsed && <span className="hidden md:inline">Painel de Atividades</span>}
-              </button>
-              <button
-                title={isSidebarCollapsed ? "Cadastrar Planos" : undefined}
-                onClick={() => {
-                  setIsMyTasksSelected(false);
-                  setActivePlanningSubTab("plans");
-                  handleTabChange("planning");
-                }}
-                className={cn(
-                  "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
-                  activeTab === "planning" && activePlanningSubTab === "plans"
-                    ? "bg-white/10 text-white shadow-sm border border-white/10"
-                    : "text-white/60 hover:text-white hover:bg-white/5",
-                )}
-              >
-                <MapIcon
-                  size={16}
+                >
+                  <LayoutDashboard
+                    size={16}
+                    className={cn(
+                      "flex-shrink-0 transition-colors",
+                      activeTab === "planning" && activePlanningSubTab === "dashboard" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    )}
+                  />
+                  {!isSidebarCollapsed && <span className="hidden md:inline">Painel de Atividades</span>}
+                </button>
+              )}
+              {checkPermission('planning_plans', 'view') && (
+                <button
+                  title={isSidebarCollapsed ? "Cadastrar Planos" : undefined}
+                  onClick={() => {
+                    setIsMyTasksSelected(false);
+                    setActivePlanningSubTab("plans");
+                    handleTabChange("planning");
+                  }}
                   className={cn(
-                    "flex-shrink-0 transition-colors",
-                    activeTab === "planning" && activePlanningSubTab === "plans" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                    activeTab === "planning" && activePlanningSubTab === "plans"
+                      ? "bg-white/10 text-white shadow-sm border border-white/10"
+                      : "text-white/60 hover:text-white hover:bg-white/5",
                   )}
-                />
-                {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Planos</span>}
-              </button>
-              <button
-                title={isSidebarCollapsed ? "Cadastrar Áreas Temáticas" : undefined}
-                onClick={() => {
-                  setIsMyTasksSelected(false);
-                  setActivePlanningSubTab("areas");
-                  handleTabChange("planning");
-                }}
-                className={cn(
-                  "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
-                  activeTab === "planning" && activePlanningSubTab === "areas"
-                    ? "bg-white/10 text-white shadow-sm border border-white/10"
-                    : "text-white/60 hover:text-white hover:bg-white/5",
-                )}
-              >
-                <Layers
-                  size={16}
+                >
+                  <MapIcon
+                    size={16}
+                    className={cn(
+                      "flex-shrink-0 transition-colors",
+                      activeTab === "planning" && activePlanningSubTab === "plans" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    )}
+                  />
+                  {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Planos</span>}
+                </button>
+              )}
+              {checkPermission('planning_areas', 'view') && (
+                <button
+                  title={isSidebarCollapsed ? "Cadastrar Áreas Temáticas" : undefined}
+                  onClick={() => {
+                    setIsMyTasksSelected(false);
+                    setActivePlanningSubTab("areas");
+                    handleTabChange("planning");
+                  }}
                   className={cn(
-                    "flex-shrink-0 transition-colors",
-                    activeTab === "planning" && activePlanningSubTab === "areas" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                    activeTab === "planning" && activePlanningSubTab === "areas"
+                      ? "bg-white/10 text-white shadow-sm border border-white/10"
+                      : "text-white/60 hover:text-white hover:bg-white/5",
                   )}
-                />
-                {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Áreas Temáticas</span>}
-              </button>
-              <button
-                title={isSidebarCollapsed ? "Cadastrar Categorias" : undefined}
-                onClick={() => {
-                  setIsMyTasksSelected(false);
-                  setActivePlanningSubTab("categories");
-                  handleTabChange("planning");
-                }}
-                className={cn(
-                  "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
-                  activeTab === "planning" && activePlanningSubTab === "categories"
-                    ? "bg-white/10 text-white shadow-sm border border-white/10"
-                    : "text-white/60 hover:text-white hover:bg-white/5",
-                )}
-              >
-                <Tags
-                  size={16}
+                >
+                  <Layers
+                    size={16}
+                    className={cn(
+                      "flex-shrink-0 transition-colors",
+                      activeTab === "planning" && activePlanningSubTab === "areas" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    )}
+                  />
+                  {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Áreas Temáticas</span>}
+                </button>
+              )}
+              {checkPermission('planning_categories', 'view') && (
+                <button
+                  title={isSidebarCollapsed ? "Cadastrar Categorias" : undefined}
+                  onClick={() => {
+                    setIsMyTasksSelected(false);
+                    setActivePlanningSubTab("categories");
+                    handleTabChange("planning");
+                  }}
                   className={cn(
-                    "flex-shrink-0 transition-colors",
-                    activeTab === "planning" && activePlanningSubTab === "categories" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                    activeTab === "planning" && activePlanningSubTab === "categories"
+                      ? "bg-white/10 text-white shadow-sm border border-white/10"
+                      : "text-white/60 hover:text-white hover:bg-white/5",
                   )}
-                />
-                {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Categorias</span>}
-              </button>
-              <button
-                title={isSidebarCollapsed ? "Cadastrar Responsáveis" : undefined}
-                onClick={() => {
-                  setIsMyTasksSelected(false);
-                  setActivePlanningSubTab("responsibles");
-                  handleTabChange("planning");
-                }}
-                className={cn(
-                  "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
-                  activeTab === "planning" && activePlanningSubTab === "responsibles"
-                    ? "bg-white/10 text-white shadow-sm border border-white/10"
-                    : "text-white/60 hover:text-white hover:bg-white/5",
-                )}
-              >
-                <Users
-                  size={16}
+                >
+                  <Tags
+                    size={16}
+                    className={cn(
+                      "flex-shrink-0 transition-colors",
+                      activeTab === "planning" && activePlanningSubTab === "categories" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    )}
+                  />
+                  {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Categorias</span>}
+                </button>
+              )}
+              {checkPermission('planning_responsibles', 'view') && (
+                <button
+                  title={isSidebarCollapsed ? "Cadastrar Responsáveis" : undefined}
+                  onClick={() => {
+                    setIsMyTasksSelected(false);
+                    setActivePlanningSubTab("responsibles");
+                    handleTabChange("planning");
+                  }}
                   className={cn(
-                    "flex-shrink-0 transition-colors",
-                    activeTab === "planning" && activePlanningSubTab === "responsibles" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                    activeTab === "planning" && activePlanningSubTab === "responsibles"
+                      ? "bg-white/10 text-white shadow-sm border border-white/10"
+                      : "text-white/60 hover:text-white hover:bg-white/5",
                   )}
-                />
-                {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Responsáveis</span>}
-              </button>
-              <button
-                title={isSidebarCollapsed ? "Importar Tarefas" : undefined}
-                onClick={() => {
-                  setIsMyTasksSelected(false);
-                  setActivePlanningSubTab("import");
-                  handleTabChange("planning");
-                }}
-                className={cn(
-                  "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
-                  activeTab === "planning" && activePlanningSubTab === "import"
-                    ? "bg-white/10 text-white shadow-sm border border-white/10"
-                    : "text-white/60 hover:text-white hover:bg-white/5",
-                )}
-              >
-                <Upload
-                  size={16}
+                >
+                  <Users
+                    size={16}
+                    className={cn(
+                      "flex-shrink-0 transition-colors",
+                      activeTab === "planning" && activePlanningSubTab === "responsibles" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    )}
+                  />
+                  {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Responsáveis</span>}
+                </button>
+              )}
+              {checkPermission('planning_tasks', 'view') && (
+                <button
+                  title={isSidebarCollapsed ? "Importar Tarefas" : undefined}
+                  onClick={() => {
+                    setIsMyTasksSelected(false);
+                    setActivePlanningSubTab("import");
+                    handleTabChange("planning");
+                  }}
                   className={cn(
-                    "flex-shrink-0 transition-colors",
-                    activeTab === "planning" && activePlanningSubTab === "import" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                    activeTab === "planning" && activePlanningSubTab === "import"
+                      ? "bg-white/10 text-white shadow-sm border border-white/10"
+                      : "text-white/60 hover:text-white hover:bg-white/5",
                   )}
-                />
-                {!isSidebarCollapsed && <span className="hidden md:inline">Importar Tarefas</span>}
-              </button>
-              <button
-                title={isSidebarCollapsed ? "Cadastrar Modelo de Tarefas" : undefined}
-                onClick={() => {
-                  setIsMyTasksSelected(false);
-                  setActivePlanningSubTab("models");
-                  handleTabChange("planning");
-                }}
-                className={cn(
-                  "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
-                  activeTab === "planning" && activePlanningSubTab === "models"
-                    ? "bg-white/10 text-white shadow-sm border border-white/10"
-                    : "text-white/60 hover:text-white hover:bg-white/5",
-                )}
-              >
-                <Copy
-                  size={16}
+                >
+                  <Upload
+                    size={16}
+                    className={cn(
+                      "flex-shrink-0 transition-colors",
+                      activeTab === "planning" && activePlanningSubTab === "import" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    )}
+                  />
+                  {!isSidebarCollapsed && <span className="hidden md:inline">Importar Tarefas</span>}
+                </button>
+              )}
+              {checkPermission('planning_models', 'view') && (
+                <button
+                  title={isSidebarCollapsed ? "Cadastrar Modelo de Tarefas" : undefined}
+                  onClick={() => {
+                    setIsMyTasksSelected(false);
+                    setActivePlanningSubTab("models");
+                    handleTabChange("planning");
+                  }}
                   className={cn(
-                    "flex-shrink-0 transition-colors",
-                    activeTab === "planning" && activePlanningSubTab === "models" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                    activeTab === "planning" && activePlanningSubTab === "models"
+                      ? "bg-white/10 text-white shadow-sm border border-white/10"
+                      : "text-white/60 hover:text-white hover:bg-white/5",
                   )}
-                />
-                {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Modelo de Tarefas</span>}
-              </button>
+                >
+                  <Copy
+                    size={16}
+                    className={cn(
+                      "flex-shrink-0 transition-colors",
+                      activeTab === "planning" && activePlanningSubTab === "models" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                    )}
+                  />
+                  {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Modelo de Tarefas</span>}
+                </button>
+              )}
             </div>
           </div>
 
@@ -4198,50 +4216,54 @@ const renderSupplyTable = () => {
                 </h5>
               )}
               <div className="space-y-1">
-                <button
-                  title={isSidebarCollapsed ? "Cadastrar Resoluções" : undefined}
-                  onClick={() => {
-                    setIsMyTasksSelected(false);
-                    handleTabChange("reg_cadastro");
-                  }}
-                  className={cn(
-                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
-                    activeTab === "reg_cadastro"
-                      ? "bg-white/10 text-white shadow-sm border border-white/10"
-                      : "text-white/60 hover:text-white hover:bg-white/5",
-                  )}
-                >
-                  <FileText
-                    size={16}
+                {checkPermission("reg_cadastro", "view") && (
+                  <button
+                    title={isSidebarCollapsed ? "Cadastrar Resoluções" : undefined}
+                    onClick={() => {
+                      setIsMyTasksSelected(false);
+                      handleTabChange("reg_cadastro");
+                    }}
                     className={cn(
-                      "flex-shrink-0 transition-colors",
-                      activeTab === "reg_cadastro" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                      "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                      activeTab === "reg_cadastro"
+                        ? "bg-white/10 text-white shadow-sm border border-white/10"
+                        : "text-white/60 hover:text-white hover:bg-white/5",
                     )}
-                  />
-                  {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Resoluções</span>}
-                </button>
-                <button
-                  title={isSidebarCollapsed ? "Painel de Resoluções" : undefined}
-                  onClick={() => {
-                    setIsMyTasksSelected(false);
-                    handleTabChange("reg_painel");
-                  }}
-                  className={cn(
-                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
-                    activeTab === "reg_painel"
-                      ? "bg-white/10 text-white shadow-sm border border-white/10"
-                      : "text-white/60 hover:text-white hover:bg-white/5",
-                  )}
-                >
-                  <BarChart2
-                    size={16}
+                  >
+                    <FileText
+                      size={16}
+                      className={cn(
+                        "flex-shrink-0 transition-colors",
+                        activeTab === "reg_cadastro" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                      )}
+                    />
+                    {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Resoluções</span>}
+                  </button>
+                )}
+                {checkPermission("reg_painel", "view") && (
+                  <button
+                    title={isSidebarCollapsed ? "Painel de Resoluções" : undefined}
+                    onClick={() => {
+                      setIsMyTasksSelected(false);
+                      handleTabChange("reg_painel");
+                    }}
                     className={cn(
-                      "flex-shrink-0 transition-colors",
-                      activeTab === "reg_painel" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                      "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                      activeTab === "reg_painel"
+                        ? "bg-white/10 text-white shadow-sm border border-white/10"
+                        : "text-white/60 hover:text-white hover:bg-white/5",
                     )}
-                  />
-                  {!isSidebarCollapsed && <span className="hidden md:inline">Painel de Resoluções</span>}
-                </button>
+                  >
+                    <BarChart2
+                      size={16}
+                      className={cn(
+                        "flex-shrink-0 transition-colors",
+                        activeTab === "reg_painel" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                      )}
+                    />
+                    {!isSidebarCollapsed && <span className="hidden md:inline">Painel de Resoluções</span>}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -4252,50 +4274,54 @@ const renderSupplyTable = () => {
                 </h5>
               )}
               <div className="space-y-1">
-                <button
-                  title={isSidebarCollapsed ? "Cadastrar Agenda Regulatória" : undefined}
-                  onClick={() => {
-                    setIsMyTasksSelected(false);
-                    handleTabChange("reg_agenda");
-                  }}
-                  className={cn(
-                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
-                    activeTab === "reg_agenda"
-                      ? "bg-white/10 text-white shadow-sm border border-white/10"
-                      : "text-white/60 hover:text-white hover:bg-white/5",
-                  )}
-                >
-                  <BookOpen
-                    size={16}
+                {checkPermission("reg_agenda", "view") && (
+                  <button
+                    title={isSidebarCollapsed ? "Cadastrar Agenda Regulatória" : undefined}
+                    onClick={() => {
+                      setIsMyTasksSelected(false);
+                      handleTabChange("reg_agenda");
+                    }}
                     className={cn(
-                      "flex-shrink-0 transition-colors",
-                      activeTab === "reg_agenda" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                      "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                      activeTab === "reg_agenda"
+                        ? "bg-white/10 text-white shadow-sm border border-white/10"
+                        : "text-white/60 hover:text-white hover:bg-white/5",
                     )}
-                  />
-                  {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Agenda Regulatória</span>}
-                </button>
-                <button
-                  title={isSidebarCollapsed ? "Painel da Agenda Regulatória" : undefined}
-                  onClick={() => {
-                    setIsMyTasksSelected(false);
-                    handleTabChange("reg_agenda_painel");
-                  }}
-                  className={cn(
-                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
-                    activeTab === "reg_agenda_painel"
-                      ? "bg-white/10 text-white shadow-sm border border-white/10"
-                      : "text-white/60 hover:text-white hover:bg-white/5",
-                  )}
-                >
-                  <BarChart2
-                    size={16}
+                  >
+                    <BookOpen
+                      size={16}
+                      className={cn(
+                        "flex-shrink-0 transition-colors",
+                        activeTab === "reg_agenda" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                      )}
+                    />
+                    {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Agenda Regulatória</span>}
+                  </button>
+                )}
+                {checkPermission("reg_agenda_painel", "view") && (
+                  <button
+                    title={isSidebarCollapsed ? "Painel da Agenda Regulatória" : undefined}
+                    onClick={() => {
+                      setIsMyTasksSelected(false);
+                      handleTabChange("reg_agenda_painel");
+                    }}
                     className={cn(
-                      "flex-shrink-0 transition-colors",
-                      activeTab === "reg_agenda_painel" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                      "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                      activeTab === "reg_agenda_painel"
+                        ? "bg-white/10 text-white shadow-sm border border-white/10"
+                        : "text-white/60 hover:text-white hover:bg-white/5",
                     )}
-                  />
-                  {!isSidebarCollapsed && <span className="hidden md:inline">Painel da Agenda Regulatória</span>}
-                </button>
+                  >
+                    <BarChart2
+                      size={16}
+                      className={cn(
+                        "flex-shrink-0 transition-colors",
+                        activeTab === "reg_agenda_painel" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                      )}
+                    />
+                    {!isSidebarCollapsed && <span className="hidden md:inline">Painel da Agenda Regulatória</span>}
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -4313,82 +4339,90 @@ const renderSupplyTable = () => {
                 </h5>
               )}
               <div className="space-y-1">
-                <button
-                  title={isSidebarCollapsed ? "Cadastrar Balanço" : undefined}
-                  onClick={() => handleTabChange("manage")}
-                  className={cn(
-                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
-                    activeTab === "manage"
-                      ? "bg-white/10 text-white shadow-sm border border-white/10"
-                      : "text-white/60 hover:text-white hover:bg-white/5",
-                  )}
-                >
-                  <FilePlus
-                    size={16}
+                {checkPermission("explore", "view") && (
+                  <button
+                    title={isSidebarCollapsed ? "Cadastrar Balanço" : undefined}
+                    onClick={() => handleTabChange("manage")}
                     className={cn(
-                      "flex-shrink-0 transition-colors",
-                      activeTab === "manage" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                      "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                      activeTab === "manage"
+                        ? "bg-white/10 text-white shadow-sm border border-white/10"
+                        : "text-white/60 hover:text-white hover:bg-white/5",
                     )}
-                  />
-                  {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Balanço</span>}
-                </button>
-                <button
-                  title={isSidebarCollapsed ? "Painel do Balanço Hídrico" : undefined}
-                  onClick={() => handleTabChange("analyze")}
-                  className={cn(
-                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
-                    activeTab === "analyze"
-                      ? "bg-white/10 text-white shadow-sm border border-white/10"
-                      : "text-white/60 hover:text-white hover:bg-white/5",
-                  )}
-                >
-                  <BarChart2
-                    size={16}
+                  >
+                    <FilePlus
+                      size={16}
+                      className={cn(
+                        "flex-shrink-0 transition-colors",
+                        activeTab === "manage" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                      )}
+                    />
+                    {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Balanço</span>}
+                  </button>
+                )}
+                {checkPermission("analyze", "view") && (
+                  <button
+                    title={isSidebarCollapsed ? "Painel do Balanço Hídrico" : undefined}
+                    onClick={() => handleTabChange("analyze")}
                     className={cn(
-                      "flex-shrink-0 transition-colors",
-                      activeTab === "analyze" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                      "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                      activeTab === "analyze"
+                        ? "bg-white/10 text-white shadow-sm border border-white/10"
+                        : "text-white/60 hover:text-white hover:bg-white/5",
                     )}
-                  />
-                  {!isSidebarCollapsed && <span className="hidden md:inline">Painel do Balanço Hídrico</span>}
-                </button>
-                <button
-                  title={isSidebarCollapsed ? "Comparar Balanços" : undefined}
-                  onClick={() => handleTabChange("compare")}
-                  className={cn(
-                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
-                    activeTab === "compare"
-                      ? "bg-white/10 text-white shadow-sm border border-white/10"
-                      : "text-white/60 hover:text-white hover:bg-white/5",
-                  )}
-                >
-                  <GitCompare
-                    size={16}
+                  >
+                    <BarChart2
+                      size={16}
+                      className={cn(
+                        "flex-shrink-0 transition-colors",
+                        activeTab === "analyze" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                      )}
+                    />
+                    {!isSidebarCollapsed && <span className="hidden md:inline">Painel do Balanço Hídrico</span>}
+                  </button>
+                )}
+                {checkPermission("analyze", "view") && (
+                  <button
+                    title={isSidebarCollapsed ? "Comparar Balanços" : undefined}
+                    onClick={() => handleTabChange("compare")}
                     className={cn(
-                      "flex-shrink-0 transition-colors",
-                      activeTab === "compare" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                      "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                      activeTab === "compare"
+                        ? "bg-white/10 text-white shadow-sm border border-white/10"
+                        : "text-white/60 hover:text-white hover:bg-white/5",
                     )}
-                  />
-                  {!isSidebarCollapsed && <span className="hidden md:inline">Comparar Balanços</span>}
-                </button>
-                <button
-                  title={isSidebarCollapsed ? "Arquivos de Modelo" : undefined}
-                  onClick={() => handleTabChange("templates")}
-                  className={cn(
-                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
-                    activeTab === "templates"
-                      ? "bg-white/10 text-white shadow-sm border border-white/10"
-                      : "text-white/60 hover:text-white hover:bg-white/5",
-                  )}
-                >
-                  <FileText
-                    size={16}
+                  >
+                    <GitCompare
+                      size={16}
+                      className={cn(
+                        "flex-shrink-0 transition-colors",
+                        activeTab === "compare" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                      )}
+                    />
+                    {!isSidebarCollapsed && <span className="hidden md:inline">Comparar Balanços</span>}
+                  </button>
+                )}
+                {checkPermission("templates", "view") && (
+                  <button
+                    title={isSidebarCollapsed ? "Arquivos de Modelo" : undefined}
+                    onClick={() => handleTabChange("templates")}
                     className={cn(
-                      "flex-shrink-0 transition-colors",
-                      activeTab === "templates" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                      "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                      activeTab === "templates"
+                        ? "bg-white/10 text-white shadow-sm border border-white/10"
+                        : "text-white/60 hover:text-white hover:bg-white/5",
                     )}
-                  />
-                  {!isSidebarCollapsed && <span className="hidden md:inline">Arquivos de Modelo</span>}
-                </button>
+                  >
+                    <FileText
+                      size={16}
+                      className={cn(
+                        "flex-shrink-0 transition-colors",
+                        activeTab === "templates" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                      )}
+                    />
+                    {!isSidebarCollapsed && <span className="hidden md:inline">Arquivos de Modelo</span>}
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -4401,50 +4435,54 @@ const renderSupplyTable = () => {
             )}
             <div className={cn(isSidebarCollapsed ? "" : "pl-3 border-l border-white/10 ml-3", "space-y-2 mt-2 mb-3")}>
               <div className="space-y-1">
-                <button
-                  title={isSidebarCollapsed ? "Cadastrar Publicações" : undefined}
-                  onClick={() => {
-                    setIsMyTasksSelected(false);
-                    handleTabChange("pub_cadastro");
-                  }}
-                  className={cn(
-                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
-                    activeTab === "pub_cadastro"
-                      ? "bg-white/10 text-white shadow-sm border border-white/10"
-                      : "text-white/60 hover:text-white hover:bg-white/5",
-                  )}
-                >
-                  <FileText
-                    size={16}
+                {checkPermission("pub_cadastro", "view") && (
+                  <button
+                    title={isSidebarCollapsed ? "Cadastrar Publicações" : undefined}
+                    onClick={() => {
+                      setIsMyTasksSelected(false);
+                      handleTabChange("pub_cadastro");
+                    }}
                     className={cn(
-                      "flex-shrink-0 transition-colors",
-                      activeTab === "pub_cadastro" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                      "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                      activeTab === "pub_cadastro"
+                        ? "bg-white/10 text-white shadow-sm border border-white/10"
+                        : "text-white/60 hover:text-white hover:bg-white/5",
                     )}
-                  />
-                  {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Publicações</span>}
-                </button>
-                <button
-                  title={isSidebarCollapsed ? "Painel de Publicações" : undefined}
-                  onClick={() => {
-                    setIsMyTasksSelected(false);
-                    handleTabChange("pub_painel");
-                  }}
-                  className={cn(
-                    "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
-                    activeTab === "pub_painel"
-                      ? "bg-white/10 text-white shadow-sm border border-white/10"
-                      : "text-white/60 hover:text-white hover:bg-white/5",
-                  )}
-                >
-                  <BarChart2
-                    size={16}
+                  >
+                    <FileText
+                      size={16}
+                      className={cn(
+                        "flex-shrink-0 transition-colors",
+                        activeTab === "pub_cadastro" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                      )}
+                    />
+                    {!isSidebarCollapsed && <span className="hidden md:inline">Cadastrar Publicações</span>}
+                  </button>
+                )}
+                {checkPermission("pub_painel", "view") && (
+                  <button
+                    title={isSidebarCollapsed ? "Painel de Publicações" : undefined}
+                    onClick={() => {
+                      setIsMyTasksSelected(false);
+                      handleTabChange("pub_painel");
+                    }}
                     className={cn(
-                      "flex-shrink-0 transition-colors",
-                      activeTab === "pub_painel" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                      "w-full text-left justify-start px-4 py-2.5 rounded-xl flex items-center gap-3 transition-all duration-200 group text-xs font-semibold",
+                      activeTab === "pub_painel"
+                        ? "bg-white/10 text-white shadow-sm border border-white/10"
+                        : "text-white/60 hover:text-white hover:bg-white/5",
                     )}
-                  />
-                  {!isSidebarCollapsed && <span className="hidden md:inline">Painel de Publicações</span>}
-                </button>
+                  >
+                    <BarChart2
+                      size={16}
+                      className={cn(
+                        "flex-shrink-0 transition-colors",
+                        activeTab === "pub_painel" ? "text-adasa-light" : "text-white/40 group-hover:text-white/60",
+                      )}
+                    />
+                    {!isSidebarCollapsed && <span className="hidden md:inline">Painel de Publicações</span>}
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -4816,6 +4854,7 @@ const renderSupplyTable = () => {
               />
             </motion.div>
           ) : activeTab === "analyze" ? (
+            <RequirePermission moduleId="analyze" action="view" fallback={<div className="p-8 text-center text-white/50">Acesso negado.</div>}>
             <WaterBalanceModule>
               <motion.div
                 key="analyze"
@@ -6295,7 +6334,9 @@ const renderSupplyTable = () => {
               )}
             </motion.div>
             </WaterBalanceModule>
+            </RequirePermission>
           ) : activeTab === "compare" ? (
+            <RequirePermission moduleId="analyze" action="view" fallback={<div className="p-8 text-center text-white/50">Acesso negado.</div>}>
             <WaterBalanceModule>
               <motion.div
                 key="compare"
@@ -6631,7 +6672,9 @@ const renderSupplyTable = () => {
               </div>
             </motion.div>
             </WaterBalanceModule>
+            </RequirePermission>
           ) : activeTab === "manage" ? (
+            <RequirePermission moduleId="explore" action="view" fallback={<div className="p-8 text-center text-white/50">Acesso negado.</div>}>
             <WaterBalanceModule>
               <motion.div
                 key="manage"
@@ -7887,7 +7930,9 @@ const renderSupplyTable = () => {
               </div>
             </motion.div>
             </WaterBalanceModule>
+            </RequirePermission>
           ) : activeTab === "templates" ? (
+            <RequirePermission moduleId="templates" action="view" fallback={<div className="p-8 text-center text-white/50">Acesso negado.</div>}>
             <WaterBalanceModule>
               <motion.div
                 key="templates"
@@ -8092,6 +8137,7 @@ const renderSupplyTable = () => {
               </div>
             </motion.div>
             </WaterBalanceModule>
+            </RequirePermission>
           ) : activeTab === "users" ? (
             <motion.div
               key="users"
@@ -8142,6 +8188,7 @@ const renderSupplyTable = () => {
               />
             </motion.div>
           ) : activeTab === "reg_cadastro" ? (
+            <RequirePermission moduleId="reg_cadastro" action="view" fallback={<div className="p-8 text-center text-white/50">Acesso negado.</div>}>
             <motion.div
               key="reg_cadastro"
               initial={{ opacity: 0, scale: 0.98 }}
@@ -8152,7 +8199,9 @@ const renderSupplyTable = () => {
             >
               <ResolutionsModule view="cadastro" showToast={showToast} currentUser={currentUser} />
             </motion.div>
+            </RequirePermission>
           ) : activeTab === "reg_painel" ? (
+            <RequirePermission moduleId="reg_painel" action="view" fallback={<div className="p-8 text-center text-white/50">Acesso negado.</div>}>
             <motion.div
               key="reg_painel"
               initial={{ opacity: 0, scale: 0.98 }}
@@ -8163,7 +8212,9 @@ const renderSupplyTable = () => {
             >
               <ResolutionsModule view="painel" showToast={showToast} />
             </motion.div>
+            </RequirePermission>
           ) : activeTab === "reg_agenda" ? (
+            <RequirePermission moduleId="reg_agenda" action="view" fallback={<div className="p-8 text-center text-white/50">Acesso negado.</div>}>
             <motion.div
               key="reg_agenda"
               initial={{ opacity: 0, scale: 0.98 }}
@@ -8174,7 +8225,9 @@ const renderSupplyTable = () => {
             >
               <RegulatoryAgendaModule view="agenda" showToast={showToast} currentUser={currentUser} />
             </motion.div>
+            </RequirePermission>
           ) : activeTab === "reg_agenda_painel" ? (
+            <RequirePermission moduleId="reg_agenda_painel" action="view" fallback={<div className="p-8 text-center text-white/50">Acesso negado.</div>}>
             <motion.div
               key="reg_agenda_painel"
               initial={{ opacity: 0, scale: 0.98 }}
@@ -8185,7 +8238,9 @@ const renderSupplyTable = () => {
             >
               <RegulatoryAgendaModule view="painel" showToast={showToast} />
             </motion.div>
+            </RequirePermission>
           ) : activeTab === "pub_cadastro" ? (
+            <RequirePermission moduleId="pub_cadastro" action="view" fallback={<div className="p-8 text-center text-white/50">Acesso negado.</div>}>
             <motion.div
               key="pub_cadastro"
               initial={{ opacity: 0, scale: 0.98 }}
@@ -8196,7 +8251,9 @@ const renderSupplyTable = () => {
             >
               <PublicationsModule view="cadastro" showToast={showToast} currentUser={currentUser} />
             </motion.div>
+            </RequirePermission>
           ) : activeTab === "pub_painel" ? (
+            <RequirePermission moduleId="pub_painel" action="view" fallback={<div className="p-8 text-center text-white/50">Acesso negado.</div>}>
             <motion.div
               key="pub_painel"
               initial={{ opacity: 0, scale: 0.98 }}
@@ -8207,6 +8264,7 @@ const renderSupplyTable = () => {
             >
               <PublicationsModule view="painel" showToast={showToast} />
             </motion.div>
+            </RequirePermission>
           ) : activeTab === "gerencial" ? (
             <motion.div
               key="gerencial"

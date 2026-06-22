@@ -9,6 +9,7 @@ import {
   Globe
 } from "lucide-react";
 import { motion } from "motion/react";
+import { RequirePermission } from "../lib/auth";
 
 interface ManagerialHubProps {
   onOpenPlanning: () => void;
@@ -87,6 +88,7 @@ export function ManagerialHub({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Painel de Atividades Card - PRIVATE */}
           {!showOnlyPublic && (
+            <RequirePermission moduleId="planning" action="view">
             <motion.div 
               whileHover={{ y: -2 }}
               onClick={onOpenPlanning}
@@ -105,9 +107,11 @@ export function ManagerialHub({
                 Abrir Painel de Atividades <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
               </div>
             </motion.div>
+            </RequirePermission>
           )}
 
           {/* Painel de Resoluções Card - PUBLIC */}
+          <RequirePermission moduleId="reg_painel" action="view">
           <motion.div 
             whileHover={{ y: -2 }}
             onClick={onOpenResolutions}
@@ -126,8 +130,10 @@ export function ManagerialHub({
               Abrir Painel de Resoluções <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
             </div>
           </motion.div>
+          </RequirePermission>
 
           {/* Painel da Agenda Regulatória Card - PUBLIC */}
+          <RequirePermission moduleId="reg_agenda_painel" action="view">
           <motion.div 
             whileHover={{ y: -2 }}
             onClick={onOpenRegulatoryAgenda}
@@ -146,9 +152,11 @@ export function ManagerialHub({
               Abrir Painel da Agenda <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
             </div>
           </motion.div>
+          </RequirePermission>
 
           {/* Painel do Balanço Hídrico Card - PRIVATE */}
           {!showOnlyPublic && (
+            <RequirePermission moduleId="analyze" action="view">
             <motion.div 
               whileHover={{ y: -2 }}
               onClick={onOpenWaterBalance}
@@ -167,9 +175,11 @@ export function ManagerialHub({
                 Abrir Painel do Balanço Hídrico <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
               </div>
             </motion.div>
+            </RequirePermission>
           )}
 
           {/* Painel de Publicações Card - PUBLIC */}
+          <RequirePermission moduleId="pub_painel" action="view">
           <motion.div 
             whileHover={{ y: -2 }}
             onClick={onOpenPublications}
@@ -188,6 +198,7 @@ export function ManagerialHub({
               Abrir Painel de Publicações <ArrowRight size={14} className="transform group-hover:translate-x-1 transition-transform" />
             </div>
           </motion.div>
+          </RequirePermission>
         </div>
       </section>
     </div>

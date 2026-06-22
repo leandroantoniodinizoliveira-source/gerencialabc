@@ -13,7 +13,64 @@ export function UserManagementTab() {
   const canCreate = checkPermission("users", "create");
   const canDelete = checkPermission("users", "delete");
 
-  const availableModules: ModuleId[] = ['planning', 'water_balances', 'systems', 'supply_sources', 'demands', 'dashboard', 'users'];
+  const moduleCategories: { category: string, modules: ModuleId[] }[] = [
+    {
+      category: 'Planejamento Estratégico',
+      modules: ['planning_dashboard', 'planning_tasks', 'planning_plans', 'planning_areas', 'planning_categories', 'planning_responsibles', 'planning_models']
+    },
+    {
+      category: 'Balanço Hídrico',
+      modules: ['water_balances', 'systems', 'supply_sources', 'demands', 'explore', 'analyze', 'templates']
+    },
+    {
+      category: 'Resoluções',
+      modules: ['reg_cadastro', 'reg_painel']
+    },
+    {
+      category: 'Agenda Regulatória',
+      modules: ['reg_agenda', 'reg_agenda_painel']
+    },
+    {
+      category: 'Publicações',
+      modules: ['pub_cadastro', 'pub_painel']
+    },
+    {
+      category: 'Gerencial & Mapas',
+      modules: ['dashboard', 'geo']
+    },
+    {
+      category: 'Configurações',
+      modules: ['users', 'backup']
+    }
+  ];
+
+  const moduleNames: Record<ModuleId, string> = {
+    planning_dashboard: 'Painel de Atividades (Gerencial)',
+    planning_tasks: 'Cadastrar Atividades',
+    planning_plans: 'Cadastrar Planos',
+    planning_areas: 'Cadastrar Áreas Temáticas',
+    planning_categories: 'Cadastrar Categorias',
+    planning_responsibles: 'Cadastrar Responsáveis',
+    planning_models: 'Cadastrar Modelo de Tarefas',
+    water_balances: 'Balanço Hídrico (Raiz)',
+    systems: 'Configurar Sistemas',
+    supply_sources: 'Configurar Fontes de Suprimento',
+    demands: 'Configurar Demandas',
+    explore: 'Cadastrar Balanço Hídrico',
+    analyze: 'Painel do Balanço Hídrico e Comparações',
+    templates: 'Arquivos de Modelo do Balanço',
+    reg_cadastro: 'Cadastrar Resoluções',
+    reg_painel: 'Painel de Resoluções',
+    reg_agenda: 'Cadastrar Agenda Regulatória',
+    reg_agenda_painel: 'Painel da Agenda Regulatória',
+    pub_cadastro: 'Cadastrar Publicações',
+    pub_painel: 'Painel de Publicações',
+    dashboard: 'Painel Geral Gerencial (Hub)',
+    geo: 'Mapa Interativo Avançado',
+    users: 'Gestão de Usuários e Permissões',
+    backup: 'Rotinas de Backup'
+  };
+
   const allActions: ActionType[] = ['view', 'create', 'edit', 'delete'];
 
   const handleSaveUser = () => {
@@ -205,27 +262,37 @@ export function UserManagementTab() {
                          </tr>
                        </thead>
                        <tbody className="divide-y divide-slate-100">
-                         {availableModules.map(mod => {
-                           const perms = isEditingRole.permissions?.find(p => p.moduleId === mod)?.actions || [];
-                           return (
-                             <tr key={mod} className="hover:bg-slate-50">
-                               <td className="px-4 py-3 font-medium text-slate-700 capitalize">
-                                 {mod.replace('_', ' ')}
+                         {moduleCategories.map(category => (
+                           <React.Fragment key={category.category}>
+                             <tr className="bg-slate-100">
+                               <td colSpan={5} className="px-4 py-2 font-black text-slate-600 text-[10px] uppercase tracking-wider">
+                                 {category.category}
                                </td>
-                               {allActions.map(action => (
-                                 <td key={action} className="px-4 py-2 text-center">
-                                   <button 
-                                     onClick={() => togglePermission(mod, action)}
-                                     disabled={isEditingRole.id === 'admin'}
-                                     className={`w-5 h-5 rounded flex items-center justify-center mx-auto transition-colors ${perms.includes(action) || isEditingRole.id === 'admin' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-transparent hover:bg-slate-200 border border-slate-200'}`}
-                                   >
-                                     <Check size={12} strokeWidth={4} />
-                                   </button>
-                                 </td>
-                               ))}
                              </tr>
-                           )
-                         })}
+                             {category.modules.map(mod => {
+                               const perms = isEditingRole.permissions?.find(p => p.moduleId === mod)?.actions || [];
+                               return (
+                                 <tr key={mod} className="hover:bg-slate-50">
+                                   <td className="px-4 py-3 font-medium text-slate-700 relative text-xs pl-8">
+                                     {moduleNames[mod] || mod}
+                                   </td>
+                                   {allActions.map(action => (
+                                     <td key={action} className="px-4 py-2 text-center">
+                                       <button 
+                                         onClick={() => togglePermission(mod, action)}
+                                         disabled={isEditingRole.id === 'admin'}
+                                         title={`${action === 'view' ? 'Visualizar' : action === 'create' ? 'Criar' : action === 'edit' ? 'Alterar' : 'Excluir'} ${moduleNames[mod]}`}
+                                         className={`w-5 h-5 rounded flex items-center justify-center mx-auto transition-colors ${perms.includes(action) || isEditingRole.id === 'admin' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-transparent hover:bg-slate-200 border border-slate-200'}`}
+                                       >
+                                         <Check size={12} strokeWidth={4} />
+                                       </button>
+                                     </td>
+                                   ))}
+                                 </tr>
+                               )
+                             })}
+                           </React.Fragment>
+                         ))}
                        </tbody>
                      </table>
                    </div>

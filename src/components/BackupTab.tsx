@@ -34,6 +34,10 @@ export function BackupTab({ showToast }: { showToast: any }) {
         showToast("Sucesso", "Autenticado com sucesso no Google Drive!", "success");
       }
     } catch (err: any) {
+      if (err.code === 'auth/popup-closed-by-user' || err.code === 'auth/cancelled-popup-request') {
+         console.warn("Autenticação com Google cancelada pelo usuário.");
+         return;
+      }
       console.error(err);
       showToast("Erro", "Falha na autenticação do Google Drive.", "error");
     }
@@ -138,6 +142,28 @@ export function BackupTab({ showToast }: { showToast: any }) {
     }
   };
 
+  const [isTriggeringDrive, setIsTriggeringDrive] = useState(false);
+
+  const handleTriggerDriveBackup = async () => {
+    setIsTriggeringDrive(true);
+    try {
+      const res = await fetch("/api/backup/trigger-drive", {
+        method: "POST"
+      });
+      const data = await res.json();
+      if (res.ok) {
+        showToast("Sucesso", "Backup enviado com sucesso para o Drive!", "success");
+      } else {
+        throw new Error(data.error || "Erro ao realizar o backup no Drive.");
+      }
+    } catch (err: any) {
+      console.error(err);
+      showToast("Erro", `Falha no backup para o Drive: ${err.message}`, "error");
+    } finally {
+      setIsTriggeringDrive(false);
+    }
+  };
+
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
       <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
@@ -188,7 +214,7 @@ export function BackupTab({ showToast }: { showToast: any }) {
                 onClick={handleGoogleLogin}
                 className="gsi-material-button w-full px-6 py-3 border border-slate-300 rounded-xl font-bold text-slate-700 flex items-center justify-center gap-3 hover:bg-slate-50 transition-all"
              >
-                <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" xmlns:xlink="http://www.w3.org/1999/xlink" style={{display: 'block', width: '20px', height: '20px'}}>
+                <svg version="1.1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" xmlnsXlink="http://www.w3.org/1999/xlink" style={{display: 'block', width: '20px', height: '20px'}}>
                   <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"></path>
                   <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"></path>
                   <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"></path>
@@ -224,6 +250,15 @@ export function BackupTab({ showToast }: { showToast: any }) {
             className="flex items-center justify-center w-full gap-2 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold transition-all disabled:opacity-50"
           >
             {isSavingDrive ? "Salvando..." : "Habilitar Backup Automático"}
+          </button>
+          
+          <button
+            onClick={handleTriggerDriveBackup}
+            disabled={isTriggeringDrive || !driveToken}
+            className="flex items-center justify-center w-full gap-2 px-6 py-3 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-xl font-bold transition-all disabled:opacity-50 mt-2"
+          >
+            <UploadCloud size={18} />
+            {isTriggeringDrive ? "Enviando Backup..." : "Testar Envio para o Drive Agora"}
           </button>
         </div>
       </div>
