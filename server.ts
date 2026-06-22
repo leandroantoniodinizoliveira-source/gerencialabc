@@ -4,6 +4,7 @@ import path from "path";
 import fs from "fs";
 import { Pool } from "pg";
 import { parse } from "csv-parse/sync";
+import cron from "node-cron";
 
 export const app = express();
 let dbPool: Pool | null = null;
@@ -909,6 +910,139 @@ export async function startServer(isVercel = false) {
     } catch (error) {
       console.error(error);
       res.status(500).json({ error: "Failed to load geojson" });
+    }
+  });
+
+  // Backup Endpoints and Cron Job setup
+  let driveBackupConfig = { folderId: "", accessToken: "" };
+
+  app.post("/api/backup/setup-drive", (req, res) => {
+    const { folderId, accessToken } = req.body;
+    driveBackupConfig.folderId = folderId;
+    driveBackupConfig.accessToken = accessToken;
+    res.json({ success: true, message: "Configuração do Google Drive atualizada para o backup diário." });
+  });
+
+  app.get("/api/backup/export", async (req, res) => {
+    try {
+      const pool = getDbPool();
+      const client = await pool.connect();
+      try {
+        const tablesRes = await client.query(`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'`);
+        const backup: any = { timestamp: new Date().toISOString(), tables: {} };
+        for (const row of tablesRes.rows) {
+          const table = row.table_name;
+          const dataRes = await client.query(`SELECT * FROM ${table}`);
+          backup.tables[table] = dataRes.rows;
+        }
+        res.json({ success: true, backup });
+      } finally {
+        client.release();
+      }
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  app.post("/api/backup/import", async (req, res) => {
+    try {
+      const { backup } = req.body;
+      if (!backup || !backup.tables) {
+        return res.status(400).json({ error: "Formato de backup inválido" });
+      }
+      const pool = getDbPool();
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        await client.query("SET session_replica_role = 'replica'");
+        
+        const tables = Object.keys(backup.tables);
+        for (const table of tables) {
+          await client.query(`TRUNCATE TABLE ${table} CASCADE`);
+        }
+        
+        for (const table of tables) {
+          const rows = backup.tables[table];
+          if (rows.length === 0) continue;
+          
+          const cols = Object.keys(rows[0]);
+          for (const row of rows) {
+            const vals = cols.map(c => row[c]);
+            const placeholders = cols.map((_, i) => `$${i + 1}`).join(",");
+            await client.query(`INSERT INTO ${table} (${cols.join(',')}) VALUES (${placeholders})`, vals);
+          }
+        }
+        
+        await client.query("SET session_replica_role = 'origin'");
+        await client.query("COMMIT");
+        res.json({ success: true, message: "Backup restaurado com sucesso!" });
+      } catch (error: any) {
+        await client.query("ROLLBACK");
+        await client.query("SET session_replica_role = 'origin'");
+        throw error;
+      } finally {
+        client.release();
+      }
+    } catch (error: any) {
+      res.status(500).json({ success: false, error: error.message });
+    }
+  });
+
+  cron.schedule('0 0 * * *', async () => {
+    console.log("Iniciando rotina de backup diário às 00:00 para o Google Drive...");
+    if (!driveBackupConfig.folderId || !driveBackupConfig.accessToken) {
+      console.error("Backup cancelado: Configuração do Google Drive não definida ou token expirado.");
+      return;
+    }
+    try {
+      const pool = getDbPool();
+      const client = await pool.connect();
+      let backup: any = { timestamp: new Date().toISOString(), tables: {} };
+      try {
+        const tablesRes = await client.query(`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public' AND table_type = 'BASE TABLE'`);
+        for (const row of tablesRes.rows) {
+          const table = row.table_name;
+          const dataRes = await client.query(`SELECT * FROM ${table}`);
+          backup.tables[table] = dataRes.rows;
+        }
+      } finally {
+        client.release();
+      }
+      
+      const fileContent = JSON.stringify(backup, null, 2);
+      const fileName = `backup_adasa_${new Date().toISOString().split('T')[0]}.json`;
+      
+      const metadata = {
+        name: fileName,
+        parents: [driveBackupConfig.folderId],
+      };
+      
+      const boundary = 'foo_bar_baz';
+      let body = `--${boundary}\r\n`;
+      body += 'Content-Type: application/json; charset=UTF-8\r\n\r\n';
+      body += JSON.stringify(metadata) + '\r\n';
+      body += `--${boundary}\r\n`;
+      body += 'Content-Type: application/json\r\n\r\n';
+      body += fileContent + '\r\n';
+      body += `--${boundary}--`;
+
+      const res = await fetch("https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart", {
+        method: "POST",
+        headers: {
+           Authorization: `Bearer ${driveBackupConfig.accessToken}`,
+           "Content-Type": `multipart/related; boundary=${boundary}`,
+           "Content-Length": Buffer.byteLength(body, 'utf8').toString()
+        },
+        body: body
+      });
+      
+      if (!res.ok) {
+        console.error("Erro no upload do backup ao drive:", await res.text());
+      } else {
+        console.log("Backup diário enviado com sucesso ao Google Drive:", await res.json());
+      }
+    } catch(err) {
+      console.error("Erro na rotina de backup diário:", err);
     }
   });
 
